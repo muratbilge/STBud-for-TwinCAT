@@ -1,0 +1,46 @@
+## Build results
+bin/
+obj/
+publish/
+
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.cache
+
+## .NET
+*.dll
+*.pdb
+*.exe
+*.nupkg
+
+## NuGet
+**/project.nuget.cache
+**/project.assets.json
+**/*.nuget.dgspec.json
+**/*.nuget.g.props
+**/*.nuget.g.targets
+
+## Debug/temp
+debug_lexer/
+debug.cs
+HKLM/
+
+## IDE
+.idea/
+.vscode/
+*.swp
+*~
+
+## OS
+Thumbs.db
+.DS_Store
+
+## VSIX build artifacts
+*.vsix
+.vsix-temp/
+.vsix/
+
+## Logs
+*.log

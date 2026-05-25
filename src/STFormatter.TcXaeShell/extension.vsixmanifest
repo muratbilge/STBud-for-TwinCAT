@@ -1,0 +1,23 @@
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
+  <Metadata>
+    <Identity Id="TwinCAT.STFormatter.TcXaeShell.c5d6e7f8-a9b0-4c1d-8e2f-3a4b5c6d7e8f" Version="1.0.0" Language="en-US" Publisher="TwinCAT ST Formatter" />
+    <DisplayName>TwinCAT ST Formatter (TcXaeShell)</DisplayName>
+    <Description xml:space="preserve">A code formatter for TwinCAT Structured Text (ST) for the TwinCAT XAE Shell.</Description>
+    <Icon>Resources\PackageIcon.png</Icon>
+    <PreviewImage>Resources\PreviewImage.png</PreviewImage>
+  </Metadata>
+  <Installation>
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[15.0,16.0)" />
+    <InstallationTarget Id="Microsoft.VisualStudio.IntegratedShell" Version="[15.0,16.0)" />
+  </Installation>
+  <Prerequisites>
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[15.0,16.0)" DisplayName="Visual Studio core editor" />
+  </Prerequisites>
+  <Dependencies>
+    <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" Version="[4.5,)" />
+  </Dependencies>
+  <Assets>
+    <Asset Type="Microsoft.VisualStudio.VsPackage" Path="|%CurrentProject%;PkgdefProjectOutputGroup|" />
+    <Asset Type="Microsoft.VisualStudio.MefComponent" Path="STFormatter.TcXaeShell.dll" />
+  </Assets>
+</PackageManifest>

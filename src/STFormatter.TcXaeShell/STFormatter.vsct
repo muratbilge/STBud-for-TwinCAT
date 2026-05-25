@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <Extern href="stdidcmd.h"/>
+  <Extern href="vsshlids.h"/>
+
+  <Commands package="guidSTFormatterPackage">
+    <Groups>
+      <!-- Edit menu group -->
+      <Group guid="guidSTFormatterCmdSet" id="EditMenuGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_EDIT"/>
+      </Group>
+      <!-- Standard VS code window context menu group -->
+      <Group guid="guidSTFormatterCmdSet" id="ContextMenuGroup" priority="0x0100">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_CODEWIN"/>
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <!-- Canonical button definitions - placed in multiple menus via CommandPlacements -->
+      <Button guid="guidSTFormatterCmdSet" id="cmdidFormatDocument" priority="0x0100" type="Button">
+        <Parent guid="guidSTFormatterCmdSet" id="ContextMenuGroup"/>
+        <Strings>
+          <ButtonText>Format ST &amp;Document</ButtonText>
+          <CommandName>Format ST Document</CommandName>
+        </Strings>
+      </Button>
+
+      <Button guid="guidSTFormatterCmdSet" id="cmdidFormatSelection" priority="0x0101" type="Button">
+        <Parent guid="guidSTFormatterCmdSet" id="ContextMenuGroup"/>
+        <Strings>
+          <ButtonText>Format ST &amp;Selection</ButtonText>
+          <CommandName>Format ST Selection</CommandName>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <!-- Place commands in multiple menus using CommandPlacement -->
+  <CommandPlacements>
+    <!-- Format group in Edit menu -->
+    <CommandPlacement guid="guidSTFormatterCmdSet" id="EditMenuGroup" priority="0x0600">
+      <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_EDIT"/>
+    </CommandPlacement>
+
+    <!-- Context menu group in code window context menu -->
+    <CommandPlacement guid="guidSTFormatterCmdSet" id="ContextMenuGroup" priority="0x0100">
+      <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_CODEWIN"/>
+    </CommandPlacement>
+
+    <!-- Also place buttons in Edit menu group -->
+    <CommandPlacement guid="guidSTFormatterCmdSet" id="cmdidFormatDocument" priority="0x0100">
+      <Parent guid="guidSTFormatterCmdSet" id="EditMenuGroup"/>
+    </CommandPlacement>
+
+    <CommandPlacement guid="guidSTFormatterCmdSet" id="cmdidFormatSelection" priority="0x0101">
+      <Parent guid="guidSTFormatterCmdSet" id="EditMenuGroup"/>
+    </CommandPlacement>
+  </CommandPlacements>
+
+  <KeyBindings>
+    <KeyBinding guid="guidSTFormatterCmdSet" id="cmdidFormatDocument" editor="guidVSStd97" key1="K" key2="D" mod1="Control" />
+    <KeyBinding guid="guidSTFormatterCmdSet" id="cmdidFormatSelection" editor="guidVSStd97" key1="K" key2="F" mod1="Control" />
+  </KeyBindings>
+
+  <Symbols>
+    <GuidSymbol name="guidSTFormatterPackage" value="{b1c2d3e4-f5a6-7890-abcd-ef1234567890}" />
+    <GuidSymbol name="guidSTFormatterCmdSet" value="{c2d3e4f5-a6b7-8901-cdef-234567890abc}">
+      <IDSymbol name="EditMenuGroup" value="0x1020" />
+      <IDSymbol name="ContextMenuGroup" value="0x1030" />
+      <IDSymbol name="cmdidFormatDocument" value="0x0100" />
+      <IDSymbol name="cmdidFormatSelection" value="0x0101" />
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>

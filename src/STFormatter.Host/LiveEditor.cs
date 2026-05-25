@@ -1,0 +1,827 @@
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using EnvDTE;
+using Microsoft.VisualStudio.Shell.Interop;
+using STFormatter.Core.Formatting;
+
+namespace STFormatter.Host;
+
+internal static class LiveEditor
+{
+    // COM IServiceProvider for QueryService (different from System.IServiceProvider)
+    [ComImport]
+    [Guid("6D5140C1-7436-11CE-8034-00AA006009FA")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IComServiceProvider
+    {
+        [PreserveSig]
+        int QueryService(ref Guid guidService, ref Guid riid, out IntPtr ppvObject);
+    }
+
+    private static readonly Guid SID_SVsFileChangeEx = new Guid("9BC72973-194A-4EA8-B4D5-AFB0B0D0DCB1");
+    private static readonly Guid IID_IVsFileChangeEx = new Guid("9BC72973-194A-4EA8-B4D5-AFB0B0D0DCB1");
+    private static readonly Guid SID_SVsRunningDocumentTable = new Guid("7D9C954B-1398-4706-B9C1-3E4E36E7C9DA");
+    private static readonly Guid IID_IVsRunningDocumentTable = new Guid("A928AA21-EA77-47AC-8A07-355206C94BDD");
+
+    // Get COM IServiceProvider from DTE object via QueryInterface
+    private static IComServiceProvider? GetComServiceProvider(EnvDTE.DTE dte)
+    {
+        try
+        {
+            // Try direct cast first (works on STA thread when DTE is local)
+            var sp = dte as IComServiceProvider;
+            if (sp != null)
+            {
+                Log("GetComServiceProvider: Direct cast succeeded");
+                return sp;
+            }
+
+            // Try QueryInterface for IServiceProvider (COM IID)
+            Guid ispGuid = new Guid("6D5140C1-7436-11CE-8034-00AA006009FA");
+            IntPtr punk = IntPtr.Zero;
+            int hr = Marshal.QueryInterface(Marshal.GetIUnknownForObject(dte), ref ispGuid, out punk);
+            Log($"GetComServiceProvider: QueryInterface hr=0x{hr:X8}");
+            if (hr == 0 && punk != IntPtr.Zero)
+            {
+                var result = Marshal.GetObjectForIUnknown(punk) as IComServiceProvider;
+                Marshal.Release(punk);
+                Log($"GetComServiceProvider: QueryInterface result={(result != null ? "OK" : "null")}");
+                return result;
+            }
+
+            // Fallback: try System.IServiceProvider
+            var sysSp = dte as System.IServiceProvider;
+            if (sysSp != null)
+            {
+                Log("GetComServiceProvider: System.IServiceProvider succeeded, wrapping");
+
+                // System.IServiceProvider can be used directly for GetService
+                // but we need IComServiceProvider for QueryService
+                // Try getting it via COM interop
+                try
+                {
+                    var unknown = Marshal.GetIUnknownForObject(dte);
+                    hr = Marshal.QueryInterface(unknown, ref ispGuid, out punk);
+                    Marshal.Release(unknown);
+                    if (hr == 0 && punk != IntPtr.Zero)
+                    {
+                        var result = Marshal.GetObjectForIUnknown(punk) as IComServiceProvider;
+                        Marshal.Release(punk);
+                        return result;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"GetComServiceProvider: Fallback QueryInterface failed: {ex.Message}");
+                }
+            }
+
+            Log("GetComServiceProvider: All methods failed - IServiceProvider not available");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Log($"GetComServiceProvider: FAILED: {ex.GetType().Name} - {ex.Message}");
+            return null;
+        }
+    }
+
+    // Get a VS service via COM IServiceProvider.QueryService
+    private static T? GetVsService<T>(IComServiceProvider sp, Guid serviceGuid, Guid interfaceGuid) where T : class
+    {
+        try
+        {
+            int hr = sp.QueryService(ref serviceGuid, ref interfaceGuid, out IntPtr punk);
+            if (hr != 0 || punk == IntPtr.Zero)
+            {
+                Log($"GetVsService<{typeof(T).Name}>: QueryService hr=0x{hr:X8}");
+                return null;
+            }
+
+            var obj = Marshal.GetObjectForIUnknown(punk);
+            Marshal.Release(punk);
+            var result = obj as T;
+            if (result == null)
+            {
+                Log($"GetVsService<{typeof(T).Name}>: COM object type={obj.GetType().FullName}, not castable");
+                Marshal.ReleaseComObject(obj);
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Log($"GetVsService<{typeof(T).Name}>: FAILED: {ex.Message}");
+            return null;
+        }
+    }
+
+    // Alternative: get VS service via System.IServiceProvider (works on STA thread)
+    private static T? GetVsServiceViaSystemSP<T>(System.IServiceProvider sp, Type serviceType) where T : class
+    {
+        try
+        {
+            var obj = sp.GetService(serviceType);
+            if (obj == null) return null;
+            var result = obj as T;
+            if (result == null && obj != null)
+            {
+                // Try marshaling - the service might be a COM object that needs QueryInterface
+                try
+                {
+                    var unknown = Marshal.GetIUnknownForObject(obj);
+                    var resultObj = Marshal.GetObjectForIUnknown(unknown);
+                    Marshal.Release(unknown);
+                    result = resultObj as T;
+                    if (result == null) Marshal.ReleaseComObject(resultObj);
+                }
+                catch { }
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Log($"GetVsServiceViaSystemSP<{typeof(T).Name}>: FAILED: {ex.Message}");
+            return null;
+        }
+    }
+
+    // Tier 2: File write with IVsFileChangeEx suppression + IVsPersistDocData2.ReloadDocData
+    public static bool TryFormatViaRdtFileWrite(EnvDTE.DTE dte, string filePath,
+        string formattedXml, FormattingEngine engine)
+    {
+        Log("TryFormatViaRdtFileWrite: Starting...");
+        try
+        {
+            // Try multiple approaches to get IServiceProvider
+            IComServiceProvider? comSp = GetComServiceProvider(dte);
+            System.IServiceProvider? sysSp = dte as System.IServiceProvider;
+
+            Log($"TryFormatViaRdtFileWrite: comSp={(comSp != null ? "OK" : "null")}, sysSp={(sysSp != null ? "OK" : "null")}");
+
+            if (comSp == null && sysSp == null)
+            {
+                Log("TryFormatViaRdtFileWrite: No IServiceProvider available");
+                return false;
+            }
+
+            // Get IVsFileChangeEx (suppress file change notifications)
+            IVsFileChangeEx? fileChangeEx = null;
+            if (comSp != null)
+            {
+                fileChangeEx = GetVsService<IVsFileChangeEx>(comSp, SID_SVsFileChangeEx, IID_IVsFileChangeEx);
+            }
+            if (fileChangeEx == null && sysSp != null)
+            {
+                try
+                {
+                    var obj = sysSp.GetService(typeof(SVsFileChangeEx));
+                    if (obj != null)
+                    {
+                        fileChangeEx = obj as IVsFileChangeEx;
+                        if (fileChangeEx != null)
+                            Log("TryFormatViaRdtFileWrite: IVsFileChangeEx obtained via System.IServiceProvider");
+                        else
+                        {
+                            Log($"TryFormatViaRdtFileWrite: GetService returned {obj.GetType().FullName}, trying Marshal");
+                            try
+                            {
+                                var unk = Marshal.GetIUnknownForObject(obj);
+                                fileChangeEx = Marshal.GetObjectForIUnknown(unk) as IVsFileChangeEx;
+                                Marshal.Release(unk);
+                                if (fileChangeEx != null)
+                                    Log("TryFormatViaRdtFileWrite: IVsFileChangeEx obtained via Marshal fallback");
+                            }
+                            catch (Exception ex2)
+                            {
+                                Log($"TryFormatViaRdtFileWrite: Marshal fallback failed: {ex2.Message}");
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"TryFormatViaRdtFileWrite: System.IServiceProvider.GetService for IVsFileChangeEx failed: {ex.Message}");
+                }
+            }
+
+            bool ignoreActive = false;
+            if (fileChangeEx != null)
+            {
+                int hr = fileChangeEx.IgnoreFile(0, filePath, 1);
+                Log($"TryFormatViaRdtFileWrite: IgnoreFile(1) hr=0x{hr:X8}");
+                ignoreActive = (hr == 0);
+            }
+            else
+            {
+                Log("TryFormatViaRdtFileWrite: IVsFileChangeEx not available");
+            }
+
+            try
+            {
+                // Create backup
+                string backupPath = filePath + ".bak";
+                File.Copy(filePath, backupPath, true);
+                Log($"TryFormatViaRdtFileWrite: Backup created");
+
+                // Write formatted file while notifications are suppressed
+                File.WriteAllText(filePath, formattedXml, new UTF8Encoding(false));
+                Log("TryFormatViaRdtFileWrite: File written to disk");
+
+                // Re-enable file change notifications BEFORE triggering reload
+                // This way the editor will see the change notification
+                if (fileChangeEx != null && ignoreActive)
+                {
+                    int hr = fileChangeEx.IgnoreFile(0, filePath, 0);
+                    Log($"TryFormatViaRdtFileWrite: IgnoreFile(0) RE-ENABLED early hr=0x{hr:X8}");
+                    ignoreActive = false; // Already restored
+                }
+
+                // Try to reload via RDT
+                bool reloaded = false;
+
+                // Try IVsRunningDocumentTable via QueryService
+                if (comSp != null)
+                {
+                    var rdt = GetVsService<IVsRunningDocumentTable>(comSp, SID_SVsRunningDocumentTable, IID_IVsRunningDocumentTable);
+                    if (rdt != null)
+                    {
+                        Log("TryFormatViaRdtFileWrite: IVsRunningDocumentTable obtained via QueryService");
+                        reloaded = ReloadDocDataViaRdt(rdt, filePath);
+                    }
+                    else
+                    {
+                        Log("TryFormatViaRdtFileWrite: IVsRunningDocumentTable not available via QueryService");
+                    }
+                }
+
+                // Try IVsRunningDocumentTable via System.IServiceProvider
+                if (!reloaded && sysSp != null)
+                {
+                    var rdt = GetVsServiceViaSystemSP<IVsRunningDocumentTable>(sysSp, typeof(SVsRunningDocumentTable));
+                    if (rdt != null)
+                    {
+                        Log("TryFormatViaRdtFileWrite: IVsRunningDocumentTable obtained via System.IServiceProvider");
+                        reloaded = ReloadDocDataViaRdt(rdt, filePath);
+                    }
+                    else
+                    {
+                        Log("TryFormatViaRdtFileWrite: IVsRunningDocumentTable not available via System.IServiceProvider");
+                    }
+                }
+
+                if (reloaded)
+                {
+                    Log("TryFormatViaRdtFileWrite: Document reloaded - SUCCESS");
+                    return true;
+                }
+
+                // Trigger file change notification now that notifications are re-enabled
+                if (fileChangeEx != null)
+                {
+                    int hr = fileChangeEx.SyncFile(filePath);
+                    Log($"TryFormatViaRdtFileWrite: SyncFile hr=0x{hr:X8}");
+                }
+
+                Log("TryFormatViaRdtFileWrite: File written and change notification sent");
+                return true;
+            }
+            finally
+            {
+                // Make sure notifications are restored
+                if (fileChangeEx != null && ignoreActive)
+                {
+                    int hr = fileChangeEx.IgnoreFile(0, filePath, 0);
+                    Log($"TryFormatViaRdtFileWrite: IgnoreFile(0) cleanup hr=0x{hr:X8}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"TryFormatViaRdtFileWrite: FAILED: {ex.GetType().Name} - {ex.Message}");
+            return false;
+        }
+    }
+
+    private static bool ReloadDocDataViaRdt(IVsRunningDocumentTable rdt, string filePath)
+    {
+        Log("ReloadDocDataViaRdt: Starting...");
+        try
+        {
+            int hr = rdt.FindAndLockDocument(
+                (uint)_VSRDTFLAGS.RDT_NoLock,
+                filePath,
+                out IVsHierarchy hier,
+                out uint itemId,
+                out IntPtr docDataPtr,
+                out uint cookie);
+
+            Log($"ReloadDocDataViaRdt: FindAndLockDocument hr=0x{hr:X8}");
+
+            if (hr != 0 || docDataPtr == IntPtr.Zero)
+            {
+                Log("ReloadDocDataViaRdt: Document not found in RDT");
+                return false;
+            }
+
+            try
+            {
+                var docData = Marshal.GetObjectForIUnknown(docDataPtr);
+                Log($"ReloadDocDataViaRdt: DocData type={docData?.GetType().FullName ?? "null"}");
+
+                if (docData is IVsPersistDocData2 pdd2)
+                {
+                    Log("ReloadDocDataViaRdt: IVsPersistDocData2 available");
+
+                    hr = pdd2.IsDocDataReloadable(out int reloadable);
+                    Log($"ReloadDocDataViaRdt: IsDocDataReloadable hr=0x{hr:X8}, reloadable={reloadable}");
+
+                    if (hr == 0 && reloadable != 0)
+                    {
+                        hr = pdd2.ReloadDocData(1); // RDD_IgnoreFileChange
+                        Log($"ReloadDocDataViaRdt: ReloadDocData(1) hr=0x{hr:X8}");
+
+                        if (hr == 0)
+                        {
+                            Log("ReloadDocDataViaRdt: SUCCESS via IVsPersistDocData2");
+                            return true;
+                        }
+
+                        hr = pdd2.ReloadDocData(0);
+                        Log($"ReloadDocDataViaRdt: ReloadDocData(0) hr=0x{hr:X8}");
+                        if (hr == 0)
+                        {
+                            Log("ReloadDocDataViaRdt: SUCCESS via IVsPersistDocData2 (default flags)");
+                            return true;
+                        }
+                    }
+                }
+
+                if (docData is IVsPersistDocData pdd)
+                {
+                    Log("ReloadDocDataViaRdt: IVsPersistDocData available");
+                    hr = pdd.IsDocDataReloadable(out int reloadable);
+                    Log($"ReloadDocDataViaRdt: IsDocDataReloadable hr=0x{hr:X8}, reloadable={reloadable}");
+
+                    if (hr == 0 && reloadable != 0)
+                    {
+                        hr = pdd.ReloadDocData(1);
+                        Log($"ReloadDocDataViaRdt: ReloadDocData(1) hr=0x{hr:X8}");
+                        if (hr == 0) return true;
+
+                        hr = pdd.ReloadDocData(0);
+                        Log($"ReloadDocDataViaRdt: ReloadDocData(0) hr=0x{hr:X8}");
+                        if (hr == 0) return true;
+                    }
+                }
+
+                Log("ReloadDocDataViaRdt: No persist interface supports reload");
+                return false;
+            }
+            finally
+            {
+                Marshal.Release(docDataPtr);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"ReloadDocDataViaRdt: FAILED: {ex.GetType().Name} - {ex.Message}");
+            return false;
+        }
+    }
+
+    // Tier 3: DTE.ExecuteCommand + Clipboard
+    // Must run on STA thread. Caller must ensure STA context.
+    public static bool TryFormatViaExecuteCommand(EnvDTE.DTE dte, string filePath,
+        string? formattedDecl, string? formattedImpl)
+    {
+        Log("TryFormatViaExecuteCommand: Starting...");
+        try
+        {
+            if (dte.ActiveDocument == null)
+            {
+                Log("TryFormatViaExecuteCommand: No active document");
+                return false;
+            }
+
+            try
+            {
+                dte.Commands.Item("Edit.SelectAll", -1);
+                Log("TryFormatViaExecuteCommand: Edit.SelectAll command found");
+            }
+            catch
+            {
+                Log("TryFormatViaExecuteCommand: Edit.SelectAll not found");
+                return false;
+            }
+
+            bool undoContextOpened = false;
+            try
+            {
+                if (!dte.UndoContext.IsOpen)
+                {
+                    dte.UndoContext.Open("Format ST Document");
+                    undoContextOpened = true;
+                    Log("TryFormatViaExecuteCommand: UndoContext opened");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"TryFormatViaExecuteCommand: UndoContext.Open failed: {ex.Message}");
+            }
+
+            try
+            {
+                dte.ActiveDocument.Activate();
+                Log("TryFormatViaExecuteCommand: Document activated");
+
+                // Read the current text from the active section via clipboard
+                string? savedClipboard = null;
+                try { savedClipboard = GetClipboardText(); } catch { }
+
+                // SelectAll + Copy to read current text
+                dte.ExecuteCommand("Edit.SelectAll", "");
+                System.Threading.Thread.Sleep(50);
+                dte.ExecuteCommand("Edit.Copy", "");
+                System.Threading.Thread.Sleep(100);
+
+                string currentText = GetClipboardText() ?? "";
+                Log($"TryFormatViaExecuteCommand: Read {currentText.Length} chars from active section");
+
+                if (string.IsNullOrEmpty(currentText))
+                {
+                    Log("TryFormatViaExecuteCommand: Empty text, cannot format");
+                    if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { } }
+                    return false;
+                }
+
+                // Format the text inline — decide declaration vs implementation based on content
+                var engine = new FormattingEngine(FormattingConfiguration.Default);
+                bool isDecl = LooksLikeDeclaration(currentText);
+                Log($"TryFormatViaExecuteCommand: Detected as {(isDecl ? "Declaration" : "Implementation")}");
+
+                string? formatted;
+                if (isDecl)
+                    formatted = engine.Format(currentText);
+                else
+                    formatted = engine.FormatBody(currentText);
+
+                if (string.IsNullOrEmpty(formatted) || formatted == currentText)
+                {
+                    Log("TryFormatViaExecuteCommand: No changes needed");
+                    // Deselect
+                    try { dte.ExecuteCommand("Edit.SelectionCancel", ""); } catch { }
+                    if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { } }
+                    return formatted == currentText; // true = already formatted
+                }
+
+                // Paste the formatted text — current selection is already SelectAll
+                if (!SetClipboardText(formatted))
+                {
+                    Log("TryFormatViaExecuteCommand: Failed to set clipboard");
+                    if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { } }
+                    return false;
+                }
+                Log($"TryFormatViaExecuteCommand: Clipboard set ({formatted.Length} chars)");
+
+                dte.ExecuteCommand("Edit.Delete", "");
+                Log("TryFormatViaExecuteCommand: Edit.Delete executed");
+
+                dte.ExecuteCommand("Edit.Paste", "");
+                Log("TryFormatViaExecuteCommand: Edit.Paste executed");
+
+                // Restore clipboard
+                if (savedClipboard != null)
+                {
+                    try { SetClipboardText(savedClipboard); } catch { }
+                }
+
+                Log("TryFormatViaExecuteCommand: SUCCESS - live edit applied");
+                return true;
+            }
+            finally
+            {
+                if (undoContextOpened)
+                {
+                    try { dte.UndoContext.Close(); }
+                    catch { }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"TryFormatViaExecuteCommand: FAILED: {ex.GetType().Name} - {ex.Message}");
+            return false;
+        }
+    }
+
+    private static string ReadActiveSectionText(EnvDTE.DTE dte)
+    {
+        try
+        {
+            // Try TextSelection first
+            var selection = dte.ActiveDocument?.Selection as EnvDTE.TextSelection;
+            if (selection != null && !string.IsNullOrEmpty(selection.Text))
+            {
+                return selection.Text;
+            }
+
+            // TextSelection is empty for PLC editor — use clipboard trick:
+            // 1. Save current clipboard
+            string? savedClip = null;
+            try { savedClip = GetClipboardText(); } catch { }
+
+            // 2. SelectAll + Copy to get the text onto clipboard
+            dte.ExecuteCommand("Edit.SelectAll", "");
+            System.Threading.Thread.Sleep(50);
+            dte.ExecuteCommand("Edit.Copy", "");
+            System.Threading.Thread.Sleep(50);
+
+            // 3. Read the clipboard
+            string text = GetClipboardText() ?? "";
+
+            // 4. Deselect by moving cursor
+            try
+            {
+                var sel = dte.ActiveDocument?.Selection as EnvDTE.TextSelection;
+                if (sel != null)
+                {
+                    sel.StartOfDocument(false);
+                }
+            }
+            catch { }
+
+            // 5. Restore original clipboard
+            if (savedClip != null)
+            {
+                try { SetClipboardText(savedClip); } catch { }
+            }
+
+            Log($"ReadActiveSectionText: clipboard read returned {text.Length} chars");
+            return text;
+        }
+        catch (Exception ex)
+        {
+            Log($"ReadActiveSectionText: FAILED: {ex.Message}");
+            return "";
+        }
+    }
+
+    private static bool LooksLikeDeclaration(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return true;
+        string upper = text.ToUpperInvariant();
+        bool hasVar = upper.Contains("VAR") && upper.Contains("END_VAR");
+        bool hasProgram = upper.Contains("PROGRAM") || upper.Contains("FUNCTION_BLOCK") || upper.Contains("FUNCTION");
+        bool hasBodyKeywords = upper.Contains("IF ") || upper.Contains("FOR ") || upper.Contains("WHILE ") ||
+                                upper.Contains(":=") || upper.Contains("THEN");
+        // If it has VAR/END_VAR and no body keywords, it's likely declaration
+        if (hasVar && !hasBodyKeywords) return true;
+        // If it has body keywords but not VAR, it's likely implementation
+        if (hasBodyKeywords && !hasVar) return false;
+        // If it has both (full POU), check structure — declarations start with PROGRAM/FUNCTION
+        if (hasProgram) return true;
+        return false;
+    }
+
+    // Tier 4: SendKeys fallback
+    public static bool TryFormatViaSendKeys(EnvDTE.DTE dte, string filePath,
+        string? formattedDecl, string? formattedImpl)
+    {
+        Log("TryFormatViaSendKeys: Starting...");
+        try
+        {
+            if (dte.ActiveDocument == null)
+            {
+                Log("TryFormatViaSendKeys: No active document");
+                return false;
+            }
+
+            var sb = new StringBuilder();
+            if (!string.IsNullOrEmpty(formattedDecl))
+                sb.Append(formattedDecl);
+            if (!string.IsNullOrEmpty(formattedImpl))
+            {
+                if (sb.Length > 0) sb.AppendLine().AppendLine();
+                sb.Append(formattedImpl);
+            }
+
+            string combined = sb.ToString();
+            if (string.IsNullOrEmpty(combined))
+            {
+                Log("TryFormatViaSendKeys: Empty formatted text");
+                return false;
+            }
+
+            dte.ActiveDocument.Activate();
+            Log("TryFormatViaSendKeys: Document activated");
+
+            // Use Win32 clipboard
+            if (!SetClipboardText(combined))
+            {
+                Log("TryFormatViaSendKeys: Failed to set clipboard");
+                return false;
+            }
+
+            // Use DTE ExecuteCommand instead of SendKeys for select all and delete
+            try
+            {
+                dte.ExecuteCommand("Edit.SelectAll", "");
+                System.Threading.Thread.Sleep(50);
+                dte.ExecuteCommand("Edit.Delete", "");
+                System.Threading.Thread.Sleep(50);
+                dte.ExecuteCommand("Edit.Paste", "");
+                Log("TryFormatViaSendKeys: Commands executed via DTE");
+            }
+            catch (Exception ex)
+            {
+                Log($"TryFormatViaSendKeys: DTE commands failed, trying SendKeys: {ex.Message}");
+                // Fallback to SendKeys only if DTE commands fail
+                try
+                {
+                    System.Windows.Forms.SendKeys.SendWait("^a");
+                    System.Threading.Thread.Sleep(100);
+                    System.Windows.Forms.SendKeys.SendWait("{DELETE}");
+                    System.Threading.Thread.Sleep(100);
+                    System.Windows.Forms.SendKeys.SendWait("^v");
+                    Log("TryFormatViaSendKeys: SendKeys executed");
+                }
+                catch (Exception ex2)
+                {
+                    Log($"TryFormatViaSendKeys: SendKeys also failed: {ex2.Message}");
+                    return false;
+                }
+            }
+
+            // DO NOT write to disk — the editor already has the formatted content.
+            // Writing to disk would trigger a "file changed on disk" reload dialog.
+            // The editor will persist the changes when the user saves.
+
+            Log("TryFormatViaSendKeys: SUCCESS - live edit applied, no disk write");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log($"TryFormatViaSendKeys: FAILED: {ex.GetType().Name} - {ex.Message}");
+            return false;
+        }
+    }
+
+    // Win32 clipboard API — works from any apartment (MTA or STA)
+    [DllImport("user32.dll")]
+    private static extern bool OpenClipboard(IntPtr hWndNewOwner);
+
+    [DllImport("user32.dll")]
+    private static extern bool CloseClipboard();
+
+    [DllImport("user32.dll")]
+    private static extern bool EmptyClipboard();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetClipboardData(uint uFormat);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsClipboardFormatAvailable(uint uFormat);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GlobalAlloc(uint uFlags, IntPtr dwBytes);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GlobalLock(IntPtr hMem);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool GlobalUnlock(IntPtr hMem);
+
+    private const uint CF_UNICODETEXT = 13;
+    private const uint GMEM_MOVEABLE = 0x0002;
+
+    private static bool SetClipboardText(string text)
+    {
+        try
+        {
+            if (!OpenClipboard(IntPtr.Zero)) return false;
+            try
+            {
+                if (!EmptyClipboard()) return false;
+
+                byte[] bytes = Encoding.Unicode.GetBytes(text + "\0");
+                IntPtr hMem = GlobalAlloc(GMEM_MOVEABLE, (IntPtr)bytes.Length);
+                if (hMem == IntPtr.Zero) return false;
+
+                IntPtr ptr = GlobalLock(hMem);
+                if (ptr == IntPtr.Zero) return false;
+                try
+                {
+                    Marshal.Copy(bytes, 0, ptr, bytes.Length);
+                }
+                finally
+                {
+                    GlobalUnlock(hMem);
+                }
+
+                SetClipboardData(CF_UNICODETEXT, hMem);
+                return true;
+            }
+            finally
+            {
+                CloseClipboard();
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string? GetClipboardText()
+    {
+        try
+        {
+            if (!OpenClipboard(IntPtr.Zero)) return null;
+            try
+            {
+                if (!IsClipboardFormatAvailable(CF_UNICODETEXT)) return null;
+                IntPtr hMem = GetClipboardData(CF_UNICODETEXT);
+                if (hMem == IntPtr.Zero) return null;
+                IntPtr ptr = GlobalLock(hMem);
+                if (ptr == IntPtr.Zero) return null;
+                try
+                {
+                    return Marshal.PtrToStringUni(ptr);
+                }
+                finally
+                {
+                    GlobalUnlock(hMem);
+                }
+            }
+            finally
+            {
+                CloseClipboard();
+            }
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? FormatTwinCatXmlContent(string xml, FormattingEngine engine)
+    {
+        string result = xml;
+        bool changed = false;
+        int pos = 0;
+
+        while ((pos = result.IndexOf("<![CDATA[", pos, StringComparison.Ordinal)) >= 0)
+        {
+            int cdataStart = pos + 9;
+            int cdataEnd = result.IndexOf("]]>", cdataStart, StringComparison.Ordinal);
+            if (cdataEnd < 0) break;
+
+            string stCode = result.Substring(cdataStart, cdataEnd - cdataStart);
+            string parentElement = FindParentElement(result, pos);
+            bool isDeclaration = parentElement.IndexOf("Declaration", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            string formatted;
+            if (isDeclaration)
+                formatted = engine.Format(stCode) ?? stCode;
+            else
+                formatted = engine.FormatBody(stCode) ?? stCode;
+
+            if (formatted != stCode)
+            {
+                result = result.Substring(0, cdataStart) + formatted + result.Substring(cdataEnd);
+                pos = cdataStart + formatted.Length + 3;
+                changed = true;
+            }
+            else
+            {
+                pos = cdataEnd + 3;
+            }
+        }
+
+        return changed ? result : null;
+    }
+
+    private static string FindParentElement(string xml, int cdataOffset)
+    {
+        int tagStart = xml.LastIndexOf('<', cdataOffset - 1);
+        if (tagStart < 0) return "";
+        int tagEnd = xml.IndexOf('>', tagStart);
+        if (tagEnd < 0) return "";
+        return xml.Substring(tagStart, tagEnd - tagStart + 1);
+    }
+
+    private static void Log(string message)
+    {
+        try
+        {
+            var path = Path.Combine(Path.GetTempPath(), "STFormatter_Host.log");
+            File.AppendAllText(path, $"[{DateTime.Now:HH:mm:ss.fff}] LiveEditor: {message}{Environment.NewLine}");
+        }
+        catch { }
+    }
+}

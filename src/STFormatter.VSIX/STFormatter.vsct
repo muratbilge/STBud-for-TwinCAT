@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <Extern href="stdidcmd.h"/>
+  <Extern href="vsshlids.h"/>
+
+  <Commands package="guidSTFormatterPackage">
+    <Groups>
+      <Group guid="guidSTFormatterCmdSet" id="FormatGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_EDIT"/>
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <Button guid="guidSTFormatterCmdSet" id="cmdidFormatDocument" priority="0x0100" type="Button">
+        <Parent guid="guidSTFormatterCmdSet" id="FormatGroup"/>
+        <Strings>
+          <ButtonText>Format ST &amp;Document</ButtonText>
+          <CommandName>Format ST Document</CommandName>
+        </Strings>
+      </Button>
+
+      <Button guid="guidSTFormatterCmdSet" id="cmdidFormatSelection" priority="0x0101" type="Button">
+        <Parent guid="guidSTFormatterCmdSet" id="FormatGroup"/>
+        <Strings>
+          <ButtonText>Format ST &amp;Selection</ButtonText>
+          <CommandName>Format ST Selection</CommandName>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <KeyBindings>
+    <KeyBinding guid="guidSTFormatterCmdSet" id="cmdidFormatDocument" editor="guidVSStd97" key1="K" key2="D" mod1="Control" />
+    <KeyBinding guid="guidSTFormatterCmdSet" id="cmdidFormatSelection" editor="guidVSStd97" key1="K" key2="F" mod1="Control" />
+  </KeyBindings>
+
+  <Symbols>
+    <GuidSymbol name="guidSTFormatterPackage" value="{8d2e3a4f-b5c1-4a7e-9f3d-2c1e5b6a9d4e}" />
+    <GuidSymbol name="guidSTFormatterCmdSet" value="{a3b4c5d6-e7f8-4a5b-9c0d-1e2f3a4b5c6d}">
+      <IDSymbol name="FormatGroup" value="0x1020" />
+      <IDSymbol name="cmdidFormatDocument" value="0x0100" />
+      <IDSymbol name="cmdidFormatSelection" value="0x0101" />
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>

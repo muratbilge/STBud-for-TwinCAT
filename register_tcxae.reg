@@ -1,0 +1,32 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TcXaeShell\15.0\Menus]
+"{b1c2d3e4-f5a6-7890-abcd-ef1234567890}"=", Menus.ctmenu, 1"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TcXaeShell\15.0\Packages\{b1c2d3e4-f5a6-7890-abcd-ef1234567890}]
+@="STFormatterPackage"
+"InprocServer32"="C:\\Windows\\SYSTEM32\\MSCOREE.DLL"
+"Class"="STFormatter.TcXaeShell.STFormatterPackage"
+"CodeBase"="C:\\Program Files (x86)\\Beckhoff\\TcXaeShell\\Common7\\IDE\\Extensions\\STFormatter\\STFormatter.TcXaeShell.dll"
+"AllowsBackgroundLoad"=dword:00000001
+"SupportsDynamicToolOwner"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TcXaeShell\15.0\BindingPaths\{B1C2D3E4-F5A6-7890-ABCD-EF1234567890}]
+@=""
+"C:\\Program Files (x86)\\Beckhoff\\TcXaeShell\\Common7\\IDE\\Extensions\\STFormatter"=""
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TcXaeShell\15.0\InstalledProducts\STFormatterPackage]
+@="#110"
+"Package"="{b1c2d3e4-f5a6-7890-abcd-ef1234567890}"
+"PID"="1.0"
+"ProductDetails"="#112"
+"LogoID"="#400"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TcXaeShell\15.0\ToolsOptionsPages\TwinCAT]
+@="#0"
+"Package"="{b1c2d3e4-f5a6-7890-abcd-ef1234567890}"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TcXaeShell\15.0\ToolsOptionsPages\TwinCAT\ST Formatter]
+@="#0"
+"Package"="{b1c2d3e4-f5a6-7890-abcd-ef1234567890}"
+"Page"="{a5965cbb-d738-3a3b-b33d-57e620936861}"

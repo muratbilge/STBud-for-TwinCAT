@@ -1,0 +1,123 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <OutputType>Library</OutputType>
+    <PlatformTarget>x86</PlatformTarget>
+    <GeneratePkgDefFile>false</GeneratePkgDefFile>
+    <UseCodebase>true</UseCodebase>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>false</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
+    <CopyOutputSymbolsToOutputDirectory>true</CopyOutputSymbolsToOutputDirectory>
+    <StartAction>Program</StartAction>
+    <StartProgram Condition="'$(TcXaeShellDir)' != ''">$(TcXaeShellDir)Common7\IDE\TcXaeShell.exe</StartProgram>
+    <StartArguments>/rootsuffix Exp</StartArguments>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <DeployExtension Condition="'$(BuildingInsideVisualStudio)' != 'true'">False</DeployExtension>
+    <CreateVsixContainer Condition="'$(BuildingInsideVisualStudio)' != 'true'">True</CreateVsixContainer>
+    <BypassVsixValidation>true</BypassVsixValidation>
+    <TargetVsixContainer>$(MSBuildProjectDirectory)\$(MSBuildProjectName).vsix</TargetVsixContainer>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <_VsixObjPath>obj\$(Configuration)\$(TargetFramework)\</_VsixObjPath>
+    <FileManifest Condition="'$(FileManifest)' == ''">$(_VsixObjPath)files.json</FileManifest>
+    <TemplateFileManifest Condition="'$(TemplateFileManifest)' == ''">$(_VsixObjPath)templateFiles.json</TemplateFileManifest>
+    <ResourceManifest Condition="'$(ResourceManifest)' == ''">$(_VsixObjPath)resources.json</ResourceManifest>
+    <CtoFileManifest Condition="'$(CtoFileManifest)' == ''">$(_VsixObjPath)ctoFiles.json</CtoFileManifest>
+    <CtoCacheFile Condition="'$(CtoCacheFile)' == ''">$(_VsixObjPath)mergeCto.cache</CtoCacheFile>
+    <CreateTemplateManifestsCacheFile Condition="'$(CreateTemplateManifestsCacheFile)' == ''">$(_VsixObjPath)createTemplateManifests.cache</CreateTemplateManifestsCacheFile>
+    <ResourcePackagesManifest Condition="'$(GenerateResourcePackages)'=='true' and '$(ResourcePackagesManifest)'==''">$(_VsixObjPath)resourcePackages.json</ResourcePackagesManifest>
+    <TemplateOutputDirectory Condition="'$(TemplateOutputDirectory)' == ''">$(_VsixObjPath)</TemplateOutputDirectory>
+    <CreateVsixContainerDependsOn>$(CreateVsixContainerDependsOn);GeneratePkgDef</CreateVsixContainerDependsOn>
+    <CreatePkgDefAssemblyToProcess Condition="'$(CreatePkgDefAssemblyToProcess)' == ''">$(MSBuildProjectDirectory)\obj\$(Configuration)\$(TargetFramework)\$(MSBuildProjectName).dll</CreatePkgDefAssemblyToProcess>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="15.9.3" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.VisualStudio.CommandBars" Version="8.0.0" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.12.2069">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Design" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Extensibility">
+      <HintPath>C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\PublicAssemblies\extensibility.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="IECTextEditor">
+      <HintPath>C:\TwinCAT\3.1\Components\Plc\Common\IECTextEditor.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="TextDocument">
+      <HintPath>C:\TwinCAT\3.1\Components\Plc\Common\TextDocument.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Core">
+      <HintPath>C:\TwinCAT\3.1\Components\Plc\Common\Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="STObject">
+      <HintPath>C:\TwinCAT\3.1\Components\Plc\Common\STObject.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="ImplementationObject">
+      <HintPath>C:\TwinCAT\3.1\Components\Plc\Common\ImplementationObject.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="POUObject">
+      <HintPath>C:\TwinCAT\3.1\Components\Plc\Common\POUObject.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="TwinCATPlcControl">
+      <HintPath>C:\TwinCAT\3.1\Components\Plc\Common\TwinCATPlcControl.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\STFormatter.Core\STFormatter.Core.csproj">
+      <Name>STFormatter.Core</Name>
+      <IncludeOutputGroupsInVSIX>BuiltProjectOutputGroup</IncludeOutputGroupsInVSIX>
+      <IncludeOutputGroupsInVSIXLocalOnly>DebugSymbolsProjectOutputGroup</IncludeOutputGroupsInVSIXLocalOnly>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="source.extension.vsixmanifest">
+      <SubType>Designer</SubType>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <VSCTCompile Include="STFormatter.vsct">
+      <ResourceName>Menus.ctmenu</ResourceName>
+    </VSCTCompile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Resources\PackageIcon.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="Resources\PreviewImage.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+  </ItemGroup>
+
+  <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="'$(VSToolsPath)' != ''" />
+
+  <Target Name="BuildVsixContainer" AfterTargets="Build">
+    <CallTarget Targets="CreateVsixContainer" Condition="'$(CreateVsixContainer)' == 'true'" />
+  </Target>
+</Project>
