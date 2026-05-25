@@ -73,12 +73,14 @@ cannot be properly registered** in TcXaeShell.
 ### Key Technical Details
 
 #### ROT Moniker Name (CRITICAL)
-TcXaeShell registers in the Running Object Table with the moniker:
+TcXaeShell registers in the Running Object Table with version-specific monikers:
 ```
-!TcXaeShell.DTE.15.0:{PID}
+!TcXaeShell.DTE.15.0:{PID}  (VS 2017 shell, current)
+!TcXaeShell.DTE.14.0:{PID}  (VS 2015 shell, older)
+!TcXaeShell.DTE.12.0:{PID}  (VS 2013 shell, oldest)
 ```
-**NOT** `!VisualStudio.DTE.15.0:{PID}` which is the standard VS moniker.
-Searching for `!VisualStudio.DTE` will miss it entirely.
+The `TcXaeShellVersionProfile.DetectFromRotMoniker()` method handles all versions.
+Searching for `!VisualStudio.DTE` alone will miss TcXaeShell — always also search `!TcXaeShell.DTE`.
 
 #### DTE Connection Code
 ```csharp
@@ -221,14 +223,14 @@ ShowWindow(handle, 0); // SW_HIDE
 ## How to Build and Test
 
 ```powershell
-# Build
+# Build (net48 for modern machines, net462 for older TcXaeShell)
 dotnet build src/STFormatter.Host/STFormatter.Host.csproj -c Debug
 
-# Deploy (requires admin)
-Copy-Item src/STFormatter.Host/bin/Debug/net48/STFormatter.Host.exe `
-          "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\" -Force
-Copy-Item src/STFormatter.Host/bin/Debug/net48/Microsoft.VisualStudio.Interop.dll `
-          "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\" -Force
+# Deploy net48 (default — for machines with .NET 4.8+)
+deploy.bat
+
+# Deploy net462 (for machines with only .NET 4.6.2)
+deploy.bat net462
 
 # Run
 Start-Process "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\STFormatter.Host.exe"
@@ -236,3 +238,41 @@ Start-Process "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions
 # Check log
 Get-Content "$env:TEMP\STFormatter_Host.log" -Tail 20
 ```
+
+## Cross-Version Compatibility
+
+### TcXaeShell Version Matrix
+
+| TcXaeShell Generation | VS Shell | DTE Version | ROT Moniker | .NET FW | Registry Root |
+|---|---|---|---|---|---|
+| TC3 Build 4024+ (current) | VS 2017 | 15.0 | `!TcXaeShell.DTE.15.0:{PID}` | 4.6+ | `Beckhoff\TcXaeShell\15.0` |
+| TC3 Build ~4020 | VS 2015 | 14.0 | `!TcXaeShell.DTE.14.0:{PID}` | 4.6+ | `Beckhoff\TcXaeShell\14.0` |
+| TC3 Build <4020 | VS 2013 | 12.0 | `!TcXaeShell.DTE.12.0:{PID}` | 4.5.1+ | `Beckhoff\TcXaeShell\12.0` |
+
+### TcXaeShellVersionProfile
+
+All version-specific values are encapsulated in `TcXaeShellVersionProfile` (in `STFormatter.Core/Configuration/`):
+
+- **DTE version strings** (12.0, 14.0, 15.0) — auto-detected from ROT moniker at runtime
+- **ROT moniker prefixes** — `!TcXaeShell.DTE.{version}.` and `!VisualStudio.DTE.{version}.`
+- **Context menu names** — `PlcCodeWinContextMenu`, `Code Window` (consistent across versions)
+- **Target framework** — net462 or net48 (Host/UI projects multi-target both)
+- **File extensions** — `.TcPOU/.TcDUT/.TcGVL/.TcIO/.TcTO` (consistent across versions)
+- **Registry root** — `Software\Beckhoff\TcXaeShell\{version}`
+- **Install path** — `Beckhoff\TcXaeShell\Common7\IDE\`
+- **Process name** — `TcXaeShell`
+- **Bitness** — Always x86 (32-bit)
+
+### Auto-Detection
+
+The Host scans the ROT for ALL known TcXaeShell moniker patterns:
+1. `!TcXaeShell.DTE.{version}.{PID}` (primary)
+2. `!VisualStudio.DTE.{version}.{PID}` (fallback)
+3. Any unrecognized TcXaeShell/VisualStudio DTE moniker (dynamic version parsing)
+
+### Safe Hard-Codings (DO NOT change)
+
+- `Edit.SelectAll`, `Edit.Copy`, `Edit.Delete`, `Edit.Paste`, `Edit.SelectionCancel` — standard VS DTE commands, stable across all versions
+- COM service GUIDs — VS SDK GUIDs, stable across all versions
+- `Microsoft.VisualStudio.Interop` v17.0.32112.339 — backward-compatible for DTE COM access
+- x86 platform target — all TcXaeShell versions are 32-bit

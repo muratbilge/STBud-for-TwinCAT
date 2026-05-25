@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using EnvDTE;
+using STFormatter.Core.Configuration;
 
 namespace STFormatter.Discover;
 
@@ -12,6 +13,7 @@ internal sealed class DteEntry
     public string DisplayName { get; set; } = "";
     public string Version { get; set; } = "";
     public DTE? Dte { get; set; }
+    public TcXaeShellVersionProfile? VersionProfile { get; set; }
 }
 
 internal static class DteAttacher
@@ -49,14 +51,18 @@ internal static class DteAttacher
                     DisplayName = displayName
                 };
 
-                // Try to parse PID from VisualStudio.DTE monikers
-                if (displayName.StartsWith("!VisualStudio.DTE.", StringComparison.OrdinalIgnoreCase))
+                var detectedProfile = TcXaeShellVersionProfile.DetectFromRotMoniker(displayName);
+
+                // Try to parse PID from DTE monikers
+                if (displayName.StartsWith("!VisualStudio.DTE.", StringComparison.OrdinalIgnoreCase) ||
+                    displayName.StartsWith("!TcXaeShell.DTE.", StringComparison.OrdinalIgnoreCase))
                 {
                     int colonIdx = displayName.LastIndexOf(':');
                     if (colonIdx > 0 && int.TryParse(displayName.Substring(colonIdx + 1), out int pid))
                     {
                         entry.Pid = pid;
                         entry.Version = displayName.Substring(1, colonIdx - 1);
+                        entry.VersionProfile = detectedProfile;
                     }
                 }
 
@@ -169,6 +175,10 @@ internal static class DteAttacher
                 else if (displayName.IndexOf("TcXae", StringComparison.OrdinalIgnoreCase) >= 0) marker = " *** TcXae ***";
                 else if (displayName.IndexOf("Beckhoff", StringComparison.OrdinalIgnoreCase) >= 0) marker = " *** Beckhoff ***";
 
+                var detected = TcXaeShellVersionProfile.DetectFromRotMoniker(displayName);
+                if (detected != null && !string.IsNullOrEmpty(marker) == false)
+                    marker = $" *** {detected.Name} ***";
+
                 log.WriteLine($"  [{idx:D3}] {displayName}{marker}");
                 if (isDte || !string.IsNullOrEmpty(marker))
                 {
@@ -206,14 +216,17 @@ internal static class DteAttacher
             }
         }
 
-        // Strategy 2: Try Marshal.GetActiveObject with various version strings
-        string[] dteNames = {
-            $"!VisualStudio.DTE.15.0:{pid}",
-            $"VisualStudio.DTE.15.0:{pid}",
-            "VisualStudio.DTE.15.0",
-            $"VisualStudio.DTE.15.1:{pid}",
-            "VisualStudio.DTE.15.1",
-        };
+        // Strategy 2: Try Marshal.GetActiveObject with version-profile-driven strings
+        var dteNames = new List<string>();
+        foreach (var profile in TcXaeShellVersionProfile.AllProfiles)
+        {
+            dteNames.Add($"!TcXaeShell.DTE.{profile.DteVersion}:{pid}");
+            dteNames.Add($"TcXaeShell.DTE.{profile.DteVersion}:{pid}");
+            dteNames.Add($"TcXaeShell.DTE.{profile.DteVersion}");
+            dteNames.Add($"!VisualStudio.DTE.{profile.DteVersion}:{pid}");
+            dteNames.Add($"VisualStudio.DTE.{profile.DteVersion}:{pid}");
+            dteNames.Add($"VisualStudio.DTE.{profile.DteVersion}");
+        }
 
         foreach (string dteName in dteNames)
         {

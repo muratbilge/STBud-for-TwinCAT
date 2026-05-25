@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
+    <TargetFrameworks>net462;net48</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <PlatformTarget>x86</PlatformTarget>
     <AssemblyName>STFormatter.Host</AssemblyName>

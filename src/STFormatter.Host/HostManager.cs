@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using EnvDTE;
 using Microsoft.VisualStudio.CommandBars;
+using STFormatter.Core.Configuration;
 
 namespace STFormatter.Host;
 
@@ -12,6 +13,7 @@ internal sealed class TcXaeInstance
 {
     public int Pid { get; }
     public DTE Dte { get; private set; }
+    public TcXaeShellVersionProfile? VersionProfile { get; set; }
     public HashSet<string> InjectedMenus { get; } = new(StringComparer.OrdinalIgnoreCase);
     public List<CommandBarControl> InjectedControls { get; } = new();
     public int FormatCount { get; set; }
@@ -38,11 +40,7 @@ internal sealed class TcXaeInstance
 internal sealed class HostManager
 {
     private readonly Dictionary<int, TcXaeInstance> _instances = new();
-    private readonly string[] _targetMenus =
-    {
-        "PlcCodeWinContextMenu",
-        "Code Window",
-    };
+    private string[] _targetMenus = TcXaeShellVersionProfile.VS2017.TargetContextMenuNames;
 
     private static void Log(string message)
     {
@@ -157,7 +155,7 @@ internal sealed class HostManager
 
     // --- ROT Scanning ---
 
-    public (int pid, DTE dte)? FindNewTcXaeShell()
+    public (int pid, DTE dte, TcXaeShellVersionProfile profile)? FindNewTcXaeShell()
     {
         int hr = Ole32.GetRunningObjectTable(0, out IRunningObjectTable rot);
         if (hr != 0) return null;
@@ -166,7 +164,7 @@ internal sealed class HostManager
         var monikers = new IMoniker[1];
         IntPtr fetched = IntPtr.Zero;
         Ole32.CreateBindCtx(0, out IBindCtx bindCtx);
-        (int pid, DTE dte)? result = null;
+        (int pid, DTE dte, TcXaeShellVersionProfile profile)? result = null;
 
         while (enumMoniker.Next(1, monikers, fetched) == 0)
         {
@@ -174,13 +172,12 @@ internal sealed class HostManager
             {
                 monikers[0].GetDisplayName(bindCtx, null, out string displayName);
 
-                if (displayName.StartsWith("!VisualStudio.DTE.", StringComparison.OrdinalIgnoreCase) ||
-                    displayName.StartsWith("!TcXaeShell.DTE.", StringComparison.OrdinalIgnoreCase))
+                var detectedProfile = TcXaeShellVersionProfile.DetectFromRotMoniker(displayName);
+                if (detectedProfile != null)
                 {
                     int colonIdx = displayName.LastIndexOf(':');
                     if (colonIdx > 0 && int.TryParse(displayName.Substring(colonIdx + 1), out int pid))
                     {
-                        // Skip if we already track this PID
                         if (_instances.ContainsKey(pid)) continue;
 
                         try
@@ -188,8 +185,8 @@ internal sealed class HostManager
                             int hrObj = rot.GetObject(monikers[0], out object obj);
                             if (hrObj == 0 && obj is DTE dte && IsTcXaeShell(dte))
                             {
-                                result = (pid, dte);
-                                Log($"FindNewTcXaeShell: Found PID {pid}");
+                                result = (pid, dte, detectedProfile);
+                                Log($"FindNewTcXaeShell: Found PID {pid} profile={detectedProfile}");
                                 break;
                             }
                             else
@@ -246,7 +243,14 @@ internal sealed class HostManager
         try
         {
             string name = dte.Name ?? "";
-            return name.IndexOf("TcXaeShell", StringComparison.OrdinalIgnoreCase) >= 0;
+            foreach (var profile in TcXaeShellVersionProfile.AllProfiles)
+            {
+                if (name.IndexOf(profile.DteNameMatch, StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+            if (name.IndexOf("TcXae", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+            return false;
         }
         catch
         {

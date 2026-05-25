@@ -8,6 +8,7 @@ using System.Threading;
 using System.Windows.Forms;
 using EnvDTE;
 using STFormatter.Core.Formatting;
+using STFormatter.Core.Configuration;
 using STFormatter.UI;
 
 namespace STFormatter.Host;
@@ -81,11 +82,12 @@ internal class Program
 
         try
         {
-            var newInstance = _hostManager.FindNewTcXaeShell();
-            if (newInstance != null)
+            var found = _hostManager.FindNewTcXaeShell();
+            if (found != null)
             {
-                var (pid, dte) = newInstance.Value;
+                var (pid, dte, profile) = found.Value;
                 var instance = _hostManager.Register(pid, dte);
+                instance.VersionProfile = profile;
 
                 dte.Events.DTEEvents.OnBeginShutdown += () =>
                 {
@@ -171,8 +173,18 @@ internal class Program
             }
 
             string ext = Path.GetExtension(filePath)?.ToLowerInvariant() ?? "";
-            if (ext != ".tcpou" && ext != ".tcdut" && ext != ".tcgvl" &&
-                ext != ".tcio" && ext != ".tcto")
+            var profile = instance.VersionProfile ?? TcXaeShellVersionProfile.VS2017;
+            var extensions = profile.TwinCatFileExtensions;
+            bool isKnownExt = false;
+            foreach (var knownExt in extensions)
+            {
+                if (string.Equals(ext, knownExt, StringComparison.OrdinalIgnoreCase))
+                {
+                    isKnownExt = true;
+                    break;
+                }
+            }
+            if (!isKnownExt)
             {
                 Log($"HandleFormatDocument: Not a TwinCAT XML file ({ext})");
                 return;

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
+    <TargetFrameworks>net462;net48</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <PlatformTarget>x86</PlatformTarget>
     <AssemblyName>STFormatter.Discover</AssemblyName>
@@ -10,5 +10,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Interop" Version="17.0.32112.339" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\STFormatter.Core\STFormatter.Core.csproj" />
   </ItemGroup>
 </Project>
