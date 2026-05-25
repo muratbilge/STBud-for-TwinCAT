@@ -14,10 +14,12 @@
 
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\STFormatter.Core\STFormatter.Core.csproj" />
+    <ProjectReference Include="..\STFormatter.UI\STFormatter.UI.csproj" />
   </ItemGroup>
 </Project>

@@ -394,8 +394,11 @@ internal static class LiveEditor
     // Tier 3: DTE.ExecuteCommand + Clipboard
     // Must run on STA thread. Caller must ensure STA context.
     public static bool TryFormatViaExecuteCommand(EnvDTE.DTE dte, string filePath,
-        string? formattedDecl, string? formattedImpl)
+        string? formattedDecl, string? formattedImpl,
+        out string? outOriginal, out string? outFormatted)
     {
+        outOriginal = null;
+        outFormatted = null;
         Log("TryFormatViaExecuteCommand: Starting...");
         try
         {
@@ -457,7 +460,7 @@ internal static class LiveEditor
                 }
 
                 // Format the text inline — decide declaration vs implementation based on content
-                var engine = new FormattingEngine(FormattingConfiguration.Default);
+                var engine = new FormattingEngine(STFormatter.UI.SettingsManager.Current);
                 bool isDecl = LooksLikeDeclaration(currentText);
                 Log($"TryFormatViaExecuteCommand: Detected as {(isDecl ? "Declaration" : "Implementation")}");
 
@@ -470,10 +473,11 @@ internal static class LiveEditor
                 if (string.IsNullOrEmpty(formatted) || formatted == currentText)
                 {
                     Log("TryFormatViaExecuteCommand: No changes needed");
-                    // Deselect
                     try { dte.ExecuteCommand("Edit.SelectionCancel", ""); } catch { }
-                    if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { } }
-                    return formatted == currentText; // true = already formatted
+                    if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { }
+                    }
+                    if (formatted == currentText) { outOriginal = currentText; outFormatted = formatted; }
+                    return formatted == currentText;
                 }
 
                 // Paste the formatted text — current selection is already SelectAll
@@ -498,6 +502,8 @@ internal static class LiveEditor
                 }
 
                 Log("TryFormatViaExecuteCommand: SUCCESS - live edit applied");
+                outOriginal = currentText;
+                outFormatted = formatted;
                 return true;
             }
             finally
@@ -587,8 +593,11 @@ internal static class LiveEditor
 
     // Tier 4: SendKeys fallback
     public static bool TryFormatViaSendKeys(EnvDTE.DTE dte, string filePath,
-        string? formattedDecl, string? formattedImpl)
+        string? formattedDecl, string? formattedImpl,
+        out string? outOriginal, out string? outFormatted)
     {
+        outOriginal = null;
+        outFormatted = null;
         Log("TryFormatViaSendKeys: Starting...");
         try
         {
@@ -659,6 +668,8 @@ internal static class LiveEditor
             // The editor will persist the changes when the user saves.
 
             Log("TryFormatViaSendKeys: SUCCESS - live edit applied, no disk write");
+            outOriginal = "(pre-format via SendKeys)";
+            outFormatted = combined;
             return true;
         }
         catch (Exception ex)

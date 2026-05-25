@@ -1,10 +1,14 @@
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Windows.Forms;
 using EnvDTE;
 using STFormatter.Core.Formatting;
+using STFormatter.UI;
 
 namespace STFormatter.Host;
 
@@ -12,68 +16,98 @@ internal class Program
 {
     private static HostManager? _hostManager;
     private static volatile bool _running = true;
+    private static MainForm? _mainForm;
 
     [STAThread]
     static void Main(string[] args)
     {
-        FreeConsole();
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
 
         LogInit();
         Log("=== STFormatter.Host started ===");
 
         _hostManager = new HostManager();
 
-        // Main loop: discover, connect, inject, maintain
-        while (_running)
-        {
-            System.Windows.Forms.Application.DoEvents();
+        var mainForm = new MainForm(
+            getInstances: () => GetInstanceInfos(),
+            cleanup: () => CleanupStaleInstances(),
+            maintainAction: () => Maintain()
+        );
+        _mainForm = mainForm;
 
-            try
-            {
-                Maintain();
-            }
-            catch (Exception ex)
-            {
-                Log($"Maintain error: {ex.Message}");
-            }
-
-            System.Threading.Thread.Sleep(500);
-        }
+        Application.Run(mainForm);
 
         Log("Host shutting down");
         Shutdown();
     }
 
-    // --- Maintenance loop ---
+    private static IReadOnlyDictionary<int, InstanceInfo> GetInstanceInfos()
+    {
+        var result = new Dictionary<int, InstanceInfo>();
+        if (_hostManager == null) return result;
+
+        foreach (var kvp in _hostManager.GetAllInstances())
+        {
+            bool alive = _hostManager.IsInstanceAlive(kvp.Key);
+            result[kvp.Key] = new InstanceInfo
+            {
+                Connected = alive,
+                InjectedMenus = string.Join(", ", kvp.Value.InjectedMenus),
+                LastFormatTime = kvp.Value.LastFormatTime,
+                FormatCount = kvp.Value.FormatCount
+            };
+        }
+        return result;
+    }
+
+    private static void CleanupStaleInstances()
+    {
+        if (_hostManager == null) return;
+        var snapshot = _hostManager.GetAllInstances();
+        foreach (var kvp in snapshot)
+        {
+            if (!_hostManager.IsInstanceAlive(kvp.Key))
+            {
+                Log($"CleanupStale: Removing dead instance PID {kvp.Key}");
+                _hostManager.CleanupInstance(kvp.Key);
+            }
+        }
+    }
 
     private static void Maintain()
     {
         if (_hostManager == null) return;
 
-        // Discover new TcXaeShell instances (or re-register after document reload)
-        var newInstance = _hostManager.FindNewTcXaeShell();
-        if (newInstance != null)
+        try
         {
-            var (pid, dte) = newInstance.Value;
-            var instance = _hostManager.Register(pid, dte);
-
-            dte.Events.DTEEvents.OnBeginShutdown += () =>
+            var newInstance = _hostManager.FindNewTcXaeShell();
+            if (newInstance != null)
             {
-                Log($"DTE Shutdown: PID {pid}");
-                _hostManager.CleanupInstance(pid);
-            };
+                var (pid, dte) = newInstance.Value;
+                var instance = _hostManager.Register(pid, dte);
 
-            _hostManager.InjectButtons(instance);
-        }
+                dte.Events.DTEEvents.OnBeginShutdown += () =>
+                {
+                    Log($"DTE Shutdown: PID {pid}");
+                    _hostManager.CleanupInstance(pid);
+                };
 
-        // Re-inject for instances that lost their buttons (after reconnect/restart)
-        var snapshot = _hostManager.GetAllInstances();
-        foreach (var kvp in snapshot)
-        {
-            if (kvp.Value.InjectedMenus.Count == 0)
-            {
-                _hostManager.InjectButtons(kvp.Value);
+                _hostManager.InjectButtons(instance);
             }
+
+            var snapshot = _hostManager.GetAllInstances();
+            foreach (var kvp in snapshot)
+            {
+                if (kvp.Value.InjectedMenus.Count == 0)
+                {
+                    _hostManager.InjectButtons(kvp.Value);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Maintain error: {ex.Message}");
         }
     }
 
@@ -87,7 +121,7 @@ internal class Program
         }
     }
 
-    // --- Format handlers (called from HostManager button click events) ---
+    // --- Format handlers ---
 
     public static void HandleFormatDocument(int pid)
     {
@@ -145,7 +179,8 @@ internal class Program
             }
 
             string xmlContent = File.ReadAllText(filePath, System.Text.Encoding.UTF8);
-            var engine = FormattingEngineFactory.Create();
+            var config = SettingsManager.Current;
+            var engine = new FormattingEngine(config);
 
             if (!FormatTwinCatXml(xmlContent, engine, out string formattedXml, out string? formattedDecl, out string? formattedImpl))
             {
@@ -153,45 +188,54 @@ internal class Program
                 return;
             }
 
-            // Create backup before modifying
             string backupPath = filePath + ".bak";
             File.Copy(filePath, backupPath, true);
 
-            // Tier 1: Automation API via COM InvokeMember (live update, preserves undo)
+            // Tier 1: Automation API
             if (TryFormatViaAutomation(dte, filePath, formattedDecl, formattedImpl))
             {
                 File.WriteAllText(filePath, formattedXml, System.Text.Encoding.UTF8);
-                Log("HandleFormatDocument: Tier 1 (Automation API) succeeded - live update");
+                Log("HandleFormatDocument: Tier 1 (Automation API) succeeded");
+                RecordFormat(pid, filePath, "Declaration+Implementation",
+                    xmlContent, formattedXml, "Automation", true);
                 return;
             }
 
-            // Tier 2: DTE.ExecuteCommand + Clipboard (SelectAll → Delete → Paste)
-            // Tries to replace editor content in-place, avoiding file reload prompt
-            if (LiveEditor.TryFormatViaExecuteCommand(dte, filePath, formattedDecl, formattedImpl))
+            // Tier 2: DTE ExecuteCommand + Clipboard (live edit)
+            if (LiveEditor.TryFormatViaExecuteCommand(dte, filePath, formattedDecl, formattedImpl,
+                out string? orig2, out string? fmt2))
             {
                 Log("HandleFormatDocument: Tier 2 (ExecuteCommand + Clipboard) succeeded");
+                RecordFormat(pid, filePath, "LiveEdit",
+                    orig2 ?? "", fmt2 ?? "", "ExecuteCommand", true);
                 return;
             }
 
-            // Tier 3: SendKeys fallback (Ctrl+A → Delete → Ctrl+V)
-            if (LiveEditor.TryFormatViaSendKeys(dte, filePath, formattedDecl, formattedImpl))
+            // Tier 3: SendKeys fallback
+            if (LiveEditor.TryFormatViaSendKeys(dte, filePath, formattedDecl, formattedImpl,
+                out string? orig3, out string? fmt3))
             {
                 Log("HandleFormatDocument: Tier 3 (SendKeys) succeeded");
+                RecordFormat(pid, filePath, "LiveEdit",
+                    orig3 ?? "", fmt3 ?? "", "SendKeys", true);
                 return;
             }
 
-            // Tier 4: File write with IVsFileChangeEx suppression (may still show reload dialog)
+            // Tier 4: IVsFileChangeEx + RDT
             if (LiveEditor.TryFormatViaRdtFileWrite(dte, filePath, formattedXml, engine))
             {
-                Log("HandleFormatDocument: Tier 4 (RDT File Write) - file written, editor may need reload");
+                Log("HandleFormatDocument: Tier 4 (RDT File Write) succeeded");
+                RecordFormat(pid, filePath, "FileWrite",
+                    xmlContent, formattedXml, "RdtFileWrite", true);
                 return;
             }
 
-            // Tier 5: Plain file write (user must reload manually)
-            Log("HandleFormatDocument: All live-edit tiers failed, writing formatted file to disk");
-
+            // Tier 5: Plain file write
+            Log("HandleFormatDocument: All live-edit tiers failed, writing to disk");
             File.WriteAllText(filePath, formattedXml, System.Text.Encoding.UTF8);
-            Log("HandleFormatDocument: Formatted XML written to disk — user must reload the file");
+            RecordFormat(pid, filePath, "FileWrite",
+                xmlContent, formattedXml, "PlainFileWrite", true);
+            Log("HandleFormatDocument: Written to disk — user must reload");
         }
         catch (Exception ex)
         {
@@ -239,17 +283,19 @@ internal class Program
 
             string selectedText = selection.Text;
             Log($"HandleFormatSelection: PID {pid} Formatting selection ({selectedText.Length} chars)");
-            var engine = FormattingEngineFactory.Create();
+            var config = SettingsManager.Current;
+            var engine = new FormattingEngine(config);
 
-            string? formatted = engine.FormatBody(selectedText);
+            string formatted = engine.FormatBody(selectedText) ?? selectedText;
             if (formatted == selectedText)
-                formatted = engine.Format(selectedText);
+                formatted = engine.Format(selectedText) ?? selectedText;
 
-            if (formatted != null && formatted != selectedText)
+            if (formatted != selectedText)
             {
                 selection.Delete();
                 selection.Insert(formatted);
-                Log($"HandleFormatSelection: PID {pid} Selection formatted successfully");
+                Log($"HandleFormatSelection: PID {pid} Selection formatted");
+                RecordFormat(pid, instance.Dte.ActiveDocument?.FullName ?? "", "Selection", selectedText, formatted, "TextSelection", true);
             }
             else
             {
@@ -260,6 +306,35 @@ internal class Program
         {
             Log($"HandleFormatSelection: PID {pid} FAILED: {ex.Message}");
         }
+    }
+
+    public static void ShowSettingsGui()
+    {
+        _mainForm?.Invoke((Action)(() => _mainForm.ShowWindow(0)));
+    }
+
+    private static void RecordFormat(int pid, string filePath, string section,
+        string original, string formatted, string method, bool success)
+    {
+        var inst = _hostManager?.GetInstance(pid);
+        if (inst != null)
+        {
+            inst.FormatCount++;
+            inst.LastFormatTime = DateTime.Now;
+        }
+
+        var record = new FormatRecord
+        {
+            Timestamp = DateTime.Now,
+            FilePath = filePath,
+            Section = section,
+            OriginalText = original,
+            FormattedText = formatted,
+            Pid = pid,
+            Success = success,
+            Method = method
+        };
+        _mainForm?.AddFormatRecord(record);
     }
 
     // --- Three-tier live formatting ---
@@ -312,7 +387,7 @@ internal class Program
         return changed;
     }
 
-    // Tier 1: Automation API via COM InvokeMember (live update, preserves undo)
+    // Tier 1: Automation API via COM InvokeMember
     private static bool TryFormatViaAutomation(EnvDTE.DTE dte, string filePath,
         string? formattedDecl, string? formattedImpl)
     {
@@ -337,17 +412,14 @@ internal class Program
             Type t = obj.GetType();
             Log($"TryFormatViaAutomation: ProjectItem type={t.FullName}");
 
-            // Access Node via COM IDispatch reflection
             object? node = null;
             try
             {
                 node = t.InvokeMember("Node",
-                    System.Reflection.BindingFlags.GetProperty |
-                    System.Reflection.BindingFlags.Instance |
-                    System.Reflection.BindingFlags.Public,
+                    BindingFlags.GetProperty | BindingFlags.Instance | BindingFlags.Public,
                     null, obj, null);
             }
-            catch (System.MissingMethodException)
+            catch (MissingMethodException)
             {
                 Log("TryFormatViaAutomation: 'Node' property not found on COM object");
                 return false;
@@ -365,15 +437,12 @@ internal class Program
             }
             Log($"TryFormatViaAutomation: Node found, type={node.GetType().FullName}");
 
-            // Access SysManTreeItem
             Type nodeType = node.GetType();
             object? sysManItem = null;
             try
             {
                 sysManItem = nodeType.InvokeMember("SysManTreeItem",
-                    System.Reflection.BindingFlags.GetProperty |
-                    System.Reflection.BindingFlags.Instance |
-                    System.Reflection.BindingFlags.Public,
+                    BindingFlags.GetProperty | BindingFlags.Instance | BindingFlags.Public,
                     null, node, null);
             }
             catch (Exception ex)
@@ -389,7 +458,6 @@ internal class Program
             }
             Log($"TryFormatViaAutomation: SysManTreeItem found, type={sysManItem.GetType().FullName}");
 
-            // Set DeclarationText and ImplementationText
             Type adapterType = sysManItem.GetType();
 
             if (!string.IsNullOrEmpty(formattedDecl))
@@ -397,9 +465,7 @@ internal class Program
                 try
                 {
                     adapterType.InvokeMember("DeclarationText",
-                        System.Reflection.BindingFlags.SetProperty |
-                        System.Reflection.BindingFlags.Instance |
-                        System.Reflection.BindingFlags.Public,
+                        BindingFlags.SetProperty | BindingFlags.Instance | BindingFlags.Public,
                         null, sysManItem, new object[] { formattedDecl });
                     Log("TryFormatViaAutomation: DeclarationText set");
                 }
@@ -414,9 +480,7 @@ internal class Program
                 try
                 {
                     adapterType.InvokeMember("ImplementationText",
-                        System.Reflection.BindingFlags.SetProperty |
-                        System.Reflection.BindingFlags.Instance |
-                        System.Reflection.BindingFlags.Public,
+                        BindingFlags.SetProperty | BindingFlags.Instance | BindingFlags.Public,
                         null, sysManItem, new object[] { formattedImpl });
                     Log("TryFormatViaAutomation: ImplementationText set");
                 }
@@ -426,67 +490,12 @@ internal class Program
                 }
             }
 
-            Log("TryFormatViaAutomation: SUCCESS - live update applied");
+            Log("TryFormatViaAutomation: SUCCESS");
             return true;
         }
         catch (Exception ex)
         {
             Log($"TryFormatViaAutomation: {ex.GetType().Name} - {ex.Message}");
-            return false;
-        }
-    }
-
-    // Tier 2: DTE Text Selection manipulation (preserves undo history)
-    private static bool TryFormatViaTextSelection(EnvDTE.DTE dte,
-        string? formattedDecl, string? formattedImpl)
-    {
-        Log("TryFormatViaTextSelection: Attempting...");
-        try
-        {
-            if (dte.ActiveDocument == null) return false;
-
-            var selection = dte.ActiveDocument.Selection as EnvDTE.TextSelection;
-            if (selection == null)
-            {
-                Log("TryFormatViaTextSelection: No TextSelection available");
-                return false;
-            }
-
-            // Combine declaration and implementation
-            var sb = new System.Text.StringBuilder();
-            if (!string.IsNullOrEmpty(formattedDecl))
-                sb.Append(formattedDecl);
-            if (!string.IsNullOrEmpty(formattedImpl))
-            {
-                if (sb.Length > 0) sb.AppendLine().AppendLine();
-                sb.Append(formattedImpl);
-            }
-
-            string combined = sb.ToString();
-            if (string.IsNullOrEmpty(combined))
-            {
-                Log("TryFormatViaTextSelection: Empty formatted text");
-                return false;
-            }
-
-            string currentText;
-            try { currentText = selection.Text; } catch { currentText = ""; }
-
-            if (combined == currentText)
-            {
-                Log("TryFormatViaTextSelection: Text already matches");
-                return true;
-            }
-
-            selection.SelectAll();
-            selection.Delete();
-            selection.Insert(combined);
-            Log("TryFormatViaTextSelection: SUCCESS - text updated via DTE selection");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Log($"TryFormatViaTextSelection: {ex.Message}");
             return false;
         }
     }
@@ -500,21 +509,6 @@ internal class Program
         return xml.Substring(tagStart, tagEnd - tagStart + 1);
     }
 
-    // --- Factory ---
-
-    private static class FormattingEngineFactory
-    {
-        public static FormattingEngine Create()
-        {
-            return new FormattingEngine(FormattingConfiguration.Default);
-        }
-    }
-
-    // --- Console hiding ---
-
-    [DllImport("kernel32.dll")]
-    private static extern bool FreeConsole();
-
     // --- Logging ---
 
     private static string? _logPath;
@@ -524,7 +518,7 @@ internal class Program
         _logPath = Path.Combine(Path.GetTempPath(), "STFormatter_Host.log");
     }
 
-    private static void Log(string message)
+    internal static void Log(string message)
     {
         try
         {

@@ -14,6 +14,8 @@ internal sealed class TcXaeInstance
     public DTE Dte { get; private set; }
     public HashSet<string> InjectedMenus { get; } = new(StringComparer.OrdinalIgnoreCase);
     public List<CommandBarControl> InjectedControls { get; } = new();
+    public int FormatCount { get; set; }
+    public DateTime? LastFormatTime { get; set; }
 
     public TcXaeInstance(int pid, DTE dte)
     {
@@ -314,7 +316,17 @@ internal sealed class HostManager
                 Program.HandleFormatSelection(instance.Pid);
             instance.InjectedControls.Add(selBtn);
 
-            Log($"AddButtons: PID {instance.Pid} +2 buttons to '{targetMenu.Name}'");
+            // Open Formatter Settings
+            var settingsBtn = (CommandBarButton)targetMenu.Controls.Add(
+                MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+            settingsBtn.Caption = "ST Formatter Settings";
+            settingsBtn.TooltipText = "Open the ST Formatter settings window";
+            settingsBtn.Tag = "STFormatter.OpenSettings";
+            settingsBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+                Program.ShowSettingsGui();
+            instance.InjectedControls.Add(settingsBtn);
+
+            Log($"AddButtons: PID {instance.Pid} +3 buttons to '{targetMenu.Name}'");
         }
         catch (Exception ex)
         {
