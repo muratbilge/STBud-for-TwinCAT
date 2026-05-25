@@ -107,7 +107,7 @@ The TcXaeShell extension cannot be distributed as a VSIX. It requires manual dep
 
 | Aspect | VS 2022 VSIX | TcXaeShell |
 |---|---|---|
-| Target framework | net48 | net462/x86 |
+| Target framework | net48 | net462/net48 x86 (depends on TcXaeShell version) |
 | Installation | VSIX installer | Manual copy + registry |
 | DLL location | VS extension directory | `C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\` |
 | Menu resource | VSIX manifest | Registry entry (must be version 1) |
@@ -120,7 +120,7 @@ The TcXaeShell extension cannot be distributed as a VSIX. It requires manual dep
 dotnet build src/STFormatter.TcXaeShell/STFormatter.TcXaeShell.csproj -c Release
 ```
 
-Output: `src/STFormatter.TcXaeShell/bin/Release/net462/`
+Output: `src/STFormatter.TcXaeShell/bin/Release/net48/` (or `net462/` for older TcXaeShell versions)
 
 ### Deployment / Bereitstellung
 
@@ -128,7 +128,7 @@ Output: `src/STFormatter.TcXaeShell/bin/Release/net462/`
 
 ```powershell
 # Stop TcXaeShell first!
-$src = "src\STFormatter.TcXaeShell\bin\Release\net462"
+$src = "src\STFormatter.TcXaeShell\bin\Release\net48"  # use net462 for older TcXaeShell
 $dst = "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter"
 
 New-Item -ItemType Directory -Path $dst -Force
@@ -150,6 +150,7 @@ reg import register_tcxae.reg
 Clear caches:
 
 ```powershell
+# NOTE: Replace "15.0" with your TcXaeShell version (15.0=VS2017, 14.0=VS2015, 12.0=VS2013)
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Beckhoff\TcXaeShell\15.0_IsoShell\ComponentModelCache"
 Remove-Item -Force "$env:LOCALAPPDATA\Beckhoff\TcXaeShell\15.0\Extensions\extensions.en-US.cache"
 ```
@@ -245,5 +246,5 @@ For TcXaeShell, create a deployment package:
   uses: actions/upload-artifact@v3
   with:
     name: TcXaeShell
-    path: src/STFormatter.TcXaeShell/bin/Release/net462/*.dll
+        path: src/STFormatter.TcXaeShell/bin/Release/net48/*.dll
 ```

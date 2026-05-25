@@ -90,20 +90,24 @@ dotnet build TwinCAT.STFormatter.sln -c Release
 ## Option 3: TwinCAT XAE Shell (TcXaeShell)
 
 ### Prerequisites / Voraussetzungen
-- TwinCAT XAE Shell (Beckhoff TcXaeShell 4024+)
-- .NET Framework 4.6.2+ (included with Windows)
+- TwinCAT XAE Shell (Beckhoff TcXaeShell — version determines the VS Shell generation: 4024+ = 15.0, older builds = 14.0 or 12.0)
+- .NET Framework 4.6.2+ (4.6.2 for older TcXaeShell versions; 4.8 for current TcXaeShell 15.0)
 - Admin privileges for deployment
 
-> **Note / Hinweis:** TcXaeShell is a 32-bit Visual Studio 2017 Isolated Shell application.
+> **Note / Hinweis:** TcXaeShell is a 32-bit Visual Studio Isolated Shell application (VS 2017 v15, VS 2015 v14, or VS 2013 v12 depending on the TwinCAT build).
 > The extension must be deployed manually — there is no VSIX installer for TcXaeShell.
 
 ### Build from Source / Quellcode erstellen
 
 ```bash
 dotnet build src/STFormatter.TcXaeShell/STFormatter.TcXaeShell.csproj -c Release
+# Use net48 target for machines with .NET 4.8+ (current TcXaeShell 15.0):
+#   output: src/STFormatter.TcXaeShell/bin/Release/net48/
+# Use net462 target for older machines with only .NET 4.6.2 (TcXaeShell 14.0/12.0):
+#   output: src/STFormatter.TcXaeShell/bin/Release/net462/
 ```
 
-Output files are in `src/STFormatter.TcXaeShell/bin/Release/net462/`.
+Output files are in `src/STFormatter.TcXaeShell/bin/Release/net48/` (or `net462/` for older TcXaeShell).
 
 ### Deploy / Bereitstellung
 
@@ -117,7 +121,7 @@ Close all instances of TcXaeShell before deploying.
 
 ```powershell
 # Run as Administrator
-$src = "src\STFormatter.TcXaeShell\bin\Release\net462"
+$src = "src\STFormatter.TcXaeShell\bin\Release\net48"  # use net462 for older TcXaeShell
 $dst = "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter"
 
 # Create destination if needed
@@ -147,6 +151,7 @@ This registers the package, menu commands, and options page.
 **Step 4: Clear caches**
 
 ```powershell
+# NOTE: Replace "15.0" with your TcXaeShell version (15.0=VS2017, 14.0=VS2015, 12.0=VS2013)
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Beckhoff\TcXaeShell\15.0_IsoShell\ComponentModelCache"
 Remove-Item -Force "$env:LOCALAPPDATA\Beckhoff\TcXaeShell\15.0\Extensions\extensions.en-US.cache"
 ```

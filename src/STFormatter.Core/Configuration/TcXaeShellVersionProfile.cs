@@ -27,8 +27,8 @@ public sealed class TcXaeShellVersionProfile
         Name = name;
         DteVersion = dteVersion;
         VsShellGeneration = vsShellGeneration;
-        PrimaryRotMonikerPrefix = $"!TcXaeShell.DTE.{dteVersion}.";
-        FallbackRotMonikerPrefix = $"!VisualStudio.DTE.{dteVersion}.";
+        PrimaryRotMonikerPrefix = $"!TcXaeShell.DTE.{dteVersion}:";
+        FallbackRotMonikerPrefix = $"!VisualStudio.DTE.{dteVersion}:";
         RegistryRoot = registryRoot;
         RequiredFramework = requiredFramework;
         TargetContextMenuNames = new[] { "PlcCodeWinContextMenu", "Code Window" };
@@ -78,12 +78,17 @@ public sealed class TcXaeShellVersionProfile
         if (displayName.StartsWith("!TcXaeShell.DTE.", StringComparison.OrdinalIgnoreCase) ||
             displayName.StartsWith("!VisualStudio.DTE.", StringComparison.OrdinalIgnoreCase))
         {
-            int firstDot = displayName.IndexOf('.', 1);
-            int secondDot = displayName.IndexOf('.', firstDot + 1);
-            if (firstDot > 0 && secondDot > firstDot)
+            // Format: !TcXaeShell.DTE.15.0:28196 or !VisualStudio.DTE.15.0:28196
+            // Extract version between "!<prefix>.DTE." and ":PID"
+            int dteEnd = displayName.IndexOf(".DTE.", StringComparison.OrdinalIgnoreCase);
+            if (dteEnd > 0)
             {
-                string version = displayName.Substring(firstDot + 1, secondDot - firstDot - 1);
-                return FromDteVersion(version);
+                int versionStart = dteEnd + 5; // skip ".DTE."
+                int colonIdx = displayName.IndexOf(':', versionStart);
+                string versionPart = colonIdx > versionStart
+                    ? displayName.Substring(versionStart, colonIdx - versionStart)
+                    : displayName.Substring(versionStart);
+                return FromDteVersion(versionPart);
             }
         }
 

@@ -30,10 +30,10 @@ dotnet test tests/STFormatter.Core.Tests
 
 ## TcXaeShell Development Workflow / TcXaeShell-Entwicklungsworkflow
 
-1. Build: `dotnet build src\STFormatter.TcXaeShell -c Release`
+1. Build: `dotnet build src\STFormatter.TcXaeShell -c Release` (use `-p:TargetFramework=net462` for older TcXaeShell)
 2. Stop TcXaeShell
 3. Run deploy script as admin (copies DLLs to `C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\`)
-4. Clear caches:
+4. Clear caches (replace `15.0` with your TcXaeShell version — 15.0, 14.0, or 12.0):
    - Delete `%LOCALAPPDATA%\Beckhoff\TcXaeShell\15.0_IsoShell\ComponentModelCache\`
    - Delete `%LOCALAPPDATA%\Beckhoff\TcXaeShell\15.0\Extensions\extensions.en-US.cache`
 5. Restart TcXaeShell
@@ -61,7 +61,7 @@ dotnet test tests/STFormatter.Core.Tests
 
 ## TcXaeShell Technical Notes / TcXaeShell-Technische Hinweise
 
-- It is a 32-bit VS 2017 Isolated Shell — must target `net462/x86`
+- It is a 32-bit VS Isolated Shell (VS 2017 v15, VS 2015 v14, or VS 2013 v12 depending on TwinCAT build) — must target `net462/x86` or `net48/x86`
 - VS SDK 15.9.3 reference, VSSDK BuildTools 17.12.2069 for sdk-style project
 - Menu resource version must stay at 1
 - Beckhoff DLLs referenced with `Private=false`, loaded via TwinCAT binding path

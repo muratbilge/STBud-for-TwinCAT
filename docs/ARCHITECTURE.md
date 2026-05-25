@@ -34,7 +34,7 @@ TwinCAT.STFormatter.sln
 |   +-- STFormatter.Core/        net8.0;net48;net462   Formatting engine
 |   +-- STFormatter.CLI/         net8.0                 Command-line interface
 |   +-- STFormatter.VSIX/        net48                  Visual Studio 2022 extension
-|   +-- STFormatter.TcXaeShell/  net462/x86             TcXaeShell extension
+|   +-- STFormatter.TcXaeShell/  net462;net48/x86        TcXaeShell extension
 |
 +-- tests/
 |   +-- STFormatter.Core.Tests/  net8.0, xUnit          57 unit tests
@@ -43,7 +43,7 @@ TwinCAT.STFormatter.sln
 +-- samples/                                            Sample ST files
 ```
 
-The solution contains four projects sharing a single formatting engine (`STFormatter.Core`). The Core project is multi-targeted so that every consumer — CLI (.NET 8), Visual Studio (.NET Framework 4.8), and TcXaeShell (.NET Framework 4.6.2, x86) — references the same code compiled for its runtime.
+The solution contains four projects sharing a single formatting engine (`STFormatter.Core`). The Core project is multi-targeted so that every consumer — CLI (.NET 8), Visual Studio (.NET Framework 4.8), and TcXaeShell (.NET Framework 4.6.2 or 4.8, x86) — references the same code compiled for its runtime.
 
 ---
 
@@ -54,7 +54,7 @@ The solution contains four projects sharing a single formatting engine (`STForma
 | `STFormatter.Core`               | net8.0;net48;net462 | Immutable formatting engine: lexer, parser, syntax tree, visitor      |
 | `STFormatter.CLI`                | net8.0              | Command-line tool for batch formatting, checking, and config management |
 | `STFormatter.VSIX`               | net48               | Visual Studio 2022 extension with commands, options page, format-on-save |
-| `STFormatter.TcXaeShell`         | net462/x86          | TwinCAT XAE Shell extension with identical features as VSIX            |
+| `STFormatter.TcXaeShell`         | net462;net48/x86    | TwinCAT XAE Shell extension with identical features as VSIX            |
 | `STFormatter.Core.Tests`         | net8.0              | xUnit test suite (57 tests) covering lexer, parser, and formatting    |
 
 ---
@@ -535,15 +535,15 @@ TwinCAT stores ST source in `.TcPOU` XML files:
 
 ## 7. STFormatter.TcXaeShell — TwinCAT Extension / TcXaeShell-Erweiterung
 
-**Target**: net462, x86 (32-bit)
+**Target**: net462 or net48, x86 (32-bit)
 **Host**: Beckhoff TcXaeShell (TwinCAT engineering environment)
 
-The TcXaeShell extension mirrors the VSIX architecture but targets the TwinCAT-specific IDE. It is compiled as x86 because TcXaeShell runs as a 32-bit process.
+The TcXaeShell extension mirrors the VSIX architecture but targets the TwinCAT-specific IDE. It is compiled as x86 because TcXaeShell runs as a 32-bit process. The target framework depends on the TcXaeShell version: net48 for current TcXaeShell 15.0 (VS 2017 shell), net462 for older TcXaeShell 14.0/12.0 (VS 2015/2013 shells).
 
 Key differences from the VSIX:
 
-- References `STFormatter.Core` as `net462` (not `net48`)
-- Runs in a 32-bit host process
+- References `STFormatter.Core` as `net462` or `net48` (depending on TcXaeShell version)
+- Runs in a 32-bit host process (all TcXaeShell versions are x86)
 - Uses TcXaeShell-specific VS SDK APIs where they differ from Visual Studio
 - Shares the same `FormatHelper`, `FormatOnSaveHelper`, and `STFormatterOptionPage` logic adapted for the TcXaeShell environment
 
@@ -557,7 +557,8 @@ Key differences from the VSIX:
  STFormatter.Core
  +-- net8.0   ------> STFormatter.CLI
  +-- net48    ------> STFormatter.VSIX
- +-- net462   ------> STFormatter.TcXaeShell (x86)
+  +-- net462   ------> STFormatter.TcXaeShell x86 (older TcXaeShell 14.0/12.0)
+  +-- net48    ------> STFormatter.TcXaeShell x86 (current TcXaeShell 15.0)
 ```
 
 ### How It Works / Funktionsweise
@@ -587,7 +588,7 @@ Each consumer project references Core with a `ProjectReference` and MSBuild reso
 ### Rationale / Begruendung
 
 - **Single source of truth**: All formatting logic lives in one project. Bug fixes and new features propagate to every consumer automatically.
-- **API compatibility**: net462 supports TcXaeShell (x86), net48 supports VSIX (VS 2022), net8.0 supports CLI (cross-platform).
+- **API compatibility**: net462 supports older TcXaeShell (x86, VS 2015/2013 shell), net48 supports current TcXaeShell and VSIX (VS 2017 shell / VS 2022), net8.0 supports CLI (cross-platform).
 - **No duplicate code**: No copy-paste between VSIX and TcXaeShell; both reference the same engine.
 
 ---

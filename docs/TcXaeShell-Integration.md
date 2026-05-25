@@ -8,13 +8,17 @@ This document captures hard-won technical knowledge about integrating the ST For
 
 ## Architecture Overview / Architekturuebersicht
 
-TcXaeShell is a **32-bit Visual Studio 2017 Isolated Shell** (v15.0) used for PLC programming. Key characteristics:
+TcXaeShell is a **32-bit Visual Studio Isolated Shell** used for PLC programming. The specific shell version varies by TwinCAT build. Key characteristics vary by version — see the Cross-Version Compatibility section and `TcXaeShellVersionProfile` for details:
 
-- **Process**: 32-bit (x86), even on 64-bit Windows
-- **Framework**: .NET Framework 4.6
+| TcXaeShell Version | VS Shell | DTE Version | ROT Moniker | .NET FW | Registry Root |
+|---|---|---|---|---|---|
+| TC3 Build 4024+ (current) | VS 2017 | 15.0 | `!TcXaeShell.DTE.15.0:{PID}` | 4.6+ | `Software\Beckhoff\TcXaeShell\15.0` |
+| TC3 Build ~4020 | VS 2015 | 14.0 | `!TcXaeShell.DTE.14.0:{PID}` | 4.6+ | `Software\Beckhoff\TcXaeShell\14.0` |
+| TC3 Build <4020 | VS 2013 | 12.0 | `!TcXaeShell.DTE.12.0:{PID}` | 4.5.1+ | `Software\Beckhoff\TcXaeShell\12.0` |
+
+- **Process**: 32-bit (x86), even on 64-bit Windows (all versions)
 - **Install path**: `C:\Program Files (x86)\Beckhoff\TcXaeShell\`
-- **Registry root**: `HKLM\SOFTWARE\WOW6432Node\Beckhoff\TcXaeShell\15.0`
-- **Shell type**: VS 2017 Isolated Shell — not a standard VS installation
+- **Shell type**: VS Isolated Shell — not a standard VS installation
 
 The PLC editor is a CODESYS-based component embedded in the VS shell. It does not use standard VS editor infrastructure for its text content. The CODESYS engine is the source of truth, not the VS text buffer.
 
@@ -422,15 +426,13 @@ production format tool runs as an **external process** that connects via COM DTE
 
 ### Connection via ROT / Verbindung ueber ROT
 
-TcXaeShell registers DTE in the Running Object Table with the moniker:
-```
-!TcXaeShell.DTE.15.0:{PID}
-```
-**NOT** `!VisualStudio.DTE.15.0:{PID}`.
+TcXaeShell registers DTE in the Running Object Table with version-specific monikers. The DTE version is **auto-detected** at runtime via `TcXaeShellVersionProfile.DetectFromRotMoniker()` — do not hard-code a specific version:
 
-Search for both monikers in the ROT enumeration — TcXaeShell uses the
-`!TcXaeShell.DTE.15.0` prefix, while standard Visual Studio uses
-`!VisualStudio.DTE.15.0`. Only the TcXaeShell moniker will match.
+- TC3 Build 4024+: `!TcXaeShell.DTE.15.0:{PID}`
+- TC3 Build ~4020: `!TcXaeShell.DTE.14.0:{PID}`
+- TC3 Build <4020: `!TcXaeShell.DTE.12.0:{PID}`
+
+Search for both `!TcXaeShell.DTE.` and `!VisualStudio.DTE.` prefixes in the ROT enumeration — the version number varies by TcXaeShell build. Only `TcXaeShell.DTE` monikers match TcXaeShell; `VisualStudio.DTE` monikers match regular Visual Studio installations.
 
 ```csharp
 [DllImport("ole32.dll")]
@@ -450,12 +452,12 @@ while (enumMoniker.Next(1, monikers, IntPtr.Zero) == 0)
     CreateBindCtx(0, out ctx);
     monikers[0].GetDisplayName(ctx, null, out string displayName);
 
-    if (displayName.StartsWith("!TcXaeShell.DTE.", StringComparison.OrdinalIgnoreCase) ||
-        displayName.StartsWith("!VisualStudio.DTE.", StringComparison.OrdinalIgnoreCase))
+    var profile = TcXaeShellVersionProfile.DetectFromRotMoniker(displayName);
+    if (profile != null)
     {
         object comObj = rot.GetObject(monikers[0]);
         EnvDTE.DTE dte = comObj as EnvDTE.DTE;
-        // Check if this is TcXaeShell (not regular VS)
+        // profile contains version-specific values (DTE version, registry root, etc.)
     }
 }
 ```
@@ -737,6 +739,8 @@ C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\
   Microsoft.VisualStudio.Interop.dll    ← NuGet: v17.0.32112.339
 ```
 
+> **Target framework**: The Host is built for `net48` by default (for machines with .NET 4.8+). For older machines running .NET 4.6.2, build with the `net462` target instead. The `TcXaeShellVersionProfile.RequiredFramework` property indicates the minimum .NET Framework version for each TcXaeShell version.
+
 Launch (hidden):
 ```powershell
 Start-Process "C:\...\Extensions\STFormatter\STFormatter.Host.exe" -WindowStyle Hidden
@@ -918,17 +922,17 @@ Copy-Item -Path "src\STFormatter.TcXaeShell\STFormatter.TcXaeShell.pkgdef" `
 reg import register_tcxae.reg
 ```
 
-The `.reg` file registers the extension with TcXaeShell's isolated shell registry hive under `HKLM\SOFTWARE\WOW6432Node\Beckhoff\TcXaeShell\15.0`.
+The `.reg` file registers the extension with TcXaeShell's isolated shell registry hive. The registry root varies by TcXaeShell version (see `TcXaeShellVersionProfile.RegistryRoot`): `HKLM\SOFTWARE\WOW6432Node\Beckhoff\TcXaeShell\15.0` (VS 2017), `14.0` (VS 2015), or `12.0` (VS 2013).
 
 ### Cache Clear / Zwischenspeicher loeschen
 
 **Mandatory after deployment.** TcXaeShell caches extension manifests. Without clearing these caches, the extension will not load.
 
 ```powershell
-# Clear Component Model Cache
+# Clear Component Model Cache (version-specific path — adjust 15.0 to match your TcXaeShell version)
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Beckhoff\TcXaeShell\15.0_IsoShell\ComponentModelCache\*"
 
-# Clear Extensions Cache
+# Clear Extensions Cache (version-specific path — adjust 15.0 to match your TcXaeShell version)
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Beckhoff\TcXaeShell\15.0\Extensions\*"
 ```
 
@@ -964,6 +968,9 @@ When using SDK-style projects, `ProductArchitecture` must be a **child element**
                     ProductArchitecture="x86" />
 ```
 
+> **Note**: The `Version="[15.0,16.0)"` range targets VS 2017 (DTE 15.0). For multi-version TcXaeShell support, the external Host approach is used instead of VSIX — see the Cross-Version Compatibility section and `TcXaeShellVersionProfile`.
+```
+
 ### Target Framework / Zielframework
 
 ```xml
@@ -971,6 +978,56 @@ When using SDK-style projects, `ProductArchitecture` must be a **child element**
 ```
 
 The extension targets .NET Framework 4.6 to match TcXaeShell's runtime.
+
+---
+
+## Cross-Version Compatibility / Versionsuebergreifende Kompatibilitaet
+
+TcXaeShell ships in multiple versions depending on the TwinCAT 3 build. The external Host must detect and adapt to the running version at runtime. All version-specific values are encapsulated in `TcXaeShellVersionProfile` (in `STFormatter.Core/Configuration/`).
+
+### TcXaeShellVersionProfile
+
+| Property | Purpose | Varies by Version? |
+|---|---|---|
+| `DteVersion` | DTE version string (e.g. `"15.0"`, `"14.0"`, `"12.0"`) | Yes |
+| `VsShellGeneration` | VS shell generation (e.g. `"2017"`, `"2015"`, `"2013"`) | Yes |
+| `PrimaryRotMonikerPrefix` | `!TcXaeShell.DTE.{version}:` | Yes |
+| `FallbackRotMonikerPrefix` | `!VisualStudio.DTE.{version}:` | Yes |
+| `RegistryRoot` | Registry path (e.g. `Software\Beckhoff\TcXaeShell\15.0`) | Yes |
+| `RequiredFramework` | Minimum .NET Framework (e.g. `"4.6"`, `"4.5.1"`) | Yes |
+| `TargetContextMenuNames` | Context menu names | No (consistent) |
+| `TwinCatFileExtensions` | File extensions (.TcPOU, .TcDUT, etc.) | No (consistent) |
+| `ProcessName` | Always `"TcXaeShell"` | No |
+| `InstallPathPattern` | Always `Beckhoff\TcXaeShell\Common7\IDE\` | No |
+
+### Predefined Profiles
+
+```csharp
+TcXaeShellVersionProfile.VS2017  // TC3 Build 4024+, DTE 15.0, .NET 4.6+
+TcXaeShellVersionProfile.VS2015  // TC3 Build ~4020, DTE 14.0, .NET 4.6+
+TcXaeShellVersionProfile.VS2013  // TC3 Build <4020, DTE 12.0, .NET 4.5.1+
+```
+
+### Auto-Detection
+
+`TcXaeShellVersionProfile.DetectFromRotMoniker(string displayName)` automatically identifies the TcXaeShell version from the ROT moniker:
+
+1. Checks all known profiles (VS2017, VS2015, VS2013) for prefix matches
+2. Falls back to dynamic version parsing for unrecognized `!TcXaeShell.DTE.{version}:{PID}` or `!VisualStudio.DTE.{version}:{PID}` monikers
+3. Returns `null` for non-TcXaeShell monikers
+
+The Host scans the ROT for all known TcXaeShell moniker patterns at startup and on each reconnection cycle. This ensures forward compatibility with future TcXaeShell versions.
+
+### Stable Cross-Version Constants
+
+These are consistent across all TcXaeShell versions and safe to use without version branching:
+
+- DTE commands: `Edit.SelectAll`, `Edit.Copy`, `Edit.Delete`, `Edit.Paste`, `Edit.SelectionCancel`
+- Context menu names: `PlcCodeWinContextMenu`, `Code Window`
+- File extensions: `.TcPOU`, `.TcDUT`, `.TcGVL`, `.TcIO`, `.TcTO`
+- Process name: `TcXaeShell`
+- Bitness: Always x86 (32-bit)
+- `Microsoft.VisualStudio.Interop` v17.0.32112.339 — backward-compatible for DTE COM access
 
 ---
 
@@ -1100,7 +1157,7 @@ RDT → FindAndLockDocument()
 
 **External Host** (production approach):
 ```
-ROT → !TcXaeShell.DTE.15.0:{PID}
+ROT → !TcXaeShell.DTE.{version}:{PID}  (version auto-detected via TcXaeShellVersionProfile)
   → DTE.CommandBars["PlcCodeWinContextMenu"] → Inject buttons
   → Button click:
     → Edit.SelectAll → Edit.Copy → Win32 clipboard read
@@ -1114,8 +1171,8 @@ ROT → !TcXaeShell.DTE.15.0:{PID}
 1. Build: `dotnet build src\STFormatter.TcXaeShell -c Release`
 2. Copy DLLs + `.pkgdef` to `C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\`
 3. Import `register_tcxae.reg`
-4. Delete `%LOCALAPPDATA%\Beckhoff\TcXaeShell\15.0_IsoShell\ComponentModelCache\`
-5. Delete `%LOCALAPPDATA%\Beckhoff\TcXaeShell\15.0\Extensions\`
+4. Delete `%LOCALAPPDATA%\Beckhoff\TcXaeShell\{version}_IsoShell\ComponentModelCache\` (version varies: 15.0, 14.0, or 12.0)
+5. Delete `%LOCALAPPDATA%\Beckhoff\TcXaeShell\{version}\Extensions\` (version varies: 15.0, 14.0, or 12.0)
 6. Restart TcXaeShell
 
 ### Failed Approaches Summary / Zusammenfassung der gescheiterten Ansaetze
@@ -1148,7 +1205,11 @@ ROT → !TcXaeShell.DTE.15.0:{PID}
 
 ```
 +----------------------------------------------------------+
-|                    TcXaeShell (VS 2017 Isolated Shell)    |
+|                    TcXaeShell (VS Isolated Shell)         |
+|                    Version varies by TC3 build:           |
+|                    Build 4024+ → VS 2017 (DTE 15.0)      |
+|                    Build ~4020  → VS 2015 (DTE 14.0)      |
+|                    Build <4020  → VS 2013 (DTE 12.0)      |
 |                                                          |
 |  +-----------------------------------------------------+ |
 |  |              PLC Editor (CODESYS-based)              | |
@@ -1167,7 +1228,8 @@ ROT → !TcXaeShell.DTE.15.0:{PID}
 |  |     External Host (STFormatter.Host.exe)             | |
 |  |                                                     | |
 |  |  COM DTE via ROT                                    | |
-|  |    Rot → !TcXaeShell.DTE.15.0:{PID}                 | |
+|  |    Rot → !TcXaeShell.DTE.{version}:{PID}            | |
+|  |    (version auto-detected via TcXaeShellVersionProfile)
 |  |    → DTE.CommandBars["PlcCodeWinContextMenu"]       | |
 |  |    → Inject Format buttons                          | |
 |  |                                                     | |
