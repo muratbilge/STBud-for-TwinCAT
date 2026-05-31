@@ -84,6 +84,70 @@ public sealed class FormattingEngine
         return extractedFallback;
     }
 
+    public string FormatDeclaration(string declaration)
+    {
+        if (string.IsNullOrWhiteSpace(declaration))
+            return declaration;
+
+        var wrapper = $"PROGRAM __DECL_WRAPPER__\n{declaration}\nEND_PROGRAM";
+        var text = Text.SourceText.From(wrapper);
+        var parser = new Parsing.Parser(text);
+        var tree = parser.Parse();
+
+        var writer = new FormattingWriter(_config);
+        var visitor = new FormattingVisitor(writer, _config);
+
+        // Find the declaration sections inside the wrapper PROGRAM
+        var pouDecl = tree.Root.ChildNodes.FirstOrDefault();
+        if (pouDecl != null)
+        {
+            // Look for VarSection child nodes
+            bool visitedAny = false;
+            foreach (var child in pouDecl.ChildNodes)
+            {
+                if (child.Kind == SyntaxKind.VarSection)
+                {
+                    visitor.Visit(child);
+                    visitedAny = true;
+                }
+            }
+
+            if (visitedAny)
+            {
+                var extracted = writer.ToString();
+                extracted = StripCommonIndent(extracted);
+
+                var inputUsesCrLf = declaration.Contains("\r\n");
+                if (inputUsesCrLf && !extracted.Contains("\r\n"))
+                    extracted = extracted.Replace("\n", "\r\n");
+
+                return extracted;
+            }
+        }
+
+        // Fallback: format the whole wrapper and extract via string matching
+        var formatted = Format(tree);
+        var markerStart = "PROGRAM __DECL_WRAPPER__\n";
+        var markerEnd = "\nEND_PROGRAM";
+
+        string? extractedFallback = null;
+        if (formatted.StartsWith(markerStart) && formatted.EndsWith(markerEnd))
+        {
+            extractedFallback = formatted.Substring(markerStart.Length, formatted.Length - markerStart.Length - markerEnd.Length);
+        }
+
+        if (extractedFallback == null)
+            return declaration;
+
+        extractedFallback = StripCommonIndent(extractedFallback);
+
+        var usesCrLf = declaration.Contains("\r\n");
+        if (usesCrLf && !extractedFallback.Contains("\r\n"))
+            extractedFallback = extractedFallback.Replace("\n", "\r\n");
+
+        return extractedFallback;
+    }
+
     private static string StripCommonIndent(string text)
     {
         var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);

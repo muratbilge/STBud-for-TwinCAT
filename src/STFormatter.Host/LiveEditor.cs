@@ -571,19 +571,47 @@ internal static class LiveEditor
 
                 Log($"TryFormatSelectionViaExecuteCommand: Read {selectedText.Length} chars from selection");
 
+                Log($"TryFormatSelectionViaExecuteCommand: Original text: [{selectedText.Replace("\r", "\\r").Replace("\n", "\\n")}]");
+
                 var engine = new FormattingEngine(STFormatter.UI.SettingsManager.Current);
+                var formatter = new TwinCatXmlFormatter(engine);
 
-                string? formatted = engine.FormatBody(selectedText) ?? selectedText;
-                if (string.IsNullOrEmpty(formatted) || formatted == selectedText)
-                    formatted = engine.Format(selectedText) ?? selectedText;
+                string? formatted;
+                if (TwinCatXmlFormatter.LooksLikeDeclaration(selectedText))
+                {
+                    Log("TryFormatSelectionViaExecuteCommand: Detected as Declaration");
+                    formatted = engine.FormatDeclaration(selectedText);
+                    if (string.IsNullOrEmpty(formatted) || formatted == selectedText)
+                    {
+                        Log("TryFormatSelectionViaExecuteCommand: FormatDeclaration failed or unchanged, trying Format as fallback");
+                        formatted = engine.Format(selectedText);
+                    }
+                }
+                else
+                {
+                    Log("TryFormatSelectionViaExecuteCommand: Detected as Implementation (body)");
+                    formatted = engine.FormatBody(selectedText);
+                    if (string.IsNullOrEmpty(formatted) || formatted == selectedText)
+                    {
+                        Log("TryFormatSelectionViaExecuteCommand: FormatBody failed or unchanged, trying Format as fallback");
+                        formatted = engine.Format(selectedText);
+                    }
+                }
 
-                if (string.IsNullOrEmpty(formatted) || formatted == selectedText)
+                if (string.IsNullOrEmpty(formatted))
+                {
+                    Log("TryFormatSelectionViaExecuteCommand: Formatter returned empty — parse error or unsupported snippet");
+                    if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { } }
+                    return false;
+                }
+
+                if (formatted == selectedText)
                 {
                     Log("TryFormatSelectionViaExecuteCommand: No changes needed");
                     if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { } }
                     outOriginal = selectedText;
                     outFormatted = formatted;
-                    return formatted == selectedText;
+                    return true;
                 }
 
                 if (!SetClipboardText(formatted))

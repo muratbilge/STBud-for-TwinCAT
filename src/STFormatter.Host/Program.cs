@@ -300,6 +300,11 @@ internal class Program
                 Log($"HandleFormatSelection: PID {pid} No text selected — showing info");
                 ShowInfoMessage("No text selected.\n\nPlease select code first, then use Format Selected Code.");
             }
+            else if (!success)
+            {
+                Log($"HandleFormatSelection: PID {pid} Could not format selection — showing info");
+                ShowInfoMessage("Could not format the selected code.\n\nThe selection may be too small or contain incomplete ST syntax.\nTry selecting a larger code block or use Format Document instead.");
+            }
         }
         catch (Exception ex)
         {
