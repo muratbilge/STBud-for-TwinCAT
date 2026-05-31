@@ -1,6 +1,35 @@
 # How to Install — TwinCAT ST Formatter
 
-Step-by-step installation instructions for all three deployment targets.
+Step-by-step installation instructions for all deployment targets.
+
+---
+
+## 0. One-Click Installer (Easiest)
+
+Download and run the installer — it covers all three platforms:
+
+```
+STFormatter-Setup-1.0.0.exe
+```
+
+The installer lets you choose which components to install:
+
+- **CLI Tool** — `stfmt` command (requires .NET 8 runtime)
+- **VS 2022 Extension** — installs VSIX silently
+- **TcXaeShell Host** — deploys to TcXaeShell extensions folder
+
+### Building the Installer from Source
+
+Prerequisites: .NET 8 SDK, .NET Framework 4.6.2/4.8 targeting packs, Inno Setup 6, VS 2022 with VSSDK workload (for VSIX)
+
+```powershell
+.\installer\build-installer.ps1                    # Build everything + create installer
+.\installer\build-installer.ps1 -SkipVSIX           # Skip VSIX if no VS SDK
+.\installer\build-installer.ps1 -SkipInstaller       # Build binaries only, no installer
+.\installer\build-installer.ps1 -Configuration Release -Version 1.0.0  # Custom config/version
+```
+
+Output: `publish\STFormatter-Setup-1.0.0.exe`
 
 ---
 

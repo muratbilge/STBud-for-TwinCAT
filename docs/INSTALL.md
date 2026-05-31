@@ -4,10 +4,51 @@
 
 Choose your installation method:
 
+- [Option 0: One-Click Installer (All Platforms)](#option-0-one-click-installer)
 - [Option 1: CLI Tool (Command Line)](#option-1-cli-tool)
 - [Option 2: Visual Studio 2022 Extension](#option-2-visual-studio-2022-extension)
 - [Option 3: TwinCAT XAE Shell (TcXaeShell)](#option-3-twincat-xae-shell-tcxaeShell)
-- [Option 4: All Platforms](#option-4-all-platforms)
+- [Option 4: All Platforms (Manual)](#option-4-all-platforms-manual)
+
+---
+
+## Option 0: One-Click Installer
+
+The easiest way to install all components at once. Download `STFormatter-Setup-1.0.0.exe` and run it.
+
+The installer lets you choose which components to install:
+
+| Component | Requires | Description |
+|---|---|---|
+| CLI Tool (stfmt) | .NET 8 runtime | Command-line formatter |
+| VS 2022 Extension | Visual Studio 2022 | Installs VSIX silently via VSIXInstaller |
+| TcXaeShell Host | Beckhoff TcXaeShell | Deploys Host to extensions folder, optional auto-start |
+
+Features:
+
+- Detects .NET 8, VS 2022, and TcXaeShell on your machine
+- Automatically picks net48 or net462 Host binaries based on your .NET Framework version
+- Optional: "Start Host on login" for TcXaeShell
+- Clean uninstall via Add/Remove Programs
+- Includes EditorConfig preset templates (stweep, compact, expanded)
+
+### Building the Installer from Source
+
+```powershell
+# Build everything and create installer
+.\installer\build-installer.ps1
+
+# Build binaries only (skip Inno Setup)
+.\installer\build-installer.ps1 -SkipInstaller
+
+# Skip VSIX if VS SDK not installed
+.\installer\build-installer.ps1 -SkipVSIX
+
+# Custom configuration and version
+.\installer\build-installer.ps1 -Configuration Release -Version 1.0.0
+```
+
+Prerequisites for building: .NET 8 SDK, .NET Framework 4.6.2+4.8 targeting packs, Inno Setup 6, VS 2022 with VSSDK workload (for VSIX).
 
 ---
 
@@ -176,7 +217,7 @@ For detailed TcXaeShell integration documentation, see [HOW-TO-INSTALL.md](HOW-T
 
 ---
 
-## Option 4: All Platforms
+## Option 4: All Platforms (Manual)
 
 ```bash
 # 1. Build everything
