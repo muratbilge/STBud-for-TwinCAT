@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="ST_MotorConfig" Id="{a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d}">
+    <Declaration><![CDATA[TYPE ST_MotorConfig :
+STRUCT
+nominalSpeed:REAL;
+maxSpeed:REAL;
+acceleration:REAL;
+deceleration:REAL;
+direction:DINT;
+enabled:BOOL;
+name:STRING[32];
+position:ST_Point;
+pTarget:POINTER TO REAL;
+refFeedback:REF_TO REAL;
+errorCodes:ARRAY[1..10] OF DINT;
+timestamps:ARRAY[1..10] OF DT;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

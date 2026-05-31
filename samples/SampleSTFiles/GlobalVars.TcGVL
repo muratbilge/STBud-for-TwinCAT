@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <GVL Name="GlobalVars" Id="{d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f80}">
+    <Declaration><![CDATA[VAR_GLOBAL
+maxSpeed:REAL:=100.0;
+minSpeed:REAL:=0.0;
+defaultTimeout:TIME:=T#5s;
+errorCount:DINT:=0;
+systemName:STRING[32]:='TwinCAT3';
+axes:ARRAY[1..8] OF ST_AxisConfig;
+connected:BOOL:=FALSE;
+END_VAR
+]]></Declaration>
+  </GVL>
+</TcPlcObject>

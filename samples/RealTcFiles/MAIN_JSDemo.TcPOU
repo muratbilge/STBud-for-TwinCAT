@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="MAIN" Id="{e3295d21-a5cf-44a6-aa31-31f34392133a}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR
+            byteValue    : BYTE:=33;
+            wordValue    : WORD:=44;
+            dwordValue   :DWORD:=32;
+            sintValue    :SINT:=44;
+            intValue     :INT:=434;
+            dintValue    :DINT:=4345;
+            realValue    :REAL:=234.54;
+            lrealValue   :LREAL:=33.244;
+	
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <LineIds Name="MAIN">
+      <LineId Id="51" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <AssemblyName>STFormatter.UI</AssemblyName>
+    <ProjectGuid>{E41A4CE9-4705-435B-8CF2-5F61B93EFDDA}</ProjectGuid>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Text.Json" Version="8.0.5" />

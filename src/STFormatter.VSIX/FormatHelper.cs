@@ -130,25 +130,9 @@ internal static class FormatHelper
     {
         var xmlContent = File.ReadAllText(filePath);
         var doc = XDocument.Parse(xmlContent);
-        var engine = new FormattingEngine(config);
+        var formatter = new TwinCatXmlFormatter(config);
 
-        bool modified = false;
-
-        // Handle POU files: .TcPOU
-        if (filePath.EndsWith(".TcPOU", StringComparison.OrdinalIgnoreCase))
-        {
-            modified |= FormatTcPou(doc, engine);
-        }
-        // Handle DUT files: .TcDUT
-        else if (filePath.EndsWith(".TcDUT", StringComparison.OrdinalIgnoreCase))
-        {
-            modified |= FormatTcDut(doc, engine);
-        }
-        // Handle GVL files: .TcGVL
-        else if (filePath.EndsWith(".TcGVL", StringComparison.OrdinalIgnoreCase))
-        {
-            modified |= FormatTcGvl(doc, engine);
-        }
+        bool modified = formatter.FormatXDocument(doc);
 
         if (modified)
         {
@@ -163,102 +147,6 @@ internal static class FormatHelper
             using var writer = XmlWriter.Create(filePath, settings);
             doc.Save(writer);
         }
-    }
-
-    private static bool FormatTcPou(XDocument doc, FormattingEngine engine)
-    {
-        bool modified = false;
-
-        // Format Implementation ST code
-        var implementationSt = doc.Descendants()
-            .Where(e => e.Name == "Implementation" || e.Name.LocalName == "Implementation")
-            .Descendants()
-            .FirstOrDefault(e => e.Name == "ST" || e.Name.LocalName == "ST");
-
-        if (implementationSt != null)
-        {
-            var cdata = implementationSt.Nodes().OfType<XCData>().FirstOrDefault();
-            if (cdata != null)
-            {
-                var formatted = engine.Format(cdata.Value);
-                if (formatted != cdata.Value)
-                {
-                    cdata.Value = formatted;
-                    modified = true;
-                }
-            }
-        }
-
-        // Format Declaration code
-        var declaration = doc.Descendants()
-            .Where(e => e.Name == "Declaration" || e.Name.LocalName == "Declaration")
-            .FirstOrDefault();
-
-        if (declaration != null)
-        {
-            var cdata = declaration.Nodes().OfType<XCData>().FirstOrDefault();
-            if (cdata != null)
-            {
-                var formatted = engine.Format(cdata.Value);
-                if (formatted != cdata.Value)
-                {
-                    cdata.Value = formatted;
-                    modified = true;
-                }
-            }
-        }
-
-        return modified;
-    }
-
-    private static bool FormatTcDut(XDocument doc, FormattingEngine engine)
-    {
-        bool modified = false;
-
-        var declaration = doc.Descendants()
-            .Where(e => e.Name == "Declaration" || e.Name.LocalName == "Declaration")
-            .FirstOrDefault();
-
-        if (declaration != null)
-        {
-            var cdata = declaration.Nodes().OfType<XCData>().FirstOrDefault();
-            if (cdata != null)
-            {
-                var formatted = engine.Format(cdata.Value);
-                if (formatted != cdata.Value)
-                {
-                    cdata.Value = formatted;
-                    modified = true;
-                }
-            }
-        }
-
-        return modified;
-    }
-
-    private static bool FormatTcGvl(XDocument doc, FormattingEngine engine)
-    {
-        bool modified = false;
-
-        var declaration = doc.Descendants()
-            .Where(e => e.Name == "Declaration" || e.Name.LocalName == "Declaration")
-            .FirstOrDefault();
-
-        if (declaration != null)
-        {
-            var cdata = declaration.Nodes().OfType<XCData>().FirstOrDefault();
-            if (cdata != null)
-            {
-                var formatted = engine.Format(cdata.Value);
-                if (formatted != cdata.Value)
-                {
-                    cdata.Value = formatted;
-                    modified = true;
-                }
-            }
-        }
-
-        return modified;
     }
 
     private static FormattingConfiguration GetConfiguration(AsyncPackage package)

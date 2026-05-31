@@ -1,0 +1,3 @@
+TYPE eAlarmPriority :
+(LOW, MEDIUM := 5, HIGH := 10, CRITICAL := 20)
+END_TYPE

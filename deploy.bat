@@ -5,7 +5,7 @@ echo.
 set TFM=net48
 if "%1"=="net462" set TFM=net462
 
-set SRC=C:\Users\murat\Desktop\Playground\TwinCATPlugins\CodeFormatter\src\STFormatter.Host\bin\Debug\%TFM%
+set SRC=%~dp0src\STFormatter.Host\bin\Debug\%TFM%
 set DST=C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter
 
 echo Deploying %TFM% build...

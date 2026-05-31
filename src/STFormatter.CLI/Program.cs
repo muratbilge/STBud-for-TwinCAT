@@ -10,6 +10,11 @@ class Program
     private static readonly string[] SupportedExtensions = { ".st", ".txt", ".iecst", ".tcpou", ".tcdut", ".tcgvl", ".tcio" 
     };
 
+    private static readonly string[] TwinCatXmlExtensions = { ".tcpou", ".tcdut", ".tcgvl", ".tcio", ".tcto" };
+
+    private static bool IsTwinCatXml(string extension) =>
+        Array.IndexOf(TwinCatXmlExtensions, extension.ToLowerInvariant()) >= 0;
+
     static int Main(string[] args)
     {
         if (args.Length == 0)
@@ -53,19 +58,47 @@ class Program
 
         try
         {
-            var source = File.ReadAllText(filePath);
-            var config = FormattingEngine.LoadConfiguration(filePath);
-            var engine = new FormattingEngine(config);
-            var formatted = engine.Format(source);
+            var extension = Path.GetExtension(filePath).ToLowerInvariant();
 
-            if (dryRun)
+            if (IsTwinCatXml(extension))
             {
-                Console.WriteLine(formatted);
+                var xml = File.ReadAllText(filePath);
+                var config = FormattingEngine.LoadConfiguration(filePath);
+                var formatter = new TwinCatXmlFormatter(config);
+
+                if (formatter.FormatXmlContent(xml, out var formattedXml, out _, out _))
+                {
+                    if (dryRun)
+                    {
+                        Console.WriteLine(formattedXml);
+                    }
+                    else
+                    {
+                        File.WriteAllText(outputPath, formattedXml);
+                        Console.WriteLine($"Formatted: {filePath} -> {outputPath}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"Already formatted: {filePath}");
+                }
             }
             else
             {
-                File.WriteAllText(outputPath, formatted);
-                Console.WriteLine($"Formatted: {filePath} -> {outputPath}");
+                var source = File.ReadAllText(filePath);
+                var config = FormattingEngine.LoadConfiguration(filePath);
+                var engine = new FormattingEngine(config);
+                var formatted = engine.Format(source);
+
+                if (dryRun)
+                {
+                    Console.WriteLine(formatted);
+                }
+                else
+                {
+                    File.WriteAllText(outputPath, formatted);
+                    Console.WriteLine($"Formatted: {filePath} -> {outputPath}");
+                }
             }
 
             return 0;
@@ -152,27 +185,56 @@ class Program
             {
                 try
                 {
-                    var source = File.ReadAllText(file);
-                    var config = FormattingEngine.LoadConfiguration(file);
-                    var engine = new FormattingEngine(config);
-                    var formatted = engine.Format(source);
+                    var extension = Path.GetExtension(file).ToLowerInvariant();
 
-                    if (formatted != source)
+                    if (IsTwinCatXml(extension))
                     {
-                        if (dryRun)
+                        var xml = File.ReadAllText(file);
+                        var config = FormattingEngine.LoadConfiguration(file);
+                        var formatter = new TwinCatXmlFormatter(config);
+
+                        if (formatter.FormatXmlContent(xml, out var formattedXml, out _, out _))
                         {
-                            Console.WriteLine($"[DRY RUN] Would format: {file}");
+                            if (dryRun)
+                            {
+                                Console.WriteLine($"[DRY RUN] Would format: {file}");
+                            }
+                            else
+                            {
+                                File.WriteAllText(file, formattedXml);
+                                Console.WriteLine($"Formatted: {file}");
+                            }
+                            formattedCount++;
                         }
                         else
                         {
-                            File.WriteAllText(file, formatted);
-                            Console.WriteLine($"Formatted: {file}");
+                            unchangedCount++;
                         }
-                        formattedCount++;
                     }
                     else
                     {
-                        unchangedCount++;
+                        var source = File.ReadAllText(file);
+                        var config = FormattingEngine.LoadConfiguration(file);
+                        var engine = new FormattingEngine(config);
+                        var formatted = engine.Format(source);
+
+                        if (formatted != source)
+                        {
+                            if (dryRun)
+                            {
+                                Console.WriteLine($"[DRY RUN] Would format: {file}");
+                            }
+                            else
+                            {
+                                File.WriteAllText(file, formatted);
+                                Console.WriteLine($"Formatted: {file}");
+                            }
+                            formattedCount++;
+                        }
+                        else
+                        {
+                            unchangedCount++;
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -391,19 +453,39 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
     {
         try
         {
-            var source = File.ReadAllText(filePath);
-            var config = FormattingEngine.LoadConfiguration(filePath);
-            var engine = new FormattingEngine(config);
-            var formatted = engine.Format(source);
+            var extension = Path.GetExtension(filePath).ToLowerInvariant();
 
-            if (source != formatted)
+            if (IsTwinCatXml(extension))
             {
-                Console.Error.WriteLine($"Check failed: {filePath} is not formatted.");
-                return 1;
-            }
+                var xml = File.ReadAllText(filePath);
+                var config = FormattingEngine.LoadConfiguration(filePath);
+                var formatter = new TwinCatXmlFormatter(config);
 
-            Console.WriteLine($"Check passed: {filePath}");
-            return 0;
+                if (formatter.FormatXmlContent(xml, out var formattedXml, out _, out _))
+                {
+                    Console.Error.WriteLine($"Check failed: {filePath} is not formatted.");
+                    return 1;
+                }
+
+                Console.WriteLine($"Check passed: {filePath}");
+                return 0;
+            }
+            else
+            {
+                var source = File.ReadAllText(filePath);
+                var config = FormattingEngine.LoadConfiguration(filePath);
+                var engine = new FormattingEngine(config);
+                var formatted = engine.Format(source);
+
+                if (source != formatted)
+                {
+                    Console.Error.WriteLine($"Check failed: {filePath} is not formatted.");
+                    return 1;
+                }
+
+                Console.WriteLine($"Check passed: {filePath}");
+                return 0;
+            }
         }
         catch (Exception ex)
         {

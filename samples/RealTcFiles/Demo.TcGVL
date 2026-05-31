@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <GVL Name="Demo" Id="{bc130fb2-c5ec-4dda-a3f7-893769848640}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+	displayFields :ARRAY[0..7] OF SINT;
+END_VAR]]></Declaration>
+  </GVL>
+</TcPlcObject>

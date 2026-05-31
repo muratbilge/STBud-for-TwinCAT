@@ -354,49 +354,8 @@ internal class Program
     private static bool FormatTwinCatXml(string xml, FormattingEngine engine,
         out string formattedXml, out string? formattedDecl, out string? formattedImpl)
     {
-        formattedDecl = null;
-        formattedImpl = null;
-        string result = xml;
-        bool changed = false;
-
-        int pos = 0;
-        while ((pos = result.IndexOf("<![CDATA[", pos, StringComparison.Ordinal)) >= 0)
-        {
-            int cdataStart = pos + 9;
-            int cdataEnd = result.IndexOf("]]>", cdataStart, StringComparison.Ordinal);
-            if (cdataEnd < 0) break;
-
-            string stCode = result.Substring(cdataStart, cdataEnd - cdataStart);
-
-            string parentElement = FindParentElement(result, pos);
-            bool isDeclaration = parentElement.IndexOf("Declaration", StringComparison.OrdinalIgnoreCase) >= 0;
-
-            string formatted;
-            if (isDeclaration)
-            {
-                formatted = engine.Format(stCode) ?? stCode;
-                formattedDecl = formatted;
-            }
-            else
-            {
-                formatted = engine.FormatBody(stCode) ?? stCode;
-                formattedImpl = formatted;
-            }
-
-            if (formatted != stCode)
-            {
-                result = result.Substring(0, cdataStart) + formatted + result.Substring(cdataEnd);
-                pos = cdataStart + formatted.Length + 3;
-                changed = true;
-            }
-            else
-            {
-                pos = cdataEnd + 3;
-            }
-        }
-
-        formattedXml = result;
-        return changed;
+        var formatter = new TwinCatXmlFormatter(engine);
+        return formatter.FormatXmlContent(xml, out formattedXml, out formattedDecl, out formattedImpl);
     }
 
     // Tier 1: Automation API via COM InvokeMember
@@ -510,15 +469,6 @@ internal class Program
             Log($"TryFormatViaAutomation: {ex.GetType().Name} - {ex.Message}");
             return false;
         }
-    }
-
-    private static string FindParentElement(string xml, int cdataOffset)
-    {
-        int tagStart = xml.LastIndexOf('<', cdataOffset - 1);
-        if (tagStart < 0) return "";
-        int tagEnd = xml.IndexOf('>', tagStart);
-        if (tagEnd < 0) return "";
-        return xml.Substring(tagStart, tagEnd - tagStart + 1);
     }
 
     // --- Logging ---

@@ -15,10 +15,10 @@ public sealed class EditorConfigParser
         if (string.IsNullOrEmpty(directory))
             return null;
 
-        return LoadFromDirectory(directory);
+        return LoadFromDirectory(directory, filePath);
     }
 
-    public static FormattingConfiguration? LoadFromDirectory(string startDirectory)
+    public static FormattingConfiguration? LoadFromDirectory(string startDirectory, string? filePath = null)
     {
         var configs = new List<EditorConfigSection>();
         var currentDir = startDirectory;
@@ -48,15 +48,19 @@ public sealed class EditorConfigParser
         if (configs.Count == 0)
             return null;
 
-        // Build configuration from collected settings
-        // Later configs (closer to file) override earlier ones
         var config = new FormattingConfiguration();
         var allProperties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        // Apply from outermost to innermost
+        var fileName = filePath != null ? Path.GetFileName(filePath) : null;
+
+        // Apply from outermost to innermost; later overrides earlier
         for (var i = configs.Count - 1; i >= 0; i--)
         {
-            foreach (var prop in configs[i].Properties)
+            var section = configs[i];
+            if (fileName != null && !MatchesPattern(section.Pattern, fileName))
+                continue;
+
+            foreach (var prop in section.Properties)
             {
                 allProperties[prop.Key] = prop.Value;
             }
@@ -166,11 +170,9 @@ public sealed class EditorConfigParser
         {
             var line = rawLine.Trim();
 
-            // Skip comments and empty lines
             if (string.IsNullOrEmpty(line) || line.StartsWith("#") || line.StartsWith(";"))
                 continue;
 
-            // Section header
             if (line.StartsWith("[") && line.EndsWith("]"))
             {
                 var pattern = line.Substring(1, line.Length - 2).Trim();
@@ -179,7 +181,6 @@ public sealed class EditorConfigParser
                 continue;
             }
 
-            // Key = Value pair
             var equalsIndex = line.IndexOf('=');
             if (equalsIndex > 0 && currentSection != null)
             {
@@ -190,6 +191,128 @@ public sealed class EditorConfigParser
         }
 
         return sections;
+    }
+
+    public static bool MatchesPattern(string pattern, string fileName)
+    {
+        if (pattern == "*")
+            return true;
+
+        foreach (var singlePattern in SplitTopLevelPatterns(pattern))
+        {
+            if (MatchesSinglePattern(singlePattern.Trim(), fileName))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static List<string> SplitTopLevelPatterns(string pattern)
+    {
+        var result = new List<string>();
+        var depth = 0;
+        var start = 0;
+
+        for (var i = 0; i < pattern.Length; i++)
+        {
+            var c = pattern[i];
+            if (c == '{') depth++;
+            else if (c == '}') depth--;
+            else if (c == ',' && depth == 0)
+            {
+                result.Add(pattern.Substring(start, i - start));
+                start = i + 1;
+            }
+        }
+
+        if (start < pattern.Length)
+            result.Add(pattern.Substring(start));
+
+        return result;
+    }
+
+    private static bool MatchesSinglePattern(string pattern, string fileName)
+    {
+        if (pattern == "*")
+            return true;
+
+        // Convert editorconfig glob to regex
+        // Supported: *, **, ?, [chars], [!chars], {a,b}
+        var regexPattern = "^";
+        var i = 0;
+        while (i < pattern.Length)
+        {
+            var c = pattern[i];
+            if (c == '*')
+            {
+                if (i + 1 < pattern.Length && pattern[i + 1] == '*')
+                {
+                    regexPattern += ".*";
+                    i += 2;
+                    // Skip trailing /
+                    if (i < pattern.Length && pattern[i] == '/')
+                        i++;
+                }
+                else
+                {
+                    regexPattern += "[^/]*";
+                    i++;
+                }
+            }
+            else if (c == '?')
+            {
+                regexPattern += "[^/]";
+                i++;
+            }
+            else if (c == '[')
+            {
+                var end = pattern.IndexOf(']', i + 1);
+                if (end < 0)
+                {
+                    regexPattern += Regex.Escape(c.ToString());
+                    i++;
+                }
+                else
+                {
+                    var bracketContent = pattern.Substring(i + 1, end - i - 1);
+                    if (bracketContent.StartsWith("!"))
+                        bracketContent = "^" + bracketContent.Substring(1);
+                    regexPattern += "[" + bracketContent + "]";
+                    i = end + 1;
+                }
+            }
+            else if (c == '{')
+            {
+                var end = pattern.IndexOf('}', i + 1);
+                if (end < 0)
+                {
+                    regexPattern += Regex.Escape(c.ToString());
+                    i++;
+                }
+                else
+                {
+                    var options = pattern.Substring(i + 1, end - i - 1);
+                    var alternation = string.Join("|", options.Split(',').Select(o => o.Trim()));
+                    regexPattern += "(" + alternation + ")";
+                    i = end + 1;
+                }
+            }
+            else
+            {
+                regexPattern += Regex.Escape(c.ToString());
+                i++;
+            }
+        }
+        regexPattern += "$";
+
+        try
+        {
+            return Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
     }
 }
 

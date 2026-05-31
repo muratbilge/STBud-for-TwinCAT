@@ -34,50 +34,54 @@ public sealed class FormattingEngine
             return body;
 
         var wrapper = $"PROGRAM __BODY_WRAPPER__\n{body}\nEND_PROGRAM";
-        var formatted = Format(wrapper);
+        var text = Text.SourceText.From(wrapper);
+        var parser = new Parsing.Parser(text);
+        var tree = parser.Parse();
 
-        string? extracted = null;
+        var writer = new FormattingWriter(_config);
+        var visitor = new FormattingVisitor(writer, _config);
+
+        // Find the StatementList inside the wrapper PROGRAM and format it directly
+        var pouDecl = tree.Root.ChildNodes.FirstOrDefault();
+        if (pouDecl != null)
+        {
+            var stmtList = pouDecl.ChildNodes.FirstOrDefault(n => n.Kind == SyntaxKind.StatementList);
+            if (stmtList != null)
+            {
+                visitor.Visit(stmtList);
+                var extracted = writer.ToString();
+                extracted = StripCommonIndent(extracted);
+
+                var inputUsesCrLf = body.Contains("\r\n");
+                if (inputUsesCrLf && !extracted.Contains("\r\n"))
+                    extracted = extracted.Replace("\n", "\r\n");
+
+                return extracted;
+            }
+        }
+
+        // Fallback: format the whole wrapper and extract via string matching
+        var formatted = Format(tree);
+        string? extractedFallback = null;
 
         var markerStart = "PROGRAM __BODY_WRAPPER__\n";
         var markerEnd = "\nEND_PROGRAM";
 
         if (formatted.StartsWith(markerStart) && formatted.EndsWith(markerEnd))
         {
-            extracted = formatted.Substring(markerStart.Length, formatted.Length - markerStart.Length - markerEnd.Length);
+            extractedFallback = formatted.Substring(markerStart.Length, formatted.Length - markerStart.Length - markerEnd.Length);
         }
 
-        if (extracted == null)
-        {
-            var startIndex = formatted.IndexOf("__BODY_WRAPPER__");
-            if (startIndex >= 0)
-            {
-                var newlineAfterMarker = formatted.IndexOf('\n', startIndex);
-                if (newlineAfterMarker >= 0)
-                {
-                    var bodyStart = newlineAfterMarker + 1;
-                    var endMarker = formatted.LastIndexOf("END_PROGRAM");
-                    if (endMarker > bodyStart)
-                    {
-                        var lastNewlineBeforeEnd = formatted.LastIndexOf('\n', endMarker - 1);
-                        if (lastNewlineBeforeEnd >= bodyStart)
-                        {
-                            extracted = formatted.Substring(bodyStart, lastNewlineBeforeEnd - bodyStart);
-                        }
-                    }
-                }
-            }
-        }
-
-        if (extracted == null)
+        if (extractedFallback == null)
             return body;
 
-        extracted = StripCommonIndent(extracted);
+        extractedFallback = StripCommonIndent(extractedFallback);
 
-        var inputUsesCrLf = body.Contains("\r\n");
-        if (inputUsesCrLf && !extracted.Contains("\r\n"))
-            extracted = extracted.Replace("\n", "\r\n");
+        var usesCrLf = body.Contains("\r\n");
+        if (usesCrLf && !extractedFallback.Contains("\r\n"))
+            extractedFallback = extractedFallback.Replace("\n", "\r\n");
 
-        return extracted;
+        return extractedFallback;
     }
 
     private static string StripCommonIndent(string text)
@@ -119,7 +123,7 @@ public sealed class FormattingEngine
 
         if (!string.IsNullOrEmpty(filePath))
         {
-            var editorConfig = Configuration.EditorConfigParser.LoadForFile(filePath);
+            var editorConfig = Configuration.EditorConfigParser.LoadForFile(filePath!);
             if (editorConfig != null)
             {
                 config = editorConfig;
@@ -220,9 +224,13 @@ internal sealed class FormattingWriter
 
     public void EnsureSpace()
     {
-        if (_builder.Length > 0 && !_builder.ToString().EndsWith(" ") && !_builder.ToString().EndsWith("\t") && !_atLineStart)
+        if (_builder.Length > 0 && !_atLineStart)
         {
-            WriteSpace();
+            char last = _builder[_builder.Length - 1];
+            if (last != ' ' && last != '\t')
+            {
+                WriteSpace();
+            }
         }
     }
 
@@ -255,7 +263,8 @@ internal sealed class FormattingWriter
         if (_config.MaxLineLength > 0 && !_atLineStart && _currentLineLength + estimatedLength > _config.MaxLineLength)
         {
             WriteNewLine();
-            var continuationIndent = _config.GetIndentString(_indentLevel + 1);
+            var continuationLevel = _indentLevel + Math.Max(1, _config.ContinuationIndentSize / Math.Max(1, _config.IndentSize));
+            var continuationIndent = _config.GetIndentString(continuationLevel);
             _builder.Append(continuationIndent);
             _currentLineLength = continuationIndent.Length;
             _atLineStart = false;
@@ -267,7 +276,8 @@ internal sealed class FormattingWriter
         if (_config.MaxLineLength > 0 && !_atLineStart && _currentLineLength + text.Length > _config.MaxLineLength)
         {
             WriteNewLine();
-            var continuationIndent = _config.GetIndentString(_indentLevel + 1);
+            var continuationLevel = _indentLevel + Math.Max(1, _config.ContinuationIndentSize / Math.Max(1, _config.IndentSize));
+            var continuationIndent = _config.GetIndentString(continuationLevel);
             _builder.Append(continuationIndent);
             _currentLineLength = continuationIndent.Length;
             _atLineStart = false;
@@ -657,7 +667,8 @@ internal sealed class FormattingVisitor
 
         // :
         WriteToken(tokens.First(t => t.Kind == SyntaxKind.Colon));
-        _writer.WriteSpace();
+        if (_config.SpaceAfterColon)
+            _writer.WriteSpace();
 
         // Type
         var type = nodes.FirstOrDefault(n => IsTypeNode(n.Kind));
@@ -680,7 +691,7 @@ internal sealed class FormattingVisitor
         }
 
         // ;
-        WriteToken(tokens.First(t => t.Kind == SyntaxKind.Semicolon));
+        WriteSemicolon(tokens.First(t => t.Kind == SyntaxKind.Semicolon));
         _writer.EnsureNewLine();
     }
 
@@ -704,7 +715,8 @@ internal sealed class FormattingVisitor
 
         // :
         WriteToken(tokens.First(t => t.Kind == SyntaxKind.Colon));
-        _writer.WriteSpace();
+        if (_config.SpaceAfterColon)
+            _writer.WriteSpace();
 
         // Type
         var type = nodes.FirstOrDefault(n => IsTypeNode(n.Kind));
@@ -722,7 +734,7 @@ internal sealed class FormattingVisitor
         }
 
         // ;
-        WriteToken(tokens.First(t => t.Kind == SyntaxKind.Semicolon));
+        WriteSemicolon(tokens.First(t => t.Kind == SyntaxKind.Semicolon));
         _writer.EnsureNewLine();
     }
 
@@ -738,13 +750,14 @@ internal sealed class FormattingVisitor
         WriteToken(tokens[1]); // name
         _writer.WriteSpace();
         WriteToken(tokens[2]); // :
-        _writer.WriteSpace();
+        if (_config.SpaceAfterColon)
+            _writer.WriteSpace();
 
         var type = nodes.FirstOrDefault(n => IsTypeNode(n.Kind));
         if (type != null)
             Visit(type);
 
-        WriteToken(tokens[3]); // ;
+        WriteSemicolon(tokens[3]); // ;
         _writer.EnsureNewLine();
         _writer.IndentLevel--;
 
@@ -857,7 +870,7 @@ internal sealed class FormattingVisitor
         WriteToken(tokens[0]); // := or =>
         _writer.WriteSpace();
         Visit(nodes[1]); // right side
-        WriteToken(tokens[1]); // ;
+        WriteSemicolon(tokens[1]); // ;
         _writer.EnsureNewLine();
     }
 
@@ -866,6 +879,16 @@ internal sealed class FormattingVisitor
         return kind is SyntaxKind.IfStatement or SyntaxKind.CaseStatement
             or SyntaxKind.ForStatement or SyntaxKind.WhileStatement
             or SyntaxKind.RepeatStatement or SyntaxKind.TryStatement;
+    }
+
+    private static bool IsSingleStatementBody(SyntaxNode body)
+    {
+        if (body.Kind != SyntaxKind.StatementList) return false;
+        var children = body.ChildNodes.ToList();
+        if (children.Count != 1) return false;
+        var stmt = children[0];
+        // Don't collapse if the single statement is itself a block
+        return !IsBlockStatement(stmt.Kind) && stmt.Kind != SyntaxKind.EmptyStatement;
     }
 
     private void VisitIfStatement(SyntaxNode node)
@@ -878,10 +901,27 @@ internal sealed class FormattingVisitor
         Visit(nodes[0]); // condition
         _writer.WriteSpace();
         WriteTokenWithCasing(tokens[1]); // THEN
+
+        var thenBody = nodes[1];
+        bool keepSingleLine = _config.KeepSingleLineBlocks && IsSingleStatementBody(thenBody) &&
+                              !nodes.Any(n => n.Kind == SyntaxKind.ElsIfClause || n.Kind == SyntaxKind.ElseClause);
+
+        if (keepSingleLine)
+        {
+            _writer.WriteSpace();
+            _writer.IndentLevel++;
+            Visit(thenBody);
+            _writer.IndentLevel--;
+            _writer.WriteSpace();
+            WriteTokenWithCasing(tokens[2]); // END_IF
+            _writer.EnsureNewLine();
+            return;
+        }
+
         _writer.EnsureNewLine();
 
         _writer.IndentLevel++;
-        Visit(nodes[1]); // then body
+        Visit(thenBody); // then body
         _writer.IndentLevel--;
 
         var index = 2;
@@ -957,11 +997,27 @@ internal sealed class FormattingVisitor
 
         _writer.WriteSpace();
         WriteTokenWithCasing(tokens[4]); // DO
+
+        var bodyIndex = nodes.Count > 3 && nodes[2].Kind == SyntaxKind.ForByClause ? 3 : 2;
+        var forBody = nodes[bodyIndex];
+        bool keepSingleLine = _config.KeepSingleLineBlocks && IsSingleStatementBody(forBody);
+
+        if (keepSingleLine)
+        {
+            _writer.WriteSpace();
+            _writer.IndentLevel++;
+            Visit(forBody);
+            _writer.IndentLevel--;
+            _writer.WriteSpace();
+            WriteTokenWithCasing(tokens[5]); // END_FOR
+            _writer.EnsureNewLine();
+            return;
+        }
+
         _writer.EnsureNewLine();
 
         _writer.IndentLevel++;
-        var bodyIndex = nodes.Count > 3 && nodes[2].Kind == SyntaxKind.ForByClause ? 3 : 2;
-        Visit(nodes[bodyIndex]); // body
+        Visit(forBody); // body
         _writer.IndentLevel--;
 
         WriteTokenWithCasing(tokens[5]); // END_FOR
@@ -978,6 +1034,21 @@ internal sealed class FormattingVisitor
         Visit(nodes[0]); // condition
         _writer.WriteSpace();
         WriteTokenWithCasing(tokens[1]); // DO
+
+        bool keepSingleLine = _config.KeepSingleLineBlocks && IsSingleStatementBody(nodes[1]);
+
+        if (keepSingleLine)
+        {
+            _writer.WriteSpace();
+            _writer.IndentLevel++;
+            Visit(nodes[1]);
+            _writer.IndentLevel--;
+            _writer.WriteSpace();
+            WriteTokenWithCasing(tokens[2]); // END_WHILE
+            _writer.EnsureNewLine();
+            return;
+        }
+
         _writer.EnsureNewLine();
 
         _writer.IndentLevel++;
@@ -1048,7 +1119,7 @@ internal sealed class FormattingVisitor
         WriteToken(tokens[0]); // := or =>
         _writer.WriteSpace();
         Visit(nodes[1]); // right
-        WriteToken(tokens[1]); // ;
+        WriteSemicolon(tokens[1]); // ;
         _writer.EnsureNewLine();
     }
 
@@ -1058,14 +1129,14 @@ internal sealed class FormattingVisitor
         var nodes = node.ChildNodes.ToList();
 
         Visit(nodes[0]); // call expression
-        WriteToken(tokens[0]); // ;
+        WriteSemicolon(tokens[0]); // ;
         _writer.EnsureNewLine();
     }
 
     private void VisitSimpleStatement(SyntaxNode node)
     {
         WriteTokenWithCasing(node.ChildTokens[0]);
-        WriteToken(node.ChildTokens[1]); // ;
+        WriteSemicolon(node.ChildTokens[1]); // ;
         _writer.EnsureNewLine();
     }
 
@@ -1074,13 +1145,13 @@ internal sealed class FormattingVisitor
         WriteTokenWithCasing(node.ChildTokens[0]); // GOTO
         _writer.WriteSpace();
         WriteToken(node.ChildTokens[1]); // label
-        WriteToken(node.ChildTokens[2]); // ;
+        WriteSemicolon(node.ChildTokens[2]); // ;
         _writer.EnsureNewLine();
     }
 
     private void VisitEmptyStatement(SyntaxNode node)
     {
-        WriteToken(node.ChildTokens[0]); // ;
+        WriteSemicolon(node.ChildTokens[0]); // ;
         _writer.EnsureNewLine();
     }
 
@@ -1158,7 +1229,8 @@ internal sealed class FormattingVisitor
             if (i > 1)
             {
                 WriteToken(tokens[i - 1]); // comma
-                _writer.WriteSpace();
+                if (_config.SpaceAfterComma)
+                    _writer.WriteSpace();
             }
             Visit(nodes[i]);
         }
@@ -1224,6 +1296,8 @@ internal sealed class FormattingVisitor
             {
                 var commaIndex = 2 + (i - 1);
                 WriteToken(tokens[commaIndex]); // comma
+                if (_config.SpaceAfterComma)
+                    _writer.WriteSpace();
             }
             Visit(nodes[i]); // range
         }
@@ -1457,6 +1531,15 @@ internal sealed class FormattingVisitor
     private void WriteToken(SyntaxToken token)
     {
         WriteLeadingTrivia(token.LeadingTrivia);
+        _writer.WriteToken(token);
+        WriteTrailingTrivia(token.TrailingTrivia);
+    }
+
+    private void WriteSemicolon(SyntaxToken token)
+    {
+        WriteLeadingTrivia(token.LeadingTrivia);
+        if (_config.SpaceBeforeSemicolon)
+            _writer.WriteSpace();
         _writer.WriteToken(token);
         WriteTrailingTrivia(token.TrailingTrivia);
     }

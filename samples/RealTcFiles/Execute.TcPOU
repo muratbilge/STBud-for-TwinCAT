@@ -1,0 +1,182 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="Execute" Id="{16de238c-02d0-4654-b592-0c63039045d2}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK Execute IMPLEMENTS ITF_PackMLState, ITF_States
+VAR
+	_MyContext : ITF_PackMLMachine;
+	_MyNextState : ITF_PackMLState;
+	_MyStoppingState : ITF_PackMLState;
+	_MyAbortingState : ITF_PackMLState;
+	_MyName : STRING(20) := 'Execute';
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="AbortingState" Id="{a5c15762-a08b-4161-91c2-5b5d8500ebc6}">
+      <Declaration><![CDATA[PROPERTY AbortingState : ITF_PackMLState
+]]></Declaration>
+      <Get Name="Get" Id="{8849a4be-4f5c-408f-8893-220c57711478}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[AbortingState := _MyAbortingState;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{d35cdb24-c26a-4df2-ac93-3d6a83189bfe}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_MyAbortingState := AbortingState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="CyclicLogic" Id="{ac050c99-a704-455e-9c5a-e556222f067a}">
+      <Declaration><![CDATA[METHOD CyclicLogic : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="EStop" Id="{2ba6e0cd-1efe-4003-8123-65a9ba9b7ac2}">
+      <Declaration><![CDATA[METHOD EStop : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_MyContext.ChangeState(_MyAbortingState);]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="MyNextState" Id="{2d3d8db9-a44d-47ba-a9fd-8c0878cf2f5b}">
+      <Declaration><![CDATA[{warning 'add property implementation'}
+PROPERTY MyNextState : ITF_PackMLState
+]]></Declaration>
+      <Get Name="Get" Id="{5d2e5776-26ac-4a8d-9a97-ef8b5054a217}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MyNextState := _MyNextState;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{b0111621-da13-46d4-85b1-9f62b318817a}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_MyNextState := MyNextState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="MyStateName" Id="{8976abae-eefc-4513-8348-4ffb6ed01903}">
+      <Declaration><![CDATA[PROPERTY MyStateName : String(20)]]></Declaration>
+      <Get Name="Get" Id="{0ffcb83e-153b-4248-94b8-c0ac0d69ac6e}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MyStateName := _MyName;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Reset" Id="{1a9cf0ec-8b14-4e8d-9539-992a9b7b2e78}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD Reset : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetContext" Id="{1700c1be-96df-4ce8-8a27-f90db3bd76f2}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD SetContext : BOOL
+VAR_INPUT
+	context	: ITF_PackMLMachine;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_MyContext := context;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Start" Id="{42576e4a-c1d8-4012-9b36-1be3c4c250b5}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD Start : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop" Id="{26dae254-0c3f-4d8e-8ed6-04c9be98f59b}">
+      <Declaration><![CDATA[METHOD Stop : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_MyContext.ChangeState(_MyStoppingState);]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="StoppingState" Id="{94f61d8a-f201-44ab-9c5d-1676d4b7878e}">
+      <Declaration><![CDATA[{warning 'add property implementation'}
+PROPERTY StoppingState : ITF_PackMLState
+]]></Declaration>
+      <Get Name="Get" Id="{fcd83bcc-4566-4c4b-88c2-ce94446d7b5f}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[StoppingState := _MyStoppingState;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{a8a29974-6336-4375-985e-b30003b343df}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_MyStoppingState := StoppingState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <LineIds Name="Execute">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="Execute.AbortingState.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="Execute.AbortingState.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="Execute.CyclicLogic">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="Execute.EStop">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="Execute.MyNextState.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="Execute.MyNextState.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="Execute.MyStateName.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="Execute.Reset">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="Execute.SetContext">
+      <LineId Id="7" Count="0" />
+    </LineIds>
+    <LineIds Name="Execute.Start">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="Execute.Stop">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="Execute.StoppingState.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="Execute.StoppingState.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

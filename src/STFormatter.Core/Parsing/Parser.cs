@@ -1299,20 +1299,24 @@ public sealed class Parser
             {
                 var openParen = NextToken();
                 var args = new List<SyntaxNode>();
+                var commaTokens = new List<SyntaxToken>();
                 if (Current.Kind != SyntaxKind.CloseParen)
                 {
                     args.Add(ParseArgument());
                     while (Current.Kind == SyntaxKind.Comma)
                     {
-                        NextToken(); // comma
+                        commaTokens.Add(NextToken());
                         args.Add(ParseArgument());
                     }
                 }
                 var closeParen = MatchToken(SyntaxKind.CloseParen);
                 var span = TextSpan.FromBounds(start, closeParen.Span.End);
+                var allTokens = new List<SyntaxToken> { openParen };
+                allTokens.AddRange(commaTokens);
+                allTokens.Add(closeParen);
                 result = SyntaxFactory.Node(SyntaxKind.InvocationExpression, span,
                     new[] { result }.Concat(args).ToList(),
-                    new[] { openParen, closeParen });
+                    allTokens);
             }
             else
             {

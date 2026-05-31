@@ -476,7 +476,7 @@ internal static class FormatHelper
             return;
         }
 
-        var formatted = LooksLikeDeclaration(source) ? engine.Format(source) : engine.FormatBody(source);
+        var formatted = TwinCatXmlFormatter.LooksLikeDeclaration(source) ? engine.Format(source) : engine.FormatBody(source);
 
         if (string.IsNullOrEmpty(formatted))
         {
@@ -541,7 +541,7 @@ internal static class FormatHelper
         }
 
         string formatted;
-        if (LooksLikeDeclaration(selectedText))
+        if (TwinCatXmlFormatter.LooksLikeDeclaration(selectedText))
         {
             Log("FormatSelectionViaIecEditor: Formatting as declaration.");
             formatted = engine.Format(selectedText);
@@ -588,7 +588,7 @@ internal static class FormatHelper
             return;
         }
 
-        var formatted = LooksLikeDeclaration(source) ? engine.Format(source) : engine.FormatBody(source);
+        var formatted = TwinCatXmlFormatter.LooksLikeDeclaration(source) ? engine.Format(source) : engine.FormatBody(source);
 
         if (string.IsNullOrEmpty(formatted))
         {
@@ -679,100 +679,8 @@ internal static class FormatHelper
 
     private static bool FormatStSectionsInXml(string xmlContent, FormattingEngine engine, out string newContent)
     {
-        newContent = xmlContent;
-        bool modified = false;
-
-        int searchStart = 0;
-        while (searchStart < newContent.Length)
-        {
-            var cdataStart = newContent.IndexOf("<![CDATA[", searchStart, StringComparison.Ordinal);
-            if (cdataStart < 0) break;
-
-            var cdataEnd = newContent.IndexOf("]]>", cdataStart, StringComparison.Ordinal);
-            if (cdataEnd < 0) break;
-
-            var valueStart = cdataStart + "<![CDATA[".Length;
-            var valueEnd = cdataEnd;
-
-            var parentContext = FindParentElement(newContent, cdataStart);
-            Log($"CDATA section at offset {cdataStart}, parent element: {parentContext}");
-
-            var stCode = newContent.Substring(valueStart, valueEnd - valueStart);
-
-            if (string.IsNullOrWhiteSpace(stCode))
-            {
-                Log($"Skipping empty CDATA in <{parentContext}>");
-                searchStart = cdataEnd + "]]>".Length;
-                continue;
-            }
-
-            bool isDeclaration = string.Equals(parentContext, "Declaration", StringComparison.OrdinalIgnoreCase);
-            bool isSt = string.Equals(parentContext, "ST", StringComparison.OrdinalIgnoreCase);
-            bool isBody = parentContext != "Declaration" && parentContext != "Unknown" && !string.IsNullOrWhiteSpace(stCode);
-
-            var inputUsesCrLf = stCode.Contains("\r\n");
-            string formatted;
-            if (isDeclaration)
-            {
-                Log($"Formatting Declaration CDATA (length={stCode.Length})");
-                formatted = engine.Format(stCode);
-            }
-            else if (isSt || isBody)
-            {
-                Log($"Formatting body CDATA in <{parentContext}> (length={stCode.Length})");
-                formatted = engine.FormatBody(stCode);
-            }
-            else
-            {
-                Log($"Skipping CDATA in <{parentContext}>");
-                searchStart = cdataEnd + "]]>".Length;
-                continue;
-            }
-
-            if (string.IsNullOrEmpty(formatted))
-            {
-                Log("Formatter returned empty result. Skipping to avoid data loss.");
-                searchStart = cdataEnd + "]]>".Length;
-                continue;
-            }
-
-            if (inputUsesCrLf && !formatted.Contains("\r\n"))
-            {
-                formatted = formatted.Replace("\n", "\r\n");
-            }
-
-            if (formatted != stCode)
-            {
-                Log($"CDATA in <{parentContext}> changed: original length={stCode.Length}, formatted length={formatted.Length}");
-                newContent = newContent.Substring(0, valueStart) + formatted + newContent.Substring(valueEnd);
-                modified = true;
-                searchStart = valueStart + formatted.Length + "]]>".Length;
-            }
-            else
-            {
-                Log($"CDATA in <{parentContext}> unchanged (length={stCode.Length})");
-                searchStart = cdataEnd + "]]>".Length;
-            }
-        }
-
-        return modified;
-    }
-
-    private static string FindParentElement(string xmlContent, int cdataOffset)
-    {
-        var searchFrom = Math.Max(0, cdataOffset - 200);
-        var context = xmlContent.Substring(searchFrom, cdataOffset - searchFrom);
-
-        var lastOpenTag = context.LastIndexOf('<');
-        if (lastOpenTag < 0) return "Unknown";
-
-        var tagContent = context.Substring(lastOpenTag + 1).TrimStart();
-        if (tagContent.StartsWith("/")) return "Unknown";
-
-        var spaceOrAngle = tagContent.IndexOfAny(new[] { ' ', '\t', '\r', '\n', '>' });
-        if (spaceOrAngle > 0) return tagContent.Substring(0, spaceOrAngle);
-
-        return tagContent.Length > 0 ? tagContent : "Unknown";
+        var formatter = new TwinCatXmlFormatter(engine);
+        return formatter.FormatXmlContent(xmlContent, out newContent, out _, out _);
     }
 
     private static void ShowStatus(string message) 
@@ -786,16 +694,6 @@ internal static class FormatHelper
             }
         }
         catch { }
-    }
-
-    private static bool LooksLikeDeclaration(string text)
-    {
-        var upper = text.ToUpperInvariant();
-        return upper.Contains("VAR") || upper.Contains("END_VAR") ||
-               upper.Contains("PROGRAM") || upper.Contains("END_PROGRAM") ||
-               upper.Contains("FUNCTION") || upper.Contains("END_FUNCTION") ||
-               upper.Contains("FUNCTION_BLOCK") || upper.Contains("END_FUNCTION_BLOCK") ||
-               upper.Contains("ACTIONS") || upper.Contains("END_ACTIONS");
     }
 
     private static bool IsTwinCatXmlFile(string? filePath)

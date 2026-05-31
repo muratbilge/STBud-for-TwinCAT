@@ -1,0 +1,46 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_State" Id="{acc0bb97-da91-4632-ac2a-7e54b3136591}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+{attribute 'to_string'}
+TYPE E_State :
+(
+	{attribute 'hide'}
+	Undefined		:= 0,
+	Idle			:= 1,
+	
+// Start
+	Starting		:= 2,
+	Execute			:= 3,
+	
+// Pause
+	Pausing			:= 4,
+	Paused			:= 5,
+	Resuming		:= 6,
+	
+// Hold
+	Holding			:= 7,
+	Held			:= 8,
+	Unholding		:= 9,
+	
+// Complete
+	Completing		:= 10,
+	Completed		:= 11,
+
+// Stop
+	Stopping		:= 12,
+	Stopped			:= 13,
+
+// Abort	
+	Aborting		:= 14,
+	Aborted			:= 15,
+
+// Reset
+	Resetting		:= 16
+
+);
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

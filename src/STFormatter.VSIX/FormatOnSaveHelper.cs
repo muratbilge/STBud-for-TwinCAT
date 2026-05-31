@@ -71,22 +71,9 @@ internal static class FormatOnSaveHelper
     {
         var xmlContent = File.ReadAllText(filePath);
         var doc = System.Xml.Linq.XDocument.Parse(xmlContent);
-        var engine = new FormattingEngine(config);
+        var formatter = new TwinCatXmlFormatter(config);
 
-        bool modified = false;
-
-        if (filePath.EndsWith(".TcPOU", StringComparison.OrdinalIgnoreCase))
-        {
-            modified |= FormatTcPou(doc, engine);
-        }
-        else if (filePath.EndsWith(".TcDUT", StringComparison.OrdinalIgnoreCase))
-        {
-            modified |= FormatTcDut(doc, engine);
-        }
-        else if (filePath.EndsWith(".TcGVL", StringComparison.OrdinalIgnoreCase))
-        {
-            modified |= FormatTcGvl(doc, engine);
-        }
+        bool modified = formatter.FormatXDocument(doc);
 
         if (modified)
         {
@@ -101,99 +88,5 @@ internal static class FormatOnSaveHelper
             using var writer = System.Xml.XmlWriter.Create(filePath, settings);
             doc.Save(writer);
         }
-    }
-
-    private static bool FormatTcPou(System.Xml.Linq.XDocument doc, FormattingEngine engine)
-    {
-        bool modified = false;
-
-        var implementationSt = doc.Descendants()
-            .Where(e => e.Name == "Implementation" || e.Name.LocalName == "Implementation")
-            .SelectMany(e => e.Descendants())
-            .FirstOrDefault(e => e.Name == "ST" || e.Name.LocalName == "ST");
-
-        if (implementationSt != null)
-        {
-            var cdata = implementationSt.Nodes().OfType<System.Xml.Linq.XCData>().FirstOrDefault();
-            if (cdata != null)
-            {
-                var formatted = engine.Format(cdata.Value);
-                if (formatted != cdata.Value)
-                {
-                    cdata.Value = formatted;
-                    modified = true;
-                }
-            }
-        }
-
-        var declaration = doc.Descendants()
-            .Where(e => e.Name == "Declaration" || e.Name.LocalName == "Declaration")
-            .FirstOrDefault();
-
-        if (declaration != null)
-        {
-            var cdata = declaration.Nodes().OfType<System.Xml.Linq.XCData>().FirstOrDefault();
-            if (cdata != null)
-            {
-                var formatted = engine.Format(cdata.Value);
-                if (formatted != cdata.Value)
-                {
-                    cdata.Value = formatted;
-                    modified = true;
-                }
-            }
-        }
-
-        return modified;
-    }
-
-    private static bool FormatTcDut(System.Xml.Linq.XDocument doc, FormattingEngine engine)
-    {
-        bool modified = false;
-
-        var declaration = doc.Descendants()
-            .Where(e => e.Name == "Declaration" || e.Name.LocalName == "Declaration")
-            .FirstOrDefault();
-
-        if (declaration != null)
-        {
-            var cdata = declaration.Nodes().OfType<System.Xml.Linq.XCData>().FirstOrDefault();
-            if (cdata != null)
-            {
-                var formatted = engine.Format(cdata.Value);
-                if (formatted != cdata.Value)
-                {
-                    cdata.Value = formatted;
-                    modified = true;
-                }
-            }
-        }
-
-        return modified;
-    }
-
-    private static bool FormatTcGvl(System.Xml.Linq.XDocument doc, FormattingEngine engine)
-    {
-        bool modified = false;
-
-        var declaration = doc.Descendants()
-            .Where(e => e.Name == "Declaration" || e.Name.LocalName == "Declaration")
-            .FirstOrDefault();
-
-        if (declaration != null)
-        {
-            var cdata = declaration.Nodes().OfType<System.Xml.Linq.XCData>().FirstOrDefault();
-            if (cdata != null)
-            {
-                var formatted = engine.Format(cdata.Value);
-                if (formatted != cdata.Value)
-                {
-                    cdata.Value = formatted;
-                    modified = true;
-                }
-            }
-        }
-
-        return modified;
     }
 }

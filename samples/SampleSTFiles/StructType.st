@@ -1,0 +1,7 @@
+TYPE ST_Point :
+STRUCT
+    x:REAL;
+    y:REAL;
+    z:REAL;
+END_STRUCT
+END_TYPE

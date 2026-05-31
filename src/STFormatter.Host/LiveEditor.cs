@@ -461,7 +461,7 @@ internal static class LiveEditor
 
                 // Format the text inline — decide declaration vs implementation based on content
                 var engine = new FormattingEngine(STFormatter.UI.SettingsManager.Current);
-                bool isDecl = LooksLikeDeclaration(currentText);
+                bool isDecl = TwinCatXmlFormatter.LooksLikeDeclaration(currentText);
                 Log($"TryFormatViaExecuteCommand: Detected as {(isDecl ? "Declaration" : "Implementation")}");
 
                 string? formatted;
@@ -572,23 +572,6 @@ internal static class LiveEditor
             Log($"ReadActiveSectionText: FAILED: {ex.Message}");
             return "";
         }
-    }
-
-    private static bool LooksLikeDeclaration(string text)
-    {
-        if (string.IsNullOrEmpty(text)) return true;
-        string upper = text.ToUpperInvariant();
-        bool hasVar = upper.Contains("VAR") && upper.Contains("END_VAR");
-        bool hasProgram = upper.Contains("PROGRAM") || upper.Contains("FUNCTION_BLOCK") || upper.Contains("FUNCTION");
-        bool hasBodyKeywords = upper.Contains("IF ") || upper.Contains("FOR ") || upper.Contains("WHILE ") ||
-                                upper.Contains(":=") || upper.Contains("THEN");
-        // If it has VAR/END_VAR and no body keywords, it's likely declaration
-        if (hasVar && !hasBodyKeywords) return true;
-        // If it has body keywords but not VAR, it's likely implementation
-        if (hasBodyKeywords && !hasVar) return false;
-        // If it has both (full POU), check structure — declarations start with PROGRAM/FUNCTION
-        if (hasProgram) return true;
-        return false;
     }
 
     // Tier 4: SendKeys fallback
@@ -778,52 +761,6 @@ internal static class LiveEditor
         {
             return null;
         }
-    }
-
-    private static string? FormatTwinCatXmlContent(string xml, FormattingEngine engine)
-    {
-        string result = xml;
-        bool changed = false;
-        int pos = 0;
-
-        while ((pos = result.IndexOf("<![CDATA[", pos, StringComparison.Ordinal)) >= 0)
-        {
-            int cdataStart = pos + 9;
-            int cdataEnd = result.IndexOf("]]>", cdataStart, StringComparison.Ordinal);
-            if (cdataEnd < 0) break;
-
-            string stCode = result.Substring(cdataStart, cdataEnd - cdataStart);
-            string parentElement = FindParentElement(result, pos);
-            bool isDeclaration = parentElement.IndexOf("Declaration", StringComparison.OrdinalIgnoreCase) >= 0;
-
-            string formatted;
-            if (isDeclaration)
-                formatted = engine.Format(stCode) ?? stCode;
-            else
-                formatted = engine.FormatBody(stCode) ?? stCode;
-
-            if (formatted != stCode)
-            {
-                result = result.Substring(0, cdataStart) + formatted + result.Substring(cdataEnd);
-                pos = cdataStart + formatted.Length + 3;
-                changed = true;
-            }
-            else
-            {
-                pos = cdataEnd + 3;
-            }
-        }
-
-        return changed ? result : null;
-    }
-
-    private static string FindParentElement(string xml, int cdataOffset)
-    {
-        int tagStart = xml.LastIndexOf('<', cdataOffset - 1);
-        if (tagStart < 0) return "";
-        int tagEnd = xml.IndexOf('>', tagStart);
-        if (tagEnd < 0) return "";
-        return xml.Substring(tagStart, tagEnd - tagStart + 1);
     }
 
     private static void Log(string message)

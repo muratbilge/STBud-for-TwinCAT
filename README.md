@@ -260,40 +260,126 @@ The parser handles the full IEC 61131-3 ST grammar plus TwinCAT extensions:
 - **Comments**: single-line `//`, multi-line `(* ... *)` and `/* ... */`
 - ** pragmas**: `{pragma ...}`, `{region ...}`, `{endregion}`
 
-------------------------------------------------------------------------
+## Using the ST Formatter
 
-## Building
-
-```shell
-dotnet build TwinCAT.STFormatter.sln -c Release
-```
-
-The solution builds all five projects. The VSIX and TcXaeShell projects
-require the Visual Studio SDK and TwinCAT SDK references respectively.
-
-For Host-only builds (no VS SDK required):
+### 1. CLI — Format Files from the Command Line
 
 ```shell
-dotnet build src/STFormatter.Host -c Debug
-```
-
-For CLI-only builds:
-
-```shell
+# Build the CLI
 dotnet build src/STFormatter.CLI -c Release
+
+# Format a single file (overwrites in place)
+dotnet run --project src/STFormatter.CLI format MyProgram.st
+
+# Dry-run (print result without changing the file)
+dotnet format MyProgram.st --dry-run
+
+# Format to a different output file
+dotnet format MyProgram.st -o MyProgram_formatted.st
+
+# Batch-format all .st files in a directory
+dotnet format batch ./POUs --recursive
+
+# Batch-format TwinCAT XML files (.TcPOU, .TcDUT, .TcGVL)
+dotnet format batch ./MyProject --recursive --twincat
+
+# Check if files are formatted (CI mode — exit code 1 on mismatch)
+dotnet format check ./src --recursive
+
+# Generate .editorconfig from a preset
+dotnet format init . --preset stweep
+
+# View preset details
+dotnet format preset stweep
 ```
 
-------------------------------------------------------------------------
-
-## Testing
-
-57 unit tests covering lexer, parser, and formatter scenarios:
+### 2. TcXaeShell — Format Inside the PLC Editor
 
 ```shell
-dotnet test TwinCAT.STFormatter.sln
+# Build the Host
+dotnet build src/STFormatter.Host -c Debug
+
+# Deploy to TcXaeShell (requires admin)
+deploy.bat
+
+# Start the Host (auto-detects running TcXaeShell)
+Start-Process "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\STFormatter.Host.exe"
 ```
 
-Test files are in `tests/STFormatter.Core.Tests/`.
+Once running, the Host injects **Format ST Document** and **Format ST Selection** buttons
+into the PLC editor's right-click context menu. Click either to format the active
+declaration or implementation section.
+
+The Host also provides a system tray icon with:
+- **Settings** — change formatting options at runtime
+- **Instances** — view connected TcXaeShell processes
+- **History** — review past format operations
+- **Log** — live log viewer (`%TEMP%\STFormatter_Host.log`)
+
+### 3. Visual Studio 2022 — Format Inside VS
+
+```shell
+# Build the VSIX
+build-vsix.ps1
+
+# Install the VSIX
+Double-click the .vsix file in publish/ or use VSIXInstaller.exe
+```
+
+After installation:
+- **Edit > Advanced > Format Document** (Ctrl+K, D)
+- **Edit > Advanced > Format Selection** (Ctrl+K, F)
+- Automatic **Format on Save** for `.st`, `.txt`, `.iecst`, `.TcPOU`, `.TcDUT`, `.TcGVL` files
+- Configuration via **Tools > Options > TwinCAT > ST Formatter**
+
+### 4. Configuration via .editorconfig
+
+The formatter reads `.editorconfig` files walking up from each source file's directory. Create one:
+
+```shell
+# Generate from a preset
+dotnet format init . --preset stweep
+```
+
+This creates:
+
+```ini
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+max_line_length = 120
+
+[*.st]
+st_keyword_casing = upper
+st_space_around_operators = true
+st_align_variable_declarations = true
+st_align_assignments = true
+st_empty_lines_between_pous = 2
+st_empty_lines_between_var_sections = 1
+st_format_on_save = true
+```
+
+All configuration options work as `.editorconfig` properties with the `st_` prefix.
+
+### 5. Sample Files
+
+The `samples/` directory contains test files:
+
+| Directory | Contents |
+|---|---|
+| `SampleSTFiles/` | 20 hand-crafted `.st` files + 5 synthetic TwinCAT XML files covering STRUCT, ENUM, ARRAY, POINTER, FUNCTION_BLOCK, etc. |
+| `RealTcFiles/` | 27 real TwinCAT project files (12 `.TcDUT`, 5 `.TcGVL`, 10 `.TcPOU`) from State Pattern, Observer, Factory, and Component projects |
+
+```shell
+# Format all real samples as a dry-run
+dotnet format batch ./samples/RealTcFiles --twincat --dry-run
+
+# Format a single real file
+dotnet format ./samples/RealTcFiles/Execute.TcPOU --dry-run
+```
 
 ------------------------------------------------------------------------
 
