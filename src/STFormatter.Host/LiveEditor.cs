@@ -522,6 +522,110 @@ internal static class LiveEditor
         }
     }
 
+    public static bool TryFormatSelectionViaExecuteCommand(EnvDTE.DTE dte,
+        out string? outOriginal, out string? outFormatted)
+    {
+        outOriginal = null;
+        outFormatted = null;
+
+        try
+        {
+            if (dte.ActiveDocument == null)
+            {
+                Log("TryFormatSelectionViaExecuteCommand: No active document");
+                return false;
+            }
+
+            bool undoContextOpened = false;
+            try
+            {
+                try
+                {
+                    if (!dte.UndoContext.IsOpen)
+                    {
+                        dte.UndoContext.Open("Format Selected Code");
+                        undoContextOpened = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"TryFormatSelectionViaExecuteCommand: UndoContext.Open failed: {ex.Message}");
+                }
+
+                dte.ActiveDocument.Activate();
+
+                string? savedClipboard = null;
+                try { savedClipboard = GetClipboardText(); } catch { }
+
+                dte.ExecuteCommand("Edit.Copy", "");
+                System.Threading.Thread.Sleep(100);
+
+                string selectedText = GetClipboardText() ?? "";
+
+                if (string.IsNullOrEmpty(selectedText))
+                {
+                    Log("TryFormatSelectionViaExecuteCommand: No text selected (clipboard empty after Edit.Copy)");
+                    if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { } }
+                    return false;
+                }
+
+                Log($"TryFormatSelectionViaExecuteCommand: Read {selectedText.Length} chars from selection");
+
+                var engine = new FormattingEngine(STFormatter.UI.SettingsManager.Current);
+
+                string? formatted = engine.FormatBody(selectedText) ?? selectedText;
+                if (string.IsNullOrEmpty(formatted) || formatted == selectedText)
+                    formatted = engine.Format(selectedText) ?? selectedText;
+
+                if (string.IsNullOrEmpty(formatted) || formatted == selectedText)
+                {
+                    Log("TryFormatSelectionViaExecuteCommand: No changes needed");
+                    if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { } }
+                    outOriginal = selectedText;
+                    outFormatted = formatted;
+                    return formatted == selectedText;
+                }
+
+                if (!SetClipboardText(formatted))
+                {
+                    Log("TryFormatSelectionViaExecuteCommand: Failed to set clipboard");
+                    if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { } }
+                    return false;
+                }
+                Log($"TryFormatSelectionViaExecuteCommand: Clipboard set ({formatted.Length} chars)");
+
+                dte.ExecuteCommand("Edit.Delete", "");
+                Log("TryFormatSelectionViaExecuteCommand: Edit.Delete executed");
+
+                dte.ExecuteCommand("Edit.Paste", "");
+                Log("TryFormatSelectionViaExecuteCommand: Edit.Paste executed");
+
+                if (savedClipboard != null)
+                {
+                    try { SetClipboardText(savedClipboard); } catch { }
+                }
+
+                Log("TryFormatSelectionViaExecuteCommand: SUCCESS - selection formatted");
+                outOriginal = selectedText;
+                outFormatted = formatted;
+                return true;
+            }
+            finally
+            {
+                if (undoContextOpened)
+                {
+                    try { dte.UndoContext.Close(); }
+                    catch { }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"TryFormatSelectionViaExecuteCommand: FAILED: {ex.GetType().Name} - {ex.Message}");
+            return false;
+        }
+    }
+
     private static string ReadActiveSectionText(EnvDTE.DTE dte)
     {
         try

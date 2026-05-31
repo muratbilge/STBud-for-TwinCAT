@@ -286,38 +286,33 @@ internal class Program
                 return;
             }
 
-            var selection = instance.Dte.ActiveDocument.Selection as EnvDTE.TextSelection;
-            if (selection == null || string.IsNullOrEmpty(selection.Text))
+            string? original, formatted;
+            bool success = LiveEditor.TryFormatSelectionViaExecuteCommand(
+                instance.Dte, out original, out formatted);
+
+            if (success && original != null && formatted != null)
             {
-                HandleFormatDocument(pid);
-                return;
+                RecordFormat(pid, instance.Dte.ActiveDocument?.FullName ?? "",
+                    "Selection", original, formatted, "Clipboard-Selection", true);
             }
-
-            string selectedText = selection.Text;
-            Log($"HandleFormatSelection: PID {pid} Formatting selection ({selectedText.Length} chars)");
-            var config = SettingsManager.Current;
-            var engine = new FormattingEngine(config);
-
-            string formatted = engine.FormatBody(selectedText) ?? selectedText;
-            if (formatted == selectedText)
-                formatted = engine.Format(selectedText) ?? selectedText;
-
-            if (formatted != selectedText)
+            else if (!success && original == null)
             {
-                selection.Delete();
-                selection.Insert(formatted);
-                Log($"HandleFormatSelection: PID {pid} Selection formatted");
-                RecordFormat(pid, instance.Dte.ActiveDocument?.FullName ?? "", "Selection", selectedText, formatted, "TextSelection", true);
-            }
-            else
-            {
-                Log($"HandleFormatSelection: PID {pid} No changes needed");
+                Log($"HandleFormatSelection: PID {pid} No text selected — showing info");
+                ShowInfoMessage("No text selected.\n\nPlease select code first, then use Format Selected Code.");
             }
         }
         catch (Exception ex)
         {
             Log($"HandleFormatSelection: PID {pid} FAILED: {ex.Message}");
         }
+    }
+
+    public static void ShowInfoMessage(string message)
+    {
+        _mainForm?.Invoke((Action)(() =>
+            System.Windows.Forms.MessageBox.Show(message, "ST Formatter",
+                System.Windows.Forms.MessageBoxButtons.OK,
+                System.Windows.Forms.MessageBoxIcon.Information)));
     }
 
     public static void ShowSettingsGui()

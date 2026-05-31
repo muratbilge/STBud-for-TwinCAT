@@ -310,12 +310,12 @@ internal sealed class HostManager
                 Program.HandleFormatDocument(instance.Pid);
             instance.InjectedControls.Add(docBtn);
 
-            // Format ST Selection
+            // Format Selected Code
             var selBtn = (CommandBarButton)targetMenu.Controls.Add(
                 MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
-            selBtn.Caption = "Format ST Selection";
-            selBtn.TooltipText = "Format the selected ST code";
-            selBtn.Tag = "STFormatter.FormatSelection";
+            selBtn.Caption = "Format Selected Code";
+            selBtn.TooltipText = "Format the selected ST code (select text first)";
+            selBtn.Tag = "STFormatter.FormatSelectedCode";
             selBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
                 Program.HandleFormatSelection(instance.Pid);
             instance.InjectedControls.Add(selBtn);
