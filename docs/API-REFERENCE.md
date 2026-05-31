@@ -154,7 +154,6 @@ _Unveranderliches Optionsobjekt, das alle Aspekte der Formatierung steuert. Jede
 public sealed class FormattingConfiguration
 {
     public static FormattingConfiguration Default { get; }
-    public static FormattingConfiguration STweepPreset { get; }
     public static FormattingConfiguration CompactPreset { get; }
     public static FormattingConfiguration ExpandedPreset { get; }
 
@@ -194,7 +193,6 @@ _Vier eingebaute Voreinstellungen sind verfuegbar:_
 | Preset / Voreinstellung | Description / Beschreibung |
 |---|---|
 | `Default` | Balanced defaults: 4-space indent, upper-case keywords, Allman braces, alignment enabled. |
-| `STweepPreset` | Matches the popular STweep formatter conventions for easy migration. |
 | `CompactPreset` | Minimal whitespace: 2-space indent, K&R braces, no alignment, single blank line between POU declarations. |
 | `ExpandedPreset` | Generous spacing: 4-space indent, Allman braces, alignment enabled, 2 blank lines between var sections. |
 
@@ -204,7 +202,7 @@ var config = FormattingConfiguration.CompactPreset;
 var engine = new FormattingEngine(config);
 
 // Or load a preset by name (case-insensitive)
-config = FormattingConfiguration.FromPreset("stweep");
+config = FormattingConfiguration.FromPreset("default");
 config = FormattingConfiguration.FromPreset("compact");
 config = FormattingConfiguration.FromPreset("expanded");
 
@@ -476,7 +474,7 @@ config.FormatKeyword("Program");  // "Program" (unchanged)
 
 #### FromPreset(string presetName)
 
-Static factory. Returns a preset configuration by name. Case-insensitive. Recognised names: `"default"`, `"stweep"`, `"compact"`, `"expanded"`.
+Static factory. Returns a preset configuration by name. Case-insensitive. Recognised names: `"default"`, `"compact"`, `"expanded"`. The alias `"stweep"` is accepted for backward compatibility and maps to `"default"`.
 
 _Statische Factory-Methode. Liefert eine Voreinstellung nach Namen. Gross-/Kleinschreibung wird ignoriert._
 

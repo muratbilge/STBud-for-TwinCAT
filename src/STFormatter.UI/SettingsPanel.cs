@@ -86,7 +86,7 @@ END_IF";
             var presetRow = new Panel { Width = 800, Height = 38, Margin = new Padding(0, 0, 0, 4) };
             var presetLabel = new Label { Text = "Preset:", Left = 0, Top = 8, Width = 50, Font = new Font("Segoe UI", 9.5f), TextAlign = ContentAlignment.MiddleRight };
             _presetCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Left = 58, Top = 5, Width = 180, Height = 28, Font = new Font("Segoe UI", 9.5f) };
-            _presetCombo.Items.AddRange(new object[] { "Default", "STweep", "Compact", "Expanded" });
+            _presetCombo.Items.AddRange(new object[] { "Default", "Compact", "Expanded" });
             _presetCombo.SelectedIndex = 0;
             _presetCombo.SelectedIndexChanged += OnPresetChanged;
             var previewBtn = new Button { Text = "Preview", Left = 260, Top = 4, Width = 80, Height = 30, Font = new Font("Segoe UI", 9.5f) };

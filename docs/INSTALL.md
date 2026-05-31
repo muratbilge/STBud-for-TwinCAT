@@ -30,7 +30,7 @@ Features:
 - Automatically picks net48 or net462 Host binaries based on your .NET Framework version
 - Optional: "Start Host on login" for TcXaeShell
 - Clean uninstall via Add/Remove Programs
-- Includes EditorConfig preset templates (stweep, compact, expanded)
+- Includes EditorConfig preset templates (default, compact, expanded)
 
 ### Building the Installer from Source
 
@@ -242,8 +242,8 @@ dotnet tool install --global --add-source bin/Release STFormatter.CLI
 ### Create Configuration File / Konfigurationsdatei erstellen
 
 ```bash
-# Create .editorconfig with STweep preset
-stfmt init . --preset stweep
+# Create .editorconfig with Default preset
+stfmt init . --preset default
 
 # Or with compact preset / Oder mit Compact-Voreinstellung
 stfmt init . --preset compact

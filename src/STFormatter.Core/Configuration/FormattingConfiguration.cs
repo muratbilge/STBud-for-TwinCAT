@@ -49,28 +49,7 @@ public sealed class FormattingConfiguration
         };
     }
 
-    // Presets
-    public static FormattingConfiguration STweepPreset => new()
-    {
-        IndentStyle = "spaces",
-        IndentSize = 4,
-        ContinuationIndentSize = 8,
-        NewLineStyle = "crlf",
-        KeywordCasing = "upper",
-        BraceStyle = "allman",
-        SpaceAroundOperators = true,
-        SpaceAfterComma = true,
-        SpaceBeforeSemicolon = false,
-        SpaceAfterColon = true,
-        AlignAssignments = true,
-        AlignVariableDeclarations = true,
-        MaxLineLength = 120,
-        EmptyLinesBetweenPOUs = 2,
-        EmptyLinesBetweenVarSections = 1,
-        KeepSingleLineBlocks = false,
-        FormatOnSave = true
-    };
-
+    // Presets — "stweep" is kept as a backward-compatible alias for "default"
     public static FormattingConfiguration CompactPreset => new()
     {
         IndentStyle = "spaces",
@@ -117,7 +96,7 @@ public sealed class FormattingConfiguration
     {
         return presetName.ToLowerInvariant() switch
         {
-            "stweep" => STweepPreset,
+            "stweep" => Default,
             "compact" => CompactPreset,
             "expanded" => ExpandedPreset,
             _ => Default

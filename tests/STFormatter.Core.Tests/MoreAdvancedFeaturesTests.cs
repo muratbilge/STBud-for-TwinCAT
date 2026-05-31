@@ -5,9 +5,9 @@ namespace STFormatter.Core.Tests;
 public class PresetTests
 {
     [Fact]
-    public void STweepPreset_HasCorrectValues()
+    public void DefaultPreset_HasCorrectValues()
     {
-        var config = FormattingConfiguration.STweepPreset;
+        var config = FormattingConfiguration.Default;
 
         Assert.Equal("spaces", config.IndentStyle);
         Assert.Equal(4, config.IndentSize);
@@ -47,6 +47,7 @@ public class PresetTests
     }
 
     [Theory]
+    [InlineData("default")]
     [InlineData("stweep")]
     [InlineData("compact")]
     [InlineData("expanded")]

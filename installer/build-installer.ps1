@@ -234,7 +234,7 @@ Write-Host "Creating EditorConfig preset templates..." -ForegroundColor Yellow
 $presetsDir = Join-Path $FilesDir "editorconfig-templates"
 New-Item -ItemType Directory -Path $presetsDir -Force | Out-Null
 
-# STweep preset
+# Default preset
 @"
 root = true
 
@@ -262,7 +262,7 @@ st_format_on_save = true
 [*.{TcPOU,TcDUT,TcGVL}]
 st_keyword_casing = upper
 st_brace_style = allman
-"@ | Set-Content (Join-Path $presetsDir "stweep.editorconfig") -Encoding UTF8
+"@ | Set-Content (Join-Path $presetsDir "default.editorconfig") -Encoding UTF8
 
 # Compact preset
 @"
@@ -390,7 +390,7 @@ if (-not $SkipInstaller -and $buildErrors.Count -eq 0) {
                 if (-not $SkipCLI) { Write-Host "  [x] CLI Tool (stfmt)" -ForegroundColor White }
                 if (-not $SkipHost) { Write-Host "  [x] TcXaeShell Host (net48 + net462)" -ForegroundColor White }
                 if (-not $SkipVSIX) { Write-Host "  [x] VS 2022 Extension" -ForegroundColor White }
-                Write-Host "  [x] EditorConfig presets (stweep, compact, expanded)" -ForegroundColor White
+                Write-Host "  [x] EditorConfig presets (default, compact, expanded)" -ForegroundColor White
             } else {
                 Write-Warning "Installer seems to have completed but output file not found."
             }

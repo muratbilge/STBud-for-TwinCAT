@@ -845,11 +845,9 @@ Matches the built-in defaults of `FormattingConfiguration`.
 | `KeepSingleLineBlocks`        | `false`     |
 | `FormatOnSave`                | `true`      |
 
-### STweepPreset
+### Default (Preset)
 
-Compatible with the commercial STeep formatting tool. Professional, readable style with generous vertical spacing and aligned declarations.
-
-Kompatibel mit dem kommerziellen STeep-Formatierungstool.
+Professional, readable style with generous vertical spacing and aligned declarations.
 
 | Property                      | Value       |
 |-------------------------------|-------------|
@@ -871,7 +869,7 @@ Kompatibel mit dem kommerziellen STeep-Formatierungstool.
 | `KeepSingleLineBlocks`        | `false`     |
 | `FormatOnSave`                | `true`      |
 
-**Example output** with STweepPreset:
+**Example output** with Default preset:
 
 ```st
 PROGRAM ConveyorControl
@@ -1020,7 +1018,7 @@ END_FUNCTION
 
 ### Preset Comparison / Preset-Vergleich
 
-| Option                         | Default | STweep | Compact | Expanded |
+| Option                         | Default | Compact | Expanded |
 |--------------------------------|---------|--------|---------|----------|
 | `IndentSize`                   | 4       | 4      | 2       | 4        |
 | `ContinuationIndentSize`       | 8       | 8      | 4       | 8        |
@@ -1112,7 +1110,7 @@ Der `EditorConfigParser` durchlaeuft den Verzeichnisbaum aufwaerts und sammelt `
 Use the CLI to generate an `.editorconfig` from a preset:
 
 ```bash
-stfmt init . --preset stweep
+stfmt init . --preset default
 stfmt init . --preset compact
 stfmt init . --preset expanded
 ```
@@ -1184,10 +1182,10 @@ stfmt batch ./POUs --recursive --twincat
 stfmt init . --preset compact
 
 # View preset details
-stfmt preset stweep
+stfmt preset default
 
 # Export current configuration for version control
-stfmt export team-style.json --preset stweep
+stfmt export team-style.json --preset default
 
 # Import and apply configuration from JSON
 stfmt import team-style.json

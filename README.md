@@ -42,7 +42,7 @@ The formatting engine, multi-targeting `net8.0`, `net48`, and `net462`.
   reformatted text through `FormattingWriter`. Keyword casing, indentation,
   spacing, alignment, and line-break decisions are all driven by
   `FormattingConfiguration`.
-- **Configuration** -- `FormattingConfiguration` with built-in presets (STweep,
+- **Configuration** -- `FormattingConfiguration` with built-in presets (Default,
   Compact, Expanded) plus `.editorconfig` file support (`EditorConfigParser`
   walks up from the source file's directory to find applicable settings).
 
@@ -198,7 +198,7 @@ formatted.
 
 ### Presets
 
-| | STweep | Compact | Expanded |
+| | Default | Compact | Expanded |
 |---|---|---|---|
 | Indent | 4 spaces | 2 spaces | 4 spaces |
 | Continuation | 8 | 4 | 8 |
@@ -253,7 +253,7 @@ All ST-specific `.editorconfig` properties:
 | `st_continuation_indent_size` | `ContinuationIndentSize` | integer |
 | `st_format_on_save` | `FormatOnSave` | `true`, `false` |
 
-Use `stfmt init . --preset stweep` to generate an `.editorconfig` from a
+Use `stfmt init . --preset default` to generate an `.editorconfig` from a
 preset, or `stfmt import myconfig.json` to convert a JSON export.
 
 ------------------------------------------------------------------------
@@ -307,10 +307,10 @@ dotnet format batch ./MyProject --recursive --twincat
 dotnet format check ./src --recursive
 
 # Generate .editorconfig from a preset
-dotnet format init . --preset stweep
+dotnet format init . --preset default
 
 # View preset details
-dotnet format preset stweep
+dotnet format preset default
 ```
 
 ### 2. TcXaeShell — Format Inside the PLC Editor
@@ -358,7 +358,7 @@ The formatter reads `.editorconfig` files walking up from each source file's dir
 
 ```shell
 # Generate from a preset
-dotnet format init . --preset stweep
+dotnet format init . --preset default
 ```
 
 This creates:

@@ -260,7 +260,7 @@ class Program
         var directory = args.Length > 0 ? args[0] : ".";
         var presetName = args.Contains("--preset") 
             ? args[Array.IndexOf(args, "--preset") + 1] 
-            : "stweep";
+            : "default";
 
         try
         {
@@ -314,12 +314,12 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
         if (args.Length == 0)
         {
             Console.WriteLine("Available presets:");
-            Console.WriteLine("  stweep    - Standard STweep-like formatting (default)");
+            Console.WriteLine("  default   - Default formatting (4-space indent, uppercase keywords)");
             Console.WriteLine("  compact   - Compact 2-space formatting");
             Console.WriteLine("  expanded  - Expanded with 80-char line limit");
             Console.WriteLine();
             Console.WriteLine("Usage: stfmt preset <name>");
-            Console.WriteLine("       stfmt preset stweep");
+            Console.WriteLine("       stfmt preset default");
             return 0;
         }
 
@@ -343,7 +343,7 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
         var outputPath = args.Length > 0 ? args[0] : "stformatter.config.json";
         var presetName = args.Contains("--preset") 
             ? args[Array.IndexOf(args, "--preset") + 1] 
-            : "stweep";
+            : "default";
 
         try
         {
@@ -528,12 +528,12 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
         Console.WriteLine("  --dry-run       Preview without writing files");
         Console.WriteLine("  --recursive     Include subdirectories");
         Console.WriteLine("  --twincat       Include .TcPOU, .TcDUT, .TcGVL files");
-        Console.WriteLine("  --preset        Use a preset (stweep, compact, expanded)");
+        Console.WriteLine("  --preset        Use a preset (default, compact, expanded)");
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  stfmt format MyProgram.st");
         Console.WriteLine("  stfmt batch ./POUs --recursive --twincat");
-        Console.WriteLine("  stfmt init . --preset stweep");
+        Console.WriteLine("  stfmt init . --preset default");
         Console.WriteLine("  stfmt export myconfig.json --preset compact");
         Console.WriteLine("  stfmt check ./src --recursive");
     }

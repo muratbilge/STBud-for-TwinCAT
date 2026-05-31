@@ -10,7 +10,7 @@ public class CliFeatureTests
     [Fact]
     public void FormattingConfiguration_CanBeSerialized_ToJson()
     {
-        var config = FormattingConfiguration.STweepPreset;
+        var config = FormattingConfiguration.Default;
         var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
         {
             WriteIndented = true,
@@ -113,10 +113,10 @@ END_VAR
 x:=1;
 END_PROGRAM";
 
-        // STweep preset
-        var stweepConfig = FormattingConfiguration.STweepPreset;
-        var stweepEngine = new FormattingEngine(stweepConfig);
-        var stweepResult = stweepEngine.Format(source);
+        // Default preset
+        var defaultConfig = FormattingConfiguration.Default;
+        var defaultEngine = new FormattingEngine(defaultConfig);
+        var defaultResult = defaultEngine.Format(source);
 
         // Compact preset
         var compactConfig = FormattingConfiguration.CompactPreset;
@@ -124,12 +124,12 @@ END_PROGRAM";
         var compactResult = compactEngine.Format(source);
 
         // They should produce different output
-        Assert.NotEqual(stweepResult, compactResult);
+        Assert.NotEqual(defaultResult, compactResult);
 
         // Compact should have 2-space indent and lower case
         Assert.Contains("  x : int;", compactResult);
 
-        // STweep should have 4-space indent and upper case
-        Assert.Contains("    x : INT;", stweepResult);
+        // Default should have 4-space indent and upper case
+        Assert.Contains("    x : INT;", defaultResult);
     }
 }

@@ -307,8 +307,8 @@ dotnet tool install --global --add-source src/STFormatter.CLI/bin/Release STForm
 Create an `.editorconfig` in your project directory:
 
 ```bash
-# Generate from STweep preset (recommended for TwinCAT projects)
-stfmt init . --preset stweep
+# Generate from Default preset (recommended for TwinCAT projects)
+stfmt init . --preset default
 
 # Or from Compact preset
 stfmt init . --preset compact

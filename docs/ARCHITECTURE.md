@@ -372,7 +372,7 @@ All formatting settings are held in `FormattingConfiguration`, an immutable opti
 | Preset / Vorlage      | Description / Beschreibung                                           |
 |------------------------|----------------------------------------------------------------------|
 | `Default`             | Balanced readability: 4-space indent, upper-case keywords, next-line braces |
-| `STweepPreset`        | Compatible with the commercial STeep tool                            |
+| `Default`              | Default formatting (4-space indent, uppercase keywords, aligned declarations) |
 | `CompactPreset`       | Minimal vertical spacing, reduced indentation                        |
 | `ExpandedPreset`      | Generous vertical spacing, expanded layout                          |
 
