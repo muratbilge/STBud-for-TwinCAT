@@ -49,7 +49,7 @@ public sealed class FormattingConfiguration
         };
     }
 
-    // Presets — "stweep" is kept as a backward-compatible alias for "default"
+    // Presets
     public static FormattingConfiguration CompactPreset => new()
     {
         IndentStyle = "spaces",
@@ -96,7 +96,6 @@ public sealed class FormattingConfiguration
     {
         return presetName.ToLowerInvariant() switch
         {
-            "stweep" => Default,
             "compact" => CompactPreset,
             "expanded" => ExpandedPreset,
             _ => Default

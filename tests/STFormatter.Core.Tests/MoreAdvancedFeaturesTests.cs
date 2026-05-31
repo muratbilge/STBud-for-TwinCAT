@@ -48,7 +48,6 @@ public class PresetTests
 
     [Theory]
     [InlineData("default")]
-    [InlineData("stweep")]
     [InlineData("compact")]
     [InlineData("expanded")]
     public void FromPreset_ReturnsCorrectPreset(string presetName)

@@ -3,7 +3,7 @@
   <Metadata>
     <Identity Id="TwinCAT.STFormatter.8d2e3a4f-b5c1-4a7e-9f3d-2c1e5b6a9d4e" Version="1.0.0" Language="en-US" Publisher="TwinCAT ST Formatter" />
     <DisplayName>TwinCAT ST Formatter</DisplayName>
-    <Description xml:space="preserve">A code formatter for TwinCAT Structured Text (ST) similar to STweep.</Description>
+    <Description xml:space="preserve">A code formatter for TwinCAT Structured Text (ST) with configurable presets and .editorconfig support.</Description>
     <Icon>Resources\PackageIcon.png</Icon>
     <PreviewImage>Resources\PreviewImage.png</PreviewImage>
   </Metadata>

@@ -474,7 +474,7 @@ config.FormatKeyword("Program");  // "Program" (unchanged)
 
 #### FromPreset(string presetName)
 
-Static factory. Returns a preset configuration by name. Case-insensitive. Recognised names: `"default"`, `"compact"`, `"expanded"`. The alias `"stweep"` is accepted for backward compatibility and maps to `"default"`.
+Static factory. Returns a preset configuration by name. Case-insensitive. Recognised names: `"default"`, `"compact"`, `"expanded"`.
 
 _Statische Factory-Methode. Liefert eine Voreinstellung nach Namen. Gross-/Kleinschreibung wird ignoriert._
 
