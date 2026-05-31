@@ -198,4 +198,44 @@ public class ConfigurationPropertyTests
         var compact = new FormattingEngine(compactConfig).Format(source);
         Assert.True(compact.Length <= allman.Length, "Compact should produce equal or shorter output");
     }
+
+    [Fact]
+    public void Formatter_Handles_UnionType()
+    {
+        var engine = new FormattingEngine();
+        var source = "TYPE MyUnion :\nUNION\nasInt:DINT;\nasReal:REAL;\nEND_UNION\nEND_TYPE";
+        var result = engine.Format(source);
+        Assert.Contains("UNION", result);
+        Assert.Contains("END_UNION", result);
+        Assert.Contains("END_TYPE", result);
+    }
+
+    [Fact]
+    public void Formatter_Handles_UsingDirective()
+    {
+        var engine = new FormattingEngine();
+        var source = "USING MyLibrary;\nPROGRAM Test\nEND_PROGRAM";
+        var result = engine.Format(source);
+        Assert.Contains("USING", result.ToUpperInvariant());
+    }
+
+    [Fact]
+    public void Formatter_Handles_LabelStatement()
+    {
+        var engine = new FormattingEngine();
+        var source = "PROGRAM Test\nRetry:\nx := x + 1;\nEND_PROGRAM";
+        var result = engine.Format(source);
+        Assert.Contains("Retry", result);
+        Assert.Contains("x := x + 1", result);
+    }
+
+    [Fact]
+    public void Formatter_Handles_GotoStatement()
+    {
+        var engine = new FormattingEngine();
+        var source = "PROGRAM Test\nIF x > 10 THEN\nGOTO Skip;\nEND_IF\ny := 2;\nSkip:\ny := 3;\nEND_PROGRAM";
+        var result = engine.Format(source);
+        Assert.Contains("GOTO", result.ToUpperInvariant());
+        Assert.Contains("Skip", result);
+    }
 }

@@ -245,6 +245,7 @@ public enum SyntaxKind
     ArrayRange,
     RangeExpression,
     StructuredType,
+    UnionType,
     StructureElement,
     StringType,
     EnumerationType,

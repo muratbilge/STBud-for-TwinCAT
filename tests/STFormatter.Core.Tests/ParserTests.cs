@@ -177,4 +177,127 @@ END_PROGRAM";
         Assert.NotEmpty(tree.Diagnostics);
         Assert.Single(tree.Root.ChildNodes);
     }
+
+    [Fact]
+    public void Parser_Parses_UnionType()
+    {
+        var source = @"TYPE MyUnion :
+UNION
+    asInt : DINT;
+    asReal : REAL;
+END_UNION
+END_TYPE";
+
+        var text = SourceText.From(source);
+        var parser = new Parser(text);
+        var tree = parser.Parse();
+
+        Assert.Empty(tree.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Single(tree.Root.ChildNodes);
+        Assert.Equal(SyntaxKind.TypeDeclaration, tree.Root.ChildNodes[0].Kind);
+    }
+
+    [Fact]
+    public void Parser_Parses_UsingDirective()
+    {
+        var source = @"USING MyLibrary;
+PROGRAM Test
+END_PROGRAM";
+
+        var text = SourceText.From(source);
+        var parser = new Parser(text);
+        var tree = parser.Parse();
+
+        Assert.Empty(tree.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Equal(2, tree.Root.ChildNodes.Length);
+        Assert.Equal(SyntaxKind.UsingDirective, tree.Root.ChildNodes[0].Kind);
+    }
+
+    [Fact]
+    public void Parser_Parses_DottedUsingDirective()
+    {
+        var source = @"USING MyLib.Utilities.Math;
+PROGRAM Test
+END_PROGRAM";
+
+        var text = SourceText.From(source);
+        var parser = new Parser(text);
+        var tree = parser.Parse();
+
+        Assert.Empty(tree.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Equal(2, tree.Root.ChildNodes.Length);
+        Assert.Equal(SyntaxKind.UsingDirective, tree.Root.ChildNodes[0].Kind);
+    }
+
+    [Fact]
+    public void Parser_Parses_Transition()
+    {
+        var source = @"TRANSITION StartRun : Idle TO Running; END_TRANSITION";
+
+        var text = SourceText.From(source);
+        var parser = new Parser(text);
+        var tree = parser.Parse();
+
+        Assert.Empty(tree.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Single(tree.Root.ChildNodes);
+        Assert.Equal(SyntaxKind.TransitionDeclaration, tree.Root.ChildNodes[0].Kind);
+    }
+
+    [Fact]
+    public void Parser_Parses_Step()
+    {
+        var source = @"STEP Idle
+VAR
+    timer : TON;
+END_VAR
+timer(IN := TRUE);
+END_STEP";
+
+        var text = SourceText.From(source);
+        var parser = new Parser(text);
+        var tree = parser.Parse();
+
+        Assert.Empty(tree.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Single(tree.Root.ChildNodes);
+        Assert.Equal(SyntaxKind.StepDeclaration, tree.Root.ChildNodes[0].Kind);
+    }
+
+    [Fact]
+    public void Parser_Parses_GotoStatement()
+    {
+        var source = @"PROGRAM Test
+IF x > 10 THEN
+    GOTO Skip;
+END_IF;
+y := 2;
+Skip:
+y := 3;
+END_PROGRAM";
+
+        var text = SourceText.From(source);
+        var parser = new Parser(text);
+        var tree = parser.Parse();
+
+        Assert.Empty(tree.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
+    public void Parser_Parses_LabelStatement()
+    {
+        var source = @"PROGRAM Test
+Retry:
+x := x + 1;
+END_PROGRAM";
+
+        var text = SourceText.From(source);
+        var parser = new Parser(text);
+        var tree = parser.Parse();
+
+        Assert.Empty(tree.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+        var pou = tree.Root.ChildNodes[0];
+        var body = pou.ChildNodes.FirstOrDefault(n => n.Kind == SyntaxKind.StatementList);
+        Assert.NotNull(body);
+        // Label wraps the next statement, so we have one LabelStatement
+        Assert.Equal(SyntaxKind.LabelStatement, body.ChildNodes[0].Kind);
+    }
 }

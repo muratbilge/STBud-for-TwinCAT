@@ -313,6 +313,8 @@ internal sealed class FormattingVisitor
             case SyntaxKind.PropertyDeclaration:
             case SyntaxKind.ActionDeclaration:
             case SyntaxKind.InterfaceDeclaration:
+            case SyntaxKind.TransitionDeclaration:
+            case SyntaxKind.StepDeclaration:
                 VisitPouDeclaration(node);
                 break;
             case SyntaxKind.VarSection:
@@ -357,6 +359,9 @@ internal sealed class FormattingVisitor
             case SyntaxKind.GotoStatement:
                 VisitGotoStatement(node);
                 break;
+            case SyntaxKind.LabelStatement:
+                VisitLabelStatement(node);
+                break;
             case SyntaxKind.BinaryExpression:
                 VisitBinaryExpression(node);
                 break;
@@ -387,6 +392,7 @@ internal sealed class FormattingVisitor
             case SyntaxKind.StringType:
             case SyntaxKind.PointerType:
             case SyntaxKind.ReferenceType:
+            case SyntaxKind.UnionType:
                 VisitType(node);
                 break;
             case SyntaxKind.ArrayRange:
@@ -404,6 +410,9 @@ internal sealed class FormattingVisitor
                 break;
             case SyntaxKind.TypeDeclaration:
                 VisitTypeDeclaration(node);
+                break;
+            case SyntaxKind.UsingDirective:
+                VisitUsingDirective(node);
                 break;
             case SyntaxKind.ElsIfClause:
                 VisitElsIfClause(node);
@@ -766,11 +775,16 @@ internal sealed class FormattingVisitor
         if (type != null)
             Visit(type);
 
-        WriteSemicolon(tokens[3]); // ;
+        var semicolon = tokens.FirstOrDefault(t => t.Kind == SyntaxKind.Semicolon);
+        if (semicolon != null)
+        {
+            WriteSemicolon(semicolon);
+        }
         _writer.EnsureNewLine();
         _writer.IndentLevel--;
 
-        WriteTokenWithCasing(tokens[4]); // END_TYPE
+        var endType = tokens.First(t => t.Kind == SyntaxKind.EndTypeKeyword);
+        WriteTokenWithCasing(endType); // END_TYPE
         _writer.EnsureNewLine();
     }
 
@@ -1164,6 +1178,40 @@ internal sealed class FormattingVisitor
         _writer.EnsureNewLine();
     }
 
+    private void VisitLabelStatement(SyntaxNode node)
+    {
+        var tokens = node.ChildTokens.ToList();
+        var nodes = node.ChildNodes.ToList();
+
+        WriteToken(tokens[0]); // label name
+        WriteToken(tokens[1]); // :
+        _writer.WriteSpace();
+        Visit(nodes[0]); // labeled statement
+    }
+
+    private void VisitUsingDirective(SyntaxNode node)
+    {
+        var tokens = node.ChildTokens.ToList();
+        WriteTokenWithCasing(tokens[0]); // USING
+        _writer.WriteSpace();
+        for (var i = 1; i < tokens.Count; i++)
+        {
+            if (tokens[i].Kind == SyntaxKind.Dot)
+            {
+                WriteToken(tokens[i]);
+            }
+            else if (tokens[i].Kind == SyntaxKind.Identifier)
+            {
+                WriteToken(tokens[i]);
+            }
+            else if (tokens[i].Kind == SyntaxKind.Semicolon)
+            {
+                WriteSemicolon(tokens[i]);
+            }
+        }
+        _writer.EnsureNewLine();
+    }
+
     private void VisitExpression(SyntaxNode node)
     {
         WriteToken(node.ChildTokens[0]);
@@ -1270,6 +1318,9 @@ internal sealed class FormattingVisitor
             case SyntaxKind.StructuredType:
                 VisitStructuredType(node);
                 break;
+            case SyntaxKind.UnionType:
+                VisitUnionType(node);
+                break;
             case SyntaxKind.EnumerationType:
                 VisitEnumerationType(node);
                 break;
@@ -1343,10 +1394,27 @@ internal sealed class FormattingVisitor
 
         if (!_config.IsAllmanStyle() && tokens.Count > 1 && tokens[1].Kind != SyntaxKind.EndStructKeyword)
         {
-            // Compact: try to put END_STRUCT right after last member
             _writer.EnsureSpace();
         }
         WriteTokenWithCasing(tokens[tokens.Count - 1]); // END_STRUCT
+    }
+
+    private void VisitUnionType(SyntaxNode node)
+    {
+        var tokens = node.ChildTokens.ToList();
+        var nodes = node.ChildNodes.ToList();
+
+        WriteTokenWithCasing(tokens[0]); // UNION
+        _writer.EnsureNewLine();
+
+        _writer.IndentLevel++;
+        foreach (var member in nodes)
+        {
+            Visit(member);
+        }
+        _writer.IndentLevel--;
+
+        WriteTokenWithCasing(tokens[tokens.Count - 1]); // END_UNION
     }
 
     private void VisitEnumerationType(SyntaxNode node)
@@ -1637,7 +1705,8 @@ internal sealed class FormattingVisitor
         return kind is SyntaxKind.NamedType or SyntaxKind.ArrayType
             or SyntaxKind.StructuredType or SyntaxKind.EnumerationType
             or SyntaxKind.StringType or SyntaxKind.PointerType
-            or SyntaxKind.ReferenceType or SyntaxKind.SubrangeType;
+            or SyntaxKind.ReferenceType or SyntaxKind.SubrangeType
+            or SyntaxKind.UnionType;
     }
 
     private static int EstimateNodeLength(SyntaxNode node)

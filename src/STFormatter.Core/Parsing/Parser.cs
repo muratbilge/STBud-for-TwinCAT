@@ -69,7 +69,11 @@ public sealed class Parser
 
         while (Current.Kind != SyntaxKind.EndOfFile)
         {
-            if (IsPouStart(Current.Kind))
+            if (Current.Kind == SyntaxKind.UsingKeyword)
+            {
+                declarations.Add(ParseUsingDirective());
+            }
+            else if (IsPouStart(Current.Kind))
             {
                 declarations.Add(ParsePouDeclaration());
             }
@@ -120,6 +124,8 @@ public sealed class Parser
             SyntaxKind.MethodKeyword => ParseMethod(),
             SyntaxKind.PropertyKeyword => ParseProperty(),
             SyntaxKind.ActionKeyword => ParseAction(),
+            SyntaxKind.TransitionKeyword => ParseTransition(),
+            SyntaxKind.StepKeyword => ParseStep(),
             SyntaxKind.InterfaceKeyword => ParseInterface(),
             _ => throw new InvalidOperationException($"Unexpected POU start: {Current.Kind}")
         };
@@ -257,6 +263,48 @@ public sealed class Parser
         if (endName != null) tokens.Add(endName);
 
         return SyntaxFactory.Node(SyntaxKind.ActionDeclaration, span, new[] { body }, tokens);
+    }
+
+    private SyntaxNode ParseTransition()
+    {
+        var start = Current.Span.Start;
+        var transitionKeyword = MatchToken(SyntaxKind.TransitionKeyword);
+        var name = MatchToken(SyntaxKind.Identifier);
+        var colon = MatchToken(SyntaxKind.Colon);
+        var fromExpr = ParseExpression();
+        var toKeyword = MatchToken(SyntaxKind.ToKeyword);
+        var toExpr = ParseExpression();
+        var semicolon = MatchToken(SyntaxKind.Semicolon);
+        var endKeyword = MatchToken(SyntaxKind.EndTransitionKeyword);
+        var endName = TryMatchIdentifier();
+
+        var span = TextSpan.FromBounds(start, endKeyword.Span.End);
+        var children = new List<SyntaxNode> { fromExpr, toExpr };
+        var tokens = new List<SyntaxToken> { transitionKeyword, name, colon, toKeyword, semicolon, endKeyword };
+        if (endName != null) tokens.Add(endName);
+
+        return SyntaxFactory.Node(SyntaxKind.TransitionDeclaration, span, children, tokens);
+    }
+
+    private SyntaxNode ParseStep()
+    {
+        var start = Current.Span.Start;
+        var stepKeyword = MatchToken(SyntaxKind.StepKeyword);
+        var name = MatchToken(SyntaxKind.Identifier);
+        var varSections = ParseVarSections();
+        var body = ParseStatementList();
+        var endKeyword = MatchToken(SyntaxKind.EndStepKeyword);
+        var endName = TryMatchIdentifier();
+
+        var span = TextSpan.FromBounds(start, endKeyword.Span.End);
+        var children = new List<SyntaxNode>();
+        children.AddRange(varSections);
+        children.Add(body);
+
+        var tokens = new List<SyntaxToken> { stepKeyword, name, endKeyword };
+        if (endName != null) tokens.Add(endName);
+
+        return SyntaxFactory.Node(SyntaxKind.StepDeclaration, span, children, tokens);
     }
 
     private SyntaxNode ParseInterface()
@@ -525,6 +573,11 @@ public sealed class Parser
             return ParseStructType();
         }
 
+        if (Current.Kind == SyntaxKind.UnionKeyword)
+        {
+            return ParseUnionType();
+        }
+
         if (Current.Kind == SyntaxKind.EnumKeyword)
         {
             return ParseEnumType();
@@ -607,6 +660,23 @@ public sealed class Parser
         var span = TextSpan.FromBounds(start, endKeyword.Span.End);
         return SyntaxFactory.Node(SyntaxKind.StructuredType, span, elements,
             new[] { structKeyword, endKeyword });
+    }
+
+    private SyntaxNode ParseUnionType()
+    {
+        var start = Current.Span.Start;
+        var unionKeyword = MatchToken(SyntaxKind.UnionKeyword);
+        var elements = new List<SyntaxNode>();
+
+        while (Current.Kind == SyntaxKind.Identifier)
+        {
+            elements.Add(ParseVarDeclaration());
+        }
+
+        var endKeyword = MatchToken(SyntaxKind.EndUnionKeyword);
+        var span = TextSpan.FromBounds(start, endKeyword.Span.End);
+        return SyntaxFactory.Node(SyntaxKind.UnionType, span, elements,
+            new[] { unionKeyword, endKeyword });
     }
 
     private SyntaxNode ParseEnumType()
@@ -730,12 +800,47 @@ public sealed class Parser
         var name = MatchToken(SyntaxKind.Identifier);
         var colon = MatchToken(SyntaxKind.Colon);
         var type = ParseType();
-        var semicolon = MatchToken(SyntaxKind.Semicolon);
+        var semicolon = TryMatchSemicolon();
         var endKeyword = MatchToken(SyntaxKind.EndTypeKeyword);
 
         var span = TextSpan.FromBounds(start, endKeyword.Span.End);
-        return SyntaxFactory.Node(SyntaxKind.TypeDeclaration, span, new[] { type },
-            new[] { typeKeyword, name, colon, semicolon, endKeyword });
+        var tokens = new List<SyntaxToken> { typeKeyword, name, colon, endKeyword };
+        if (semicolon != null) tokens.Insert(3, semicolon);
+
+        return SyntaxFactory.Node(SyntaxKind.TypeDeclaration, span, new[] { type }, tokens);
+    }
+
+    private SyntaxToken? TryMatchSemicolon()
+    {
+        if (Current.Kind == SyntaxKind.Semicolon)
+            return NextToken();
+        return null;
+    }
+
+    private SyntaxNode ParseUsingDirective()
+    {
+        var start = Current.Span.Start;
+        var usingKeyword = MatchToken(SyntaxKind.UsingKeyword);
+        var namespaceToken = MatchToken(SyntaxKind.Identifier);
+
+        var dottedParts = new List<SyntaxToken> { namespaceToken };
+        while (Current.Kind == SyntaxKind.Dot)
+        {
+            var dot = NextToken();
+            var part = MatchToken(SyntaxKind.Identifier);
+            dottedParts.Add(dot);
+            dottedParts.Add(part);
+        }
+
+        var semicolon = MatchToken(SyntaxKind.Semicolon);
+        var end = semicolon.Span.End;
+        var span = TextSpan.FromBounds(start, end);
+        var allTokens = new List<SyntaxToken> { usingKeyword };
+        allTokens.AddRange(dottedParts);
+        allTokens.Add(semicolon);
+
+        return SyntaxFactory.Node(SyntaxKind.UsingDirective, span,
+            ImmutableArray<SyntaxNode>.Empty, allTokens);
     }
 
     // Statements
@@ -1076,6 +1181,19 @@ public sealed class Parser
     private SyntaxNode ParseAssignmentOrCallStatement()
     {
         var start = Current.Span.Start;
+
+        // Check for label: Identifier followed by Colon (not :=)
+        if (Current.Kind == SyntaxKind.Identifier && Peek(1).Kind == SyntaxKind.Colon)
+        {
+            var label = NextToken(); // identifier
+            var colon = NextToken(); // colon
+            var statement = ParseStatement();
+            var end = statement.Span.End;
+            var span = TextSpan.FromBounds(start, end);
+            return SyntaxFactory.Node(SyntaxKind.LabelStatement, span,
+                new[] { statement }, new[] { label, colon });
+        }
+
         var left = ParseExpression();
 
         if (Current.Kind == SyntaxKind.AssignmentOperator)
