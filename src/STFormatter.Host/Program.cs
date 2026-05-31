@@ -19,6 +19,14 @@ internal class Program
     private static volatile bool _running = true;
     private static MainForm? _mainForm;
 
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetConsoleWindow();
+
+    private const int SW_HIDE = 0;
+
     [STAThread]
     static void Main(string[] args)
     {
@@ -28,6 +36,10 @@ internal class Program
         LogInit();
         Log("=== STFormatter.Host started ===");
 
+        var consoleHandle = GetConsoleWindow();
+        if (consoleHandle != IntPtr.Zero)
+            ShowWindow(consoleHandle, SW_HIDE);
+
         _hostManager = new HostManager();
 
         var mainForm = new MainForm(
@@ -36,6 +48,10 @@ internal class Program
             maintainAction: () => Maintain()
         );
         _mainForm = mainForm;
+        mainForm.Opacity = 0;
+        mainForm.Show();
+        mainForm.Hide();
+        mainForm.Opacity = 1;
 
         Application.Run(mainForm);
 
@@ -315,14 +331,25 @@ internal class Program
     public static void ShowInfoMessage(string message)
     {
         _mainForm?.Invoke((Action)(() =>
+        {
+            var consoleHandle = GetConsoleWindow();
+            if (consoleHandle != IntPtr.Zero)
+                ShowWindow(consoleHandle, SW_HIDE);
             System.Windows.Forms.MessageBox.Show(message, "ST Formatter",
                 System.Windows.Forms.MessageBoxButtons.OK,
-                System.Windows.Forms.MessageBoxIcon.Information)));
+                System.Windows.Forms.MessageBoxIcon.Information);
+        }));
     }
 
     public static void ShowSettingsGui()
     {
-        _mainForm?.Invoke((Action)(() => _mainForm.ShowWindow(0)));
+        _mainForm?.Invoke((Action)(() =>
+        {
+            _mainForm.ShowWindow(0);
+            var consoleHandle = GetConsoleWindow();
+            if (consoleHandle != IntPtr.Zero)
+                ShowWindow(consoleHandle, SW_HIDE);
+        }));
     }
 
     private static void RecordFormat(int pid, string filePath, string section,
