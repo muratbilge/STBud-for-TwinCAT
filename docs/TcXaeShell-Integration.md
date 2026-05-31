@@ -2,7 +2,9 @@
 
 This document captures hard-won technical knowledge about integrating the ST Formatter into Beckhoff's TwinCAT XAE Shell (TcXaeShell). The PLC editor in TcXaeShell is fundamentally different from a standard Visual Studio text editor. Most conventional VS SDK approaches fail. This document records what fails, why it fails, and the working solutions.
 
-> **Important**: The VSPackage / in-process approach documented in section "The Working Solution: TwinCAT Automation API" only works when the package CAN be loaded. Since TcXaeShell's isolated shell **does not load custom VSPackages**, the production approach is the **external Host process** described in the new section below.
+> **Important**: The VSPackage / in-process approach documented in sections "The Working Solution: TwinCAT Automation API" and "VS Package Configuration" only works when the package CAN be loaded. Since TcXaeShell's isolated shell **does not load custom VSPackages**, those sections are preserved for historical reference only. The **production approach** is the **external Host process** described in the "External Host Approach" section.
+>
+> Also see [HOW-TO-INSTALL.md](HOW-TO-INSTALL.md) for step-by-step deployment and [HOW-TO-USE.md](HOW-TO-USE.md) for usage instructions.
 
 ---
 
@@ -730,20 +732,21 @@ the editor and the file are already in sync.
 
 ### Deployment / Bereitstellung
 
-Deploy these files (requires admin privileges):
+Deploy these files (use `deploy.bat`, requires admin privileges):
 
 ```
 C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\
   STFormatter.Host.exe
   STFormatter.Core.dll
+  STFormatter.UI.dll
   Microsoft.VisualStudio.Interop.dll    ← NuGet: v17.0.32112.339
 ```
 
 > **Target framework**: The Host is built for `net48` by default (for machines with .NET 4.8+). For older machines running .NET 4.6.2, build with the `net462` target instead. The `TcXaeShellVersionProfile.RequiredFramework` property indicates the minimum .NET Framework version for each TcXaeShell version.
 
-Launch (hidden):
+Launch (runs as hidden background process with system tray icon):
 ```powershell
-Start-Process "C:\...\Extensions\STFormatter\STFormatter.Host.exe" -WindowStyle Hidden
+Start-Process "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\STFormatter.Host.exe"
 ```
 
 Log file: `%TEMP%\STFormatter_Host.log`
@@ -897,48 +900,50 @@ This is configured in the `.pkgdef` file to ensure TcXaeShell can locate the Bec
 ### Build / Erstellen
 
 ```powershell
-dotnet build src\STFormatter.TcXaeShell -c Release
+dotnet build src\STFormatter.Host -c Debug
+
+# For net462 target (older TcXaeShell):
+dotnet build src\STFormatter.Host\STFormatter.Host.csproj -c Debug -p:TargetFramework=net462
 ```
 
 ### Deploy / Bereitstellen
 
-Deployment requires **administrator privileges**. Files must be manually copied.
+Use the provided deployment script (requires administrator privileges):
 
 ```powershell
-# Target directory
-$targetDir = "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\"
+# For net48 (default — current TcXaeShell)
+.\deploy.bat
 
-# Copy extension DLL and .pkgdef
-Copy-Item -Path "src\STFormatter.TcXaeShell\bin\Release\*" `
-          -Destination $targetDir -Force
-Copy-Item -Path "src\STFormatter.TcXaeShell\STFormatter.TcXaeShell.pkgdef" `
-          -Destination $targetDir -Force
+# For net462 (older TcXaeShell)
+.\deploy.bat net462
 ```
 
-### Registry Import / Registrierungsimport
+This deploys the following files to `C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\`:
+
+| File | Purpose |
+|---|---|
+| `STFormatter.Host.exe` | Main host process — connects via COM DTE |
+| `STFormatter.Core.dll` | Formatting engine |
+| `STFormatter.UI.dll` | System tray icon and settings UI |
+| `Microsoft.VisualStudio.Interop.dll` | VS interop assembly |
+
+### Start / Starten
 
 ```powershell
-# Import the .reg file (requires admin)
-reg import register_tcxae.reg
+Start-Process "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\STFormatter.Host.exe"
 ```
 
-The `.reg` file registers the extension with TcXaeShell's isolated shell registry hive. The registry root varies by TcXaeShell version (see `TcXaeShellVersionProfile.RegistryRoot`): `HKLM\SOFTWARE\WOW6432Node\Beckhoff\TcXaeShell\15.0` (VS 2017), `14.0` (VS 2015), or `12.0` (VS 2013).
+The Host auto-detects running TcXaeShell instances and auto-reconnects. No cache clearing or registry import is needed.
 
-### Cache Clear / Zwischenspeicher loeschen
-
-**Mandatory after deployment.** TcXaeShell caches extension manifests. Without clearing these caches, the extension will not load.
+### Uninstall / Deinstallieren
 
 ```powershell
-# Clear Component Model Cache (version-specific path — adjust 15.0 to match your TcXaeShell version)
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Beckhoff\TcXaeShell\15.0_IsoShell\ComponentModelCache\*"
+# Stop the Host process
+Stop-Process -Name "STFormatter.Host" -ErrorAction SilentlyContinue
 
-# Clear Extensions Cache (version-specific path — adjust 15.0 to match your TcXaeShell version)
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Beckhoff\TcXaeShell\15.0\Extensions\*"
+# Remove the extension folder
+Remove-Item -Recurse -Force "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter"
 ```
-
-### Restart / Neustart
-
-Restart TcXaeShell after clearing caches.
 
 ---
 
@@ -1106,33 +1111,33 @@ content = ReplaceCdataSection(content, "Declaration", formattedDeclaration);
 Debug log file:
 
 ```
-%TEMP%\STFormatter_TcXaeShell.log
+%TEMP%\STFormatter_Host.log
 ```
 
 ### Log Configuration
 
 ```csharp
 static readonly string LogPath =
-    Path.Combine(Path.GetTempPath(), "STFormatter_TcXaeShell.log");
+    Path.Combine(Path.GetTempPath(), "STFormatter_Host.log");
 
-static void Log(string message)
-{
-    try
+    static void Log(string message)
     {
-        File.AppendAllText(LogPath,
-            $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}{Environment.NewLine}");
+        try
+        {
+            File.AppendAllText(LogPath,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Logging is best-effort; do not crash the extension
+        }
     }
-    catch
-    {
-        // Logging is best-effort; do not crash the extension
-    }
-}
 ```
 
 ### Diagnostic Steps / Diagnoseschritte
 
 1. **Host not connecting**: Check `%TEMP%\STFormatter_Host.log` for ROT scan results. Verify TcXaeShell is running.
-2. **Buttons not appearing**: Check log for "InjectButtons" entries. Verify the Host has admin privileges for deployment.
+2. **Buttons not appearing**: Check log for "InjectButtons" entries. Verify the Host is running (system tray icon or Task Manager).
 3. **Format does nothing**: Check log for "Read 0 chars" — clipboard read may have failed. Verify Win32 clipboard API works.
 4. **Wrong section formatted**: Check log for "Detected as Declaration/Implementation" — the heuristic may need tuning.
 5. **Reload dialog appears**: A file write happened after live edit — verify no fallback CDATA replacement is being triggered.
@@ -1168,12 +1173,10 @@ ROT → !TcXaeShell.DTE.{version}:{PID}  (version auto-detected via TcXaeShellVe
 
 ### Deployment Checklist / Bereitstellungscheckliste
 
-1. Build: `dotnet build src\STFormatter.TcXaeShell -c Release`
-2. Copy DLLs + `.pkgdef` to `C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\`
-3. Import `register_tcxae.reg`
-4. Delete `%LOCALAPPDATA%\Beckhoff\TcXaeShell\{version}_IsoShell\ComponentModelCache\` (version varies: 15.0, 14.0, or 12.0)
-5. Delete `%LOCALAPPDATA%\Beckhoff\TcXaeShell\{version}\Extensions\` (version varies: 15.0, 14.0, or 12.0)
-6. Restart TcXaeShell
+1. Build: `dotnet build src\STFormatter.Host -c Debug`
+2. Deploy: `.\deploy.bat` (or `.\deploy.bat net462` for older TcXaeShell)
+3. Start: Run `STFormatter.Host.exe` — it auto-connects to TcXaeShell
+4. Verify: Right-click in PLC editor → "Format ST Document" should appear
 
 ### Failed Approaches Summary / Zusammenfassung der gescheiterten Ansaetze
 

@@ -94,92 +94,85 @@ dotnet build TwinCAT.STFormatter.sln -c Release
 - .NET Framework 4.6.2+ (4.6.2 for older TcXaeShell versions; 4.8 for current TcXaeShell 15.0)
 - Admin privileges for deployment
 
-> **Note / Hinweis:** TcXaeShell is a 32-bit Visual Studio Isolated Shell application (VS 2017 v15, VS 2015 v14, or VS 2013 v12 depending on the TwinCAT build).
-> The extension must be deployed manually — there is no VSIX installer for TcXaeShell.
+> **Important:** TcXaeShell's VS 2017 Isolated Shell does **not** support standard VSIX
+> extensions, VSPackages, or MEF components. The formatter works via an **external Host
+> process** that connects to TcXaeShell via COM DTE (Running Object Table). This is the
+> only approach that works — see [AGENTS.md](../AGENTS.md) for details.
 
-### Build from Source / Quellcode erstellen
+### Build the Host / Quellcode erstellen
 
 ```bash
-dotnet build src/STFormatter.TcXaeShell/STFormatter.TcXaeShell.csproj -c Release
-# Use net48 target for machines with .NET 4.8+ (current TcXaeShell 15.0):
-#   output: src/STFormatter.TcXaeShell/bin/Release/net48/
-# Use net462 target for older machines with only .NET 4.6.2 (TcXaeShell 14.0/12.0):
-#   output: src/STFormatter.TcXaeShell/bin/Release/net462/
-```
+dotnet build src/STFormatter.Host -c Debug
 
-Output files are in `src/STFormatter.TcXaeShell/bin/Release/net48/` (or `net462/` for older TcXaeShell).
+# Use net48 target for machines with .NET 4.8+ (current TcXaeShell 15.0):
+#   output: src/STFormatter.Host/bin/Debug/net48/
+# Use net462 target for older machines with only .NET 4.6.2 (TcXaeShell 14.0/12.0):
+dotnet build src/STFormatter.Host/STFormatter.Host.csproj -c Debug -p:TargetFramework=net462
+```
 
 ### Deploy / Bereitstellung
 
 Deployment requires Administrator privileges.
 
-**Step 1: Stop TcXaeShell**
-
-Close all instances of TcXaeShell before deploying.
-
-**Step 2: Copy files**
+**Step 1: Run the deploy script**
 
 ```powershell
-# Run as Administrator
-$src = "src\STFormatter.TcXaeShell\bin\Release\net48"  # use net462 for older TcXaeShell
-$dst = "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter"
+# For net48 (default — current TcXaeShell)
+.\deploy.bat
 
-# Create destination if needed
-New-Item -ItemType Directory -Path $dst -Force
-
-# Copy extension files
-Copy-Item "$src\STFormatter.TcXaeShell.dll" $dst -Force
-Copy-Item "$src\STFormatter.TcXaeShell.pdb" $dst -Force
-Copy-Item "$src\STFormatter.Core.dll" $dst -Force
-Copy-Item "$src\STFormatter.Core.pdb" $dst -Force
-Copy-Item "$src\STFormatter.TcXaeShell.pkgdef" $dst -Force
+# For net462 (older TcXaeShell)
+.\deploy.bat net462
 ```
 
-> **Important:** Do NOT copy the Beckhoff DLLs (IECTextEditor.dll, TextDocument.dll, etc.).
-> They are loaded from the TwinCAT installation at runtime via the binding path.
+This copies the following files to `C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\`:
 
-**Step 3: Register the extension**
+| File | Purpose |
+|---|---|
+| `STFormatter.Host.exe` | Main host process — connects via COM DTE |
+| `STFormatter.Core.dll` | Formatting engine |
+| `STFormatter.UI.dll` | System tray icon and settings UI |
+| `Microsoft.VisualStudio.Interop.dll` | VS interop assembly |
 
-Import the registry file `register_tcxae.reg` (requires admin):
+**Step 2: Start the Host**
 
 ```powershell
-reg import register_tcxae.reg
+Start-Process "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\STFormatter.Host.exe"
 ```
 
-This registers the package, menu commands, and options page.
-
-**Step 4: Clear caches**
-
-```powershell
-# NOTE: Replace "15.0" with your TcXaeShell version (15.0=VS2017, 14.0=VS2015, 12.0=VS2013)
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Beckhoff\TcXaeShell\15.0_IsoShell\ComponentModelCache"
-Remove-Item -Force "$env:LOCALAPPDATA\Beckhoff\TcXaeShell\15.0\Extensions\extensions.en-US.cache"
-```
-
-**Step 5: Start TcXaeShell**
-
-Open TcXaeShell, open a TwinCAT project with a POU, and test formatting:
-- **Edit** > **Format ST Document** (or `Ctrl+K, D`)
-- **Edit** > **Format ST Selection** (or `Ctrl+K, F`)
+The Host auto-detects running TcXaeShell instances and auto-reconnects after restarts. It runs as a hidden background process with a system tray icon.
 
 ### Verify Installation
 
-1. Open a `.TcPOU` file in TcXaeShell
-2. Go to **Edit** menu — you should see **Format ST Document** and **Format ST Selection**
-3. Check **Tools** > **Options** > **TwinCAT** > **ST Formatter** for settings
-4. Debug log is written to `%TEMP%\STFormatter_TcXaeShell.log`
+1. Open TcXaeShell and load a TwinCAT project
+2. Open a POU and click in the declaration or implementation section
+3. **Right-click** in the PLC editor — you should see three new menu items:
+   - **Format ST Document** — Formats the active section
+   - **Format ST Selection** — Formats only the selected text
+   - **Format ST File** — Formats the entire file on disk
+4. Click **Format ST Document** — the code should be reformatted instantly
+5. Check the log: `Get-Content "$env:TEMP\STFormatter_Host.log" -Tail 10`
+
+### Auto-Start on Login (Optional)
+
+```powershell
+$WshShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WshShell.CreateShortcut("$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\STFormatter.Host.lnk")
+$Shortcut.TargetPath = "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\STFormatter.Host.exe"
+$Shortcut.WindowStyle = 7
+$Shortcut.Save()
+```
 
 ### Troubleshooting (TcXaeShell) / Fehlerbehebung
 
 | Problem / Problem | Solution / Losung |
 |---|---|
-| Commands don't appear | Clear caches (Step 4) and restart. Check registry entries match package GUID. |
-| Extension loads but format doesn't work | Check log at `%TEMP%\STFormatter_TcXaeShell.log` |
-| Build error: VSSDK not found | Install VS 2017 SDK or VSSDK BuildTools 17.x |
-| Menu resource version error | Keep ctmenu version as 1 in register_tcxae.reg |
-| Beckhoff DLLs not found at runtime | Verify TwinCAT binding path in registry |
+| Host won't start | Ensure all 4 files are in the Extensions\STFormatter folder. Run from command prompt for error details. |
+| No context menu items | Check `%TEMP%\STFormatter_Host.log`. The Host retries every 5 seconds if TcXaeShell is not found. |
+| Format doesn't work | Check log for errors. Ensure no clipboard manager is locking the clipboard. Click inside the code editor first. |
+| Host crashes | Use correct build (net48 for .NET 4.8+, net462 for .NET 4.6.2). Check Windows Event Viewer for .NET errors. |
+| DTE not found | Host searches for both `!TcXaeShell.DTE` and `!VisualStudio.DTE` monikers. Ensure TcXaeShell is running. |
 
-For detailed TcXaeShell integration documentation, see [TcXaeShell-Integration.md](TcXaeShell-Integration.md).
+For detailed TcXaeShell integration documentation, see [HOW-TO-INSTALL.md](HOW-TO-INSTALL.md).
 
 ---
 
@@ -197,7 +190,8 @@ dotnet tool install --global --add-source bin/Release STFormatter.CLI
 # 3. Install VSIX extension
 # Double-click: src/STFormatter.VSIX/bin/Release/net8.0-windows/TwinCAT.STFormatter.vsix
 
-# 4. Deploy TcXaeShell (see Option 3 above)
+# 4. Deploy TcXaeShell Host (requires admin)
+.\deploy.bat
 ```
 
 ---
@@ -240,11 +234,17 @@ dotnet tool uninstall --global STFormatter.CLI
 4. Click **Uninstall**
 5. Restart Visual Studio
 
-### TcXaeShell Extension
+### TcXaeShell Host
 
-1. Delete the extension folder: `C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter`
-2. Remove registry entries from `register_tcxae.reg` (remove the keys manually or create an uninstall .reg)
-3. Clear caches (see Step 4 above)
+1. Stop the Host process (right-click tray icon > Exit, or Task Manager)
+2. Delete the extension folder:
+   ```powershell
+   Remove-Item -Recurse -Force "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter"
+   ```
+3. Remove the Startup shortcut (if created):
+   ```powershell
+   Remove-Item "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\STFormatter.Host.lnk" -ErrorAction SilentlyContinue
+   ```
 4. Restart TcXaeShell
 
 ---
@@ -272,10 +272,9 @@ chmod +x src/STFormatter.CLI/bin/Release/net8.0/STFormatter.CLI
 ```
 
 ### TcXaeShell: "Commands don't appear"
-- Clear both cache directories (see deployment Step 4)
-- Verify registry entries match the package GUID `{b1c2d3e4-f5a6-7890-abcd-ef1234567890}`
-- Ensure the .pkgdef file was copied alongside the DLLs
-- Check `%TEMP%\STFormatter_TcXaeShell.log` for errors
+- Ensure STFormatter.Host.exe is running (check system tray or Task Manager)
+- Check `%TEMP%\STFormatter_Host.log` for connection errors
+- The Host auto-retries every 5 seconds — wait a moment and try again
 
 ---
 
