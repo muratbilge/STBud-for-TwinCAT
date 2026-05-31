@@ -150,6 +150,47 @@ public sealed class EditorConfigParser
         {
             config.FormatOnSave = IsTruthy(formatOnSave);
         }
+
+        if (properties.TryGetValue("st_brace_style", out var braceStyle))
+        {
+            config.BraceStyle = braceStyle.ToLowerInvariant() switch
+            {
+                "compact" or "kr" or "k&r" or "stroustrup" => "compact",
+                _ => "allman"
+            };
+        }
+
+        if (properties.TryGetValue("st_continuation_indent_size", out var contIndent) &&
+            int.TryParse(contIndent, out var contIndentValue))
+        {
+            config.ContinuationIndentSize = contIndentValue;
+        }
+
+        if (properties.TryGetValue("st_empty_lines_between_var_sections", out var emptyLinesVar) &&
+            int.TryParse(emptyLinesVar, out var emptyLinesVarValue))
+        {
+            config.EmptyLinesBetweenVarSections = emptyLinesVarValue;
+        }
+
+        if (properties.TryGetValue("st_keep_single_line_blocks", out var keepSingleLine))
+        {
+            config.KeepSingleLineBlocks = IsTruthy(keepSingleLine);
+        }
+
+        if (properties.TryGetValue("st_space_after_comma", out var spaceAfterComma))
+        {
+            config.SpaceAfterComma = IsTruthy(spaceAfterComma);
+        }
+
+        if (properties.TryGetValue("st_space_before_semicolon", out var spaceBeforeSemicolon))
+        {
+            config.SpaceBeforeSemicolon = IsTruthy(spaceBeforeSemicolon);
+        }
+
+        if (properties.TryGetValue("st_space_after_colon", out var spaceAfterColon))
+        {
+            config.SpaceAfterColon = IsTruthy(spaceAfterColon);
+        }
     }
 
     private static bool IsTruthy(string value)

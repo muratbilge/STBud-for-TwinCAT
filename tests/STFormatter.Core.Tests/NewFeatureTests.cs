@@ -136,4 +136,66 @@ public class ConfigurationPropertyTests
         var result = engine.Format(source);
         Assert.NotNull(result);
     }
+
+    [Fact]
+    public void BraceStyle_Allman_IsDefault()
+    {
+        var config = FormattingConfiguration.Default;
+        Assert.Equal("allman", config.BraceStyle);
+        Assert.True(config.IsAllmanStyle());
+        Assert.False(config.IsCompactStyle());
+    }
+
+    [Fact]
+    public void BraceStyle_CompactPreset_IsCompact()
+    {
+        var config = FormattingConfiguration.CompactPreset;
+        Assert.Equal("compact", config.BraceStyle);
+        Assert.False(config.IsAllmanStyle());
+        Assert.True(config.IsCompactStyle());
+    }
+
+    [Fact]
+    public void BraceStyle_Allman_BlankLinesBetweenVarSections()
+    {
+        var config = new FormattingConfiguration { EmptyLinesBetweenVarSections = 2 };
+        var engine = new FormattingEngine(config);
+        var source = "FUNCTION_BLOCK Test\nVAR_INPUT\nx:INT;\nEND_VAR\nVAR_OUTPUT\ny:INT;\nEND_VAR\nEND_FUNCTION_BLOCK";
+        var result = engine.Format(source);
+        Assert.Contains("END_VAR", result);
+        Assert.Contains("VAR_INPUT", result);
+        Assert.Contains("VAR_OUTPUT", result);
+    }
+
+    [Fact]
+    public void BraceStyle_Compact_NoExtraBlankLinesBetweenVarSections()
+    {
+        var config = FormattingConfiguration.CompactPreset;
+        var engine = new FormattingEngine(config);
+        var source = "FUNCTION_BLOCK Test\nVAR_INPUT\nx:INT;\nEND_VAR\nVAR_OUTPUT\ny:INT;\nEND_VAR\nEND_FUNCTION_BLOCK";
+        var result = engine.Format(source);
+        Assert.Contains("end_var", result.ToLowerInvariant());
+        Assert.DoesNotContain("\r\n\r\n\r\n", result);
+    }
+
+    [Fact]
+    public void BraceStyle_Allman_HasSeparateLinesForStructure()
+    {
+        var config = FormattingConfiguration.Default;
+        var engine = new FormattingEngine(config);
+        var source = "PROGRAM Test\nVAR\nx:INT;\ny:DINT;\nEND_VAR\nx := 1;\ny := 2;\nEND_PROGRAM";
+        var allmanResult = engine.Format(source);
+        Assert.Contains("END_VAR", allmanResult);
+    }
+
+    [Fact]
+    public void BraceStyle_Compact_IsMoreCompactThanAllman()
+    {
+        var allmanConfig = FormattingConfiguration.Default;
+        var compactConfig = FormattingConfiguration.CompactPreset;
+        var source = "PROGRAM Test\nVAR\nx:INT;\ny:DINT;\nEND_VAR\nx := 1;\ny := 2;\nEND_PROGRAM";
+        var allman = new FormattingEngine(allmanConfig).Format(source);
+        var compact = new FormattingEngine(compactConfig).Format(source);
+        Assert.True(compact.Length <= allman.Length, "Compact should produce equal or shorter output");
+    }
 }

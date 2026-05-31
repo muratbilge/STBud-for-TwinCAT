@@ -11,6 +11,9 @@ public sealed class FormattingConfiguration
     public string KeywordCasing { get; set; } = "upper";
     public string BraceStyle { get; set; } = "allman";
     public bool SpaceAroundOperators { get; set; } = true;
+
+    public bool IsAllmanStyle() => BraceStyle.Equals("allman", StringComparison.OrdinalIgnoreCase);
+    public bool IsCompactStyle() => !IsAllmanStyle();
     public bool SpaceAfterComma { get; set; } = true;
     public bool SpaceBeforeSemicolon { get; set; } = false;
     public bool SpaceAfterColon { get; set; } = true;
@@ -75,7 +78,7 @@ public sealed class FormattingConfiguration
         ContinuationIndentSize = 4,
         NewLineStyle = "crlf",
         KeywordCasing = "lower",
-        BraceStyle = "allman",
+        BraceStyle = "compact",
         SpaceAroundOperators = true,
         SpaceAfterComma = true,
         SpaceBeforeSemicolon = false,

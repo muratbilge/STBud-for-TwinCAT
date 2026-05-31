@@ -183,7 +183,7 @@ formatted.
 | `ContinuationIndentSize` | `8` | Columns for continuation lines |
 | `NewLineStyle` | `crlf` | `crlf`, `lf`, or `cr` |
 | `KeywordCasing` | `upper` | `upper`, `lower`, `pascal`, or `original` |
-| `BraceStyle` | `allman` | Brace placement style |
+| `BraceStyle` | `allman` | `allman` or `compact` — controls vertical spacing between sections |
 | `SpaceAroundOperators` | `true` | Spaces around binary operators |
 | `SpaceAfterComma` | `true` | Space after commas in argument lists |
 | `SpaceBeforeSemicolon` | `false` | Space before semicolons |
@@ -203,6 +203,7 @@ formatted.
 | Indent | 4 spaces | 2 spaces | 4 spaces |
 | Continuation | 8 | 4 | 8 |
 | Keywords | UPPER | lower | UPPER |
+| Brace style | allman | compact | allman |
 | Align assignments | Yes | No | Yes |
 | Align declarations | Yes | No | Yes |
 | Max line length | 120 | 120 | 80 |
@@ -225,6 +226,7 @@ max_line_length = 120
 
 [*.st]
 st_keyword_casing = upper
+st_brace_style = allman
 st_space_around_operators = true
 st_align_variable_declarations = true
 st_align_assignments = true
@@ -232,6 +234,24 @@ st_empty_lines_between_pous = 2
 st_empty_lines_between_var_sections = 1
 st_format_on_save = true
 ```
+
+All ST-specific `.editorconfig` properties:
+
+| Property | Maps to | Values |
+|---|---|---|
+| `st_keyword_casing` | `KeywordCasing` | `upper`, `lower`, `pascal`, `original` |
+| `st_brace_style` | `BraceStyle` | `allman`, `compact` (also: `kr`, `k&r`, `stroustrup`) |
+| `st_space_around_operators` | `SpaceAroundOperators` | `true`, `false` |
+| `st_space_after_comma` | `SpaceAfterComma` | `true`, `false` |
+| `st_space_before_semicolon` | `SpaceBeforeSemicolon` | `true`, `false` |
+| `st_space_after_colon` | `SpaceAfterColon` | `true`, `false` |
+| `st_align_variable_declarations` | `AlignVariableDeclarations` | `true`, `false` |
+| `st_align_assignments` | `AlignAssignments` | `true`, `false` |
+| `st_empty_lines_between_pous` | `EmptyLinesBetweenPOUs` | integer |
+| `st_empty_lines_between_var_sections` | `EmptyLinesBetweenVarSections` | integer |
+| `st_keep_single_line_blocks` | `KeepSingleLineBlocks` | `true`, `false` |
+| `st_continuation_indent_size` | `ContinuationIndentSize` | integer |
+| `st_format_on_save` | `FormatOnSave` | `true`, `false` |
 
 Use `stfmt init . --preset stweep` to generate an `.editorconfig` from a
 preset, or `stfmt import myconfig.json` to convert a JSON export.

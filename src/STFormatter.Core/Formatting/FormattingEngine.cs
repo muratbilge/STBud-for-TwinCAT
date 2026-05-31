@@ -435,12 +435,15 @@ internal sealed class FormattingVisitor
     private void VisitCompilationUnit(SyntaxNode node)
     {
         var declarations = node.ChildNodes.ToList();
+        var sep = _config.IsAllmanStyle()
+            ? Math.Max(1, _config.EmptyLinesBetweenPOUs)
+            : Math.Max(1, _config.EmptyLinesBetweenPOUs - 1);
         for (var i = 0; i < declarations.Count; i++)
         {
             Visit(declarations[i]);
             if (i < declarations.Count - 1)
             {
-                _writer.WriteNewLine(_config.EmptyLinesBetweenPOUs);
+                _writer.WriteNewLine(sep);
             }
         }
     }
@@ -506,7 +509,10 @@ internal sealed class FormattingVisitor
             Visit(varSections[i]);
             if (i < varSections.Count - 1)
             {
-                _writer.WriteNewLine(_config.EmptyLinesBetweenVarSections);
+                if (_config.IsAllmanStyle())
+                    _writer.WriteNewLine(_config.EmptyLinesBetweenVarSections);
+                else
+                    _writer.EnsureNewLine();
             }
         }
 
@@ -514,7 +520,10 @@ internal sealed class FormattingVisitor
         var hasBodyStatements = bodyNode != null && bodyNode.ChildNodes.Length > 0;
         if (varSections.Count > 0 && hasBodyStatements)
         {
-            _writer.WriteNewLine();
+            if (_config.IsAllmanStyle())
+                _writer.WriteNewLine();
+            else
+                _writer.EnsureNewLine();
         }
 
         // Write body
@@ -1332,7 +1341,12 @@ internal sealed class FormattingVisitor
         }
         _writer.IndentLevel--;
 
-        WriteTokenWithCasing(tokens[1]); // END_STRUCT
+        if (!_config.IsAllmanStyle() && tokens.Count > 1 && tokens[1].Kind != SyntaxKind.EndStructKeyword)
+        {
+            // Compact: try to put END_STRUCT right after last member
+            _writer.EnsureSpace();
+        }
+        WriteTokenWithCasing(tokens[tokens.Count - 1]); // END_STRUCT
     }
 
     private void VisitEnumerationType(SyntaxNode node)
@@ -1349,7 +1363,14 @@ internal sealed class FormattingVisitor
             if (i > 0)
             {
                 WriteToken(tokens[1 + i]); // comma - approximate
-                _writer.EnsureNewLine();
+                if (_config.IsAllmanStyle())
+                {
+                    _writer.EnsureNewLine();
+                }
+                else
+                {
+                    _writer.WriteSpace();
+                }
             }
             Visit(nodes[i]);
         }
