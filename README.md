@@ -10,17 +10,16 @@ TwinCAT ST Formatter automatically formats Structured Text source code to
 consistent style rules. It covers the full IEC 61131-3 ST grammar plus
 TwinCAT-specific extensions (actions, multi-instance FBs, `__TRY`/`__ENDTRY`,
 access modifiers, pragmas, and more). The same formatting engine is exposed
-through three deployment targets:
+through the production CLI and TcXaeShell Host targets.
 
-| | CLI | VSIX | TcXaeShell | Host |
-|---|---|---|---|---|
-| **Project** | `STFormatter.CLI` | `STFormatter.VSIX` | `STFormatter.TcXaeShell` | `STFormatter.Host` |
-| **Target framework** | net8.0 | net48 | net462 | net48 |
-| **Platform** | Any CPU | Any CPU | x86 | x86 |
-| **Host** | Terminal | Visual Studio 2022 | TcXaeShell (XAE Shell) | External process |
-| **Editor integration** | -- | IVsTextBuffer | In-process (VSPackage) | COM DTE / file-based |
-| **Format on Save** | -- | Yes | -- | -- |
-| **Options UI** | .editorconfig / JSON | Tools > Options | -- | .editorconfig |
+| | CLI | TcXaeShell Host |
+|---|---|---|
+| **Project** | `STFormatter.CLI` | `STFormatter.Host` |
+| **Target framework** | net8.0 | net462;net48 |
+| **Platform** | Any CPU | x86 |
+| **Host** | Terminal | External process |
+| **Editor integration** | -- | COM DTE + live edit |
+| **Options UI** | .editorconfig / JSON | Tray UI + .editorconfig |
 
 ------------------------------------------------------------------------
 
@@ -77,26 +76,6 @@ Usage:
 | `export` | Export a configuration preset to JSON |
 | `import` | Import a JSON configuration file and write an `.editorconfig` |
 
-### STFormatter.VSIX
-
-Visual Studio 2022 extension (net48, Any CPU).
-
-- **Format Document** -- `Edit.Advanced.FormatDocument` (Ctrl+K, D)
-- **Format Selection** -- `Edit.Advanced.FormatSelection` (Ctrl+K, F)
-- **Format on Save** -- automatically reformats when the file is saved
-- **Options page** -- `Tools > Options > TwinCAT > ST Formatter`
-- Handles `.TcPOU` / `.TcDUT` / `.TcGVL` XML files by locating CDATA
-  sections and formatting the ST source within, then writing the result back
-  to disk under `IVsFileChangeEx` coordination.
-
-### STFormatter.TcXaeShell (VSPackage — legacy / experimental)
-
-In-process VSPackage for TcXaeShell (net462, x86).  
-**Note**: TcXaeShell's VS 2017 Isolated Shell does not load custom VSPackage extensions
-via standard mechanisms (MEF, AddIn, AutoLoad). This project is retained for
-reference but is NOT used in production. See [AGENTS.md](AGENTS.md) for details
-on the failed approaches.
-
 ### STFormatter.Host (external process — production)
 
 Standalone .NET Framework 4.8 x86 executable that injects context menu buttons
@@ -105,8 +84,10 @@ into TcXaeShell via COM DTE from outside the process.
 - **Context menu injection** — hooks into `PlcCodeWinContextMenu` (Beckhoff PLC editor
   right-click menu) and `Code Window` (standard VS text editor menu) via
   `DTE.CommandBars` programmatic injection
-- **Format Document** / **Format Selection** — reads `.TcPOU` / `.TcDUT` / `.TcGVL`
-  XML files, formats the ST code inside CDATA sections, and writes them back
+- **Format Document** / **Format Selection** — uses DTE editor commands and the Win32
+  clipboard to format the active declaration or implementation section in place
+- **Format File** — reads `.TcPOU` / `.TcDUT` / `.TcGVL` XML files, formats the ST code
+  inside CDATA sections, and writes them back
 - **Auto-reconnect** — survives TcXaeShell restarts, reconnects automatically
 - **Hidden background process** — no console window, runs silently, logs to
   `%TEMP%\STFormatter_Host.log`
@@ -194,7 +175,7 @@ formatted.
 | `EmptyLinesBetweenPOUs` | `2` | Blank lines between top-level declarations |
 | `EmptyLinesBetweenVarSections` | `1` | Blank lines between VAR blocks |
 | `KeepSingleLineBlocks` | `false` | Keep single-statement blocks on one line |
-| `FormatOnSave` | `true` | Auto-format when saving (VS/TcXaeShell) |
+| `FormatOnSave` | `true` | Auto-format hint for editor integrations |
 
 ### Presets
 
@@ -336,23 +317,7 @@ The Host also provides a system tray icon with:
 - **History** — review past format operations
 - **Log** — live log viewer (`%TEMP%\STFormatter_Host.log`)
 
-### 3. Visual Studio 2022 — Format Inside VS
-
-```shell
-# Build the VSIX
-build-vsix.ps1
-
-# Install the VSIX
-Double-click the .vsix file in publish/ or use VSIXInstaller.exe
-```
-
-After installation:
-- **Edit > Advanced > Format Document** (Ctrl+K, D)
-- **Edit > Advanced > Format Selection** (Ctrl+K, F)
-- Automatic **Format on Save** for `.st`, `.txt`, `.iecst`, `.TcPOU`, `.TcDUT`, `.TcGVL` files
-- Configuration via **Tools > Options > TwinCAT > ST Formatter**
-
-### 4. Configuration via .editorconfig
+### 3. Configuration via .editorconfig
 
 The formatter reads `.editorconfig` files walking up from each source file's directory. Create one:
 
@@ -431,16 +396,12 @@ CodeFormatter/
       Configuration/           FormattingConfiguration, EditorConfigParser
       Formatting/              FormattingEngine, FormattingVisitor, FormattingWriter
     STFormatter.CLI/           Command-line interface (net8.0)
-    STFormatter.VSIX/          Visual Studio 2022 extension (net48)
-      Commands/                FormatDocumentCommand, FormatSelectionCommand
-      Options/                 STFormatterOptionPage
-    STFormatter.TcXaeShell/   TcXaeShell extension (net462 / x86, legacy VSPackage)
-      Commands/                (archived command classes)
-      Options/                 STFormatterOptionPage
     STFormatter.Host/          TcXaeShell external host (net48 / x86, production)
       Program.cs               Main host executable — DTE connection, context menu injection,
                                formatting engine integration, auto-reconnect
       STFormatter.Host.csproj  Project file — references Microsoft.VisualStudio.Interop
+    STFormatter.UI/            Tray UI, settings, instances, history, diff viewer
+    STFormatter.Discover/      Developer-only TcXaeShell COM discovery tool, not in solution
   tests/
     STFormatter.Core.Tests/    Unit tests
   docs/                        Documentation

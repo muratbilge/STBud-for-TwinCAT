@@ -6,9 +6,8 @@
 ;   - Run build-installer.ps1 first to populate installer/files/
 ;
 ; This installer deploys:
-;   [x] CLI Tool (stfmt) - requires .NET 8 runtime
-;   [x] VS 2022 Extension - requires VS 2022
-;   [x] TcXaeShell Host - requires Beckhoff TcXaeShell
+;   [x] TcXaeShell Host - external COM DTE integration for TwinCAT XAE Shell
+;   [x] CLI Tool (optional) - requires .NET 8 runtime
 
 #define AppName "TwinCAT ST Formatter"
 #define AppVersion "1.0.0"
@@ -27,9 +26,9 @@ AppSupportURL={#AppURL}
 DefaultDirName={autopf}\STFormatter
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
-LicenseFile=..\LICENSE
 OutputDir=..\publish
 OutputBaseFilename=STFormatter-Setup-{#AppVersion}
+SetupIconFile=..\assets\icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -50,81 +49,49 @@ Name: "full"; Description: "Full installation"
 Name: "custom"; Description: "Custom installation"; Flags: iscustom
 
 [Components]
-Name: "cli"; Description: "CLI Tool (stfmt)"; Types: full custom; Flags: checkable
-Name: "vsix"; Description: "VS 2022 Extension"; Types: full custom; Flags: checkable
-Name: "host"; Description: "TcXaeShell Host (requires TcXaeShell)"; Types: full custom; Flags: checkable
+Name: "host"; Description: "TcXaeShell Host"; Types: full custom
+Name: "cli"; Description: "CLI Tool (stfmt)"; Types: full custom
 
 [Tasks]
+Name: "desktopshortcut"; Description: "Create a desktop shortcut for STFormatter Host"; Flags: checkedonce; Components: host
 Name: "hostautostart"; Description: "Start STFormatter Host automatically on login"; Flags: unchecked; Components: host
 Name: "starthost"; Description: "Start STFormatter Host after installation"; Flags: unchecked; Components: host
-Name: "addtopath"; Description: "Add stfmt to system PATH"; Flags: checkedonce; Components: cli
+Name: "addtopath"; Description: "Add stfmt to user PATH"; Flags: checkedonce; Components: cli
 
 [Files]
 ; CLI Tool (net8.0, framework-dependent)
 Components: cli; Flags: ignoreversion recursesubdirs; DestDir: "{app}\CLI"; Source: "files\cli\*"; Excludes: "*.pdb"
 
-; VS 2022 Extension
-Components: vsix; Flags: ignoreversion; DestDir: "{app}\VSIX"; Source: "files\vsix\*.vsix"
-
-; TcXaeShell Host - net48 (for .NET 4.8+, TcXaeShell Build 4024+)
-Components: host; Flags: ignoreversion; DestDir: "{app}\Host-net48"; Source: "files\host-net48\STFormatter.Host.exe"
-Components: host; Flags: ignoreversion; DestDir: "{app}\Host-net48"; Source: "files\host-net48\STFormatter.Core.dll"
-Components: host; Flags: ignoreversion; DestDir: "{app}\Host-net48"; Source: "files\host-net48\STFormatter.UI.dll"
-Components: host; Flags: ignoreversion; DestDir: "{app}\Host-net48"; Source: "files\host-net48\Microsoft.VisualStudio.Interop.dll"
-
-; TcXaeShell Host - net462 (for .NET 4.6.2, older TcXaeShell)
-Components: host; Flags: ignoreversion recursesubdirs; DestDir: "{app}\Host-net462"; Source: "files\host-net462\*.dll"
-Components: host; Flags: ignoreversion; DestDir: "{app}\Host-net462"; Source: "files\host-net462\STFormatter.Host.exe"
-Components: host; Flags: ignoreversion; DestDir: "{app}\Host-net462"; Source: "files\host-net462\STFormatter.Core.dll"
-Components: host; Flags: ignoreversion; DestDir: "{app}\Host-net462"; Source: "files\host-net462\STFormatter.UI.dll"
-Components: host; Flags: ignoreversion; DestDir: "{app}\Host-net462"; Source: "files\host-net462\Microsoft.VisualStudio.Interop.dll"
+; TcXaeShell Host - deploy directly to Beckhoff's extension folder.
+Components: host; Flags: ignoreversion recursesubdirs; DestDir: "{code:GetTcXaeShellExtensionsPath}"; Source: "files\host-net48\*"; Check: ShouldUseNet48
+Components: host; Flags: ignoreversion recursesubdirs; DestDir: "{code:GetTcXaeShellExtensionsPath}"; Source: "files\host-net462\*"; Check: ShouldUseNet462
 
 ; EditorConfig presets
 Components: cli; Flags: ignoreversion; DestDir: "{app}\presets"; Source: "files\editorconfig-templates\*"
 
 [Icons]
+Name: "{group}\STFormatter Host (TcXaeShell)"; Filename: "{code:GetTcXaeShellHostPath}"; Components: host
 Name: "{group}\STFormatter CLI"; Filename: "{cmd}"; Parameters: "/k ""{app}\CLI\{#CliExeName}"""; Components: cli
-Name: "{group}\STFormatter Host (TcXaeShell)"; Filename: "{app}\Host-net48\{#AppExeName}"; Components: host
 Name: "{group}\Uninstall STFormatter"; Filename: "{uninstallexe}"
+Name: "{userdesktop}\STFormatter Host"; Filename: "{code:GetTcXaeShellHostPath}"; Tasks: desktopshortcut; Components: host
+Name: "{userstartup}\STFormatter Host"; Filename: "{code:GetTcXaeShellHostPath}"; Tasks: hostautostart; Components: host
 
 [Run]
-; Register CLI in PATH
-Components: cli; Filename: "{app}\CLI\{#CliExeName}"; Parameters: "--help"; Flags: runhidden nowait postinstall skipifsilent; Description: "Verify stfmt CLI"
+; Verify CLI only when explicitly selected in the final wizard page.
+Components: cli; Filename: "{app}\CLI\{#CliExeName}"; Parameters: "--help"; Flags: runhidden nowait postinstall skipifsilent unchecked; Description: "Verify stfmt CLI"
 
-; Install VSIX silently
-Components: vsix; Filename: "{code:FindVSIXInstaller}"; Parameters: "/q ""{app}\VSIX\TwinCAT.STFormatter.{#AppVersion}.vsix"""; Flags: skipifsilent runhidden; StatusMsg: "Installing VS 2022 extension..."; Check:VSIXInstallerAvailable
-
-; Deploy Host to TcXaeShell
-Components: host; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\deploy-host.ps1"""; Flags: runhidden; StatusMsg: "Deploying Host to TcXaeShell..."; Check:TcXaeShellInstalled
-
-; Create auto-start shortcut
-Components: host; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""$ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut(''{autopf}\STFormatter Host.lnk''); $sc.TargetPath = ''{app}\Host-net48\{#AppExeName}''; $sc.WindowStyle = 7; $sc.Save()"""; Flags: runhidden; Check:AutoStartHost
-
-; Copy auto-start shortcut to Startup folder
-Components: host; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""Copy-Item ''{autopf}\STFormatter Host.lnk'' ''$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\STFormatter Host.lnk'' -Force"""; Flags: runhidden; Check:AutoStartHost
-
-; Start Host immediately
-Components: host; Filename: "{app}\Host-net48\{#AppExeName}"; Flags: nowait postinstall unchecked; Description: "Start STFormatter Host now"; Check:TcXaeShellInstalled
+; Use explorer.exe so the Host starts non-elevated from an elevated installer.
+Components: host; Filename: "{win}\explorer.exe"; Parameters: """{code:GetTcXaeShellHostPath}"""; Flags: nowait postinstall skipifsilent; Description: "Start STFormatter Host now"; Tasks: starthost
 
 [UninstallRun]
-; Stop Host process if running
 Filename: "taskkill.exe"; Parameters: "/f /im STFormatter.Host.exe"; Flags: runhidden; RunOnceId: "kill_host"
 
-; Uninstall VSIX
-Filename: "{code:FindVSIXInstaller}"; Parameters: "/u:{#SetupSetting("AppId")}"; Flags: skipifsilent runhidden; RunOnceId: "uninstall_vsix"
-
 [UninstallDelete]
-Type: filesanddirs; Name: "{app}\CLI"
-Type: filesanddirs; Name: "{app}\VSIX"
-Type: filesanddirs; Name: "{app}\Host-net48"
-Type: filesanddirs; Name: "{app}\Host-net462"
-Type: filesanddirs; Name: "{app}\presets"
-Type: files; Name: "{app}\deploy-host.ps1"
+Type: filesandordirs; Name: "{app}\CLI"
+Type: filesandordirs; Name: "{app}\presets"
 Type: files; Name: "{localappdata}\STFormatter\settings.json"
-
-[Registry]
-; Add CLI to PATH (user level)
-Components: cli; Root: HKCU; Subkey: "Environment"; ValueType: string; ValueName: "Path"; ValueData: "{reg:HKCU\Environment\Path|};{app}\CLI"; Flags: preservestringtype dontcreatekey uninsdeletevalue
+Type: files; Name: "{userdesktop}\STFormatter Host.lnk"
+Type: files; Name: "{userstartup}\STFormatter Host.lnk"
 
 [Code]
 var
@@ -132,22 +99,38 @@ var
   DotNet48Installed: Boolean;
   DotNet462Installed: Boolean;
 
+const
+  AppRegistryKey = 'Software\STFormatter';
+
+function GetDotNetRelease(): Cardinal;
+var
+  Release: Cardinal;
+begin
+  Release := 0;
+  RegQueryDWordValue(HKLM, 'SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full', 'Release', Release);
+  Result := Release;
+end;
+
 function InitializeSetup(): Boolean;
 var
-  ResultCode: Integer;
+  Release: Cardinal;
 begin
   Result := True;
-
   TcXaeShellPath := '';
 
-  RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Beckhoff\TcXaeShell\15.0',
-    'InstallDir', TcXaeShellPath);
+  RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Beckhoff\TcXaeShell\15.0', 'InstallDir', TcXaeShellPath);
   if TcXaeShellPath = '' then
-    RegQueryStringValue(HKLM, 'SOFTWARE\Beckhoff\TcXaeShell\15.0',
-      'InstallDir', TcXaeShellPath);
+    RegQueryStringValue(HKLM, 'SOFTWARE\Beckhoff\TcXaeShell\15.0', 'InstallDir', TcXaeShellPath);
 
-  DotNet48Installed := RegKeyExists(HKLM, 'SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full\528040');
-  DotNet462Installed := RegKeyExists(HKLM, 'SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full\394802');
+  Release := GetDotNetRelease();
+  DotNet48Installed := Release >= 528040;
+  DotNet462Installed := Release >= 394802;
+
+  if not DotNet462Installed then
+  begin
+    MsgBox('TwinCAT ST Formatter Host requires .NET Framework 4.6.2 or newer. Install .NET Framework 4.8 and run this setup again.', mbCriticalError, MB_OK);
+    Result := False;
+  end;
 end;
 
 function TcXaeShellInstalled(): Boolean;
@@ -155,65 +138,22 @@ begin
   Result := (TcXaeShellPath <> '') or FileExists(ExpandConstant('{pf32}\Beckhoff\TcXaeShell\Common7\IDE\TcXaeShell.exe'));
 end;
 
-function AutoStartHost(): Boolean;
+function GetTcXaeShellIdePath(): string;
 begin
-  Result := IsTaskSelected('hostautostart');
-end;
-
-function FindVSIXInstaller(Param: string): string;
-var
-  VSPath: string;
-begin
-  Result := '';
-
-  VSPath := ExpandConstant('{pf32}\Microsoft Visual Studio\2022\Community\Common7\IDE\VSIXInstaller.exe');
-  if FileExists(VSPath) then begin
-    Result := VSPath;
-    Exit;
-  end;
-
-  VSPath := ExpandConstant('{pf32}\Microsoft Visual Studio\2022\Professional\Common7\IDE\VSIXInstaller.exe');
-  if FileExists(VSPath) then begin
-    Result := VSPath;
-    Exit;
-  end;
-
-  VSPath := ExpandConstant('{pf32}\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\VSIXInstaller.exe');
-  if FileExists(VSPath) then begin
-    Result := VSPath;
-    Exit;
-  end;
-
-  VSPath := ExpandConstant('{pf}\Microsoft Visual Studio\2022\Community\Common7\IDE\VSIXInstaller.exe');
-  if FileExists(VSPath) then begin
-    Result := VSPath;
-    Exit;
-  end;
-
-  VSPath := ExpandConstant('{pf}\Microsoft Visual Studio\2022\Professional\Common7\IDE\VSIXInstaller.exe');
-  if FileExists(VSPath) then begin
-    Result := VSPath;
-    Exit;
-  end;
-
-  VSPath := ExpandConstant('{pf}\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\VSIXInstaller.exe');
-  if FileExists(VSPath) then begin
-    Result := VSPath;
-    Exit;
-  end;
-end;
-
-function VSIXInstallerAvailable(): Boolean;
-begin
-  Result := (FindVSIXInstaller('') <> '');
+  if TcXaeShellPath <> '' then
+    Result := AddBackslash(TcXaeShellPath) + 'Common7\IDE'
+  else
+    Result := ExpandConstant('{pf32}\Beckhoff\TcXaeShell\Common7\IDE');
 end;
 
 function GetTcXaeShellExtensionsPath(Param: string): string;
 begin
-  if TcXaeShellPath <> '' then
-    Result := TcXaeShellPath + 'Common7\IDE\Extensions\STFormatter'
-  else
-    Result := ExpandConstant('{pf32}\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter');
+  Result := AddBackslash(GetTcXaeShellIdePath()) + 'Extensions\STFormatter';
+end;
+
+function GetTcXaeShellHostPath(Param: string): string;
+begin
+  Result := AddBackslash(GetTcXaeShellExtensionsPath('')) + '{#AppExeName}';
 end;
 
 function ShouldUseNet462(): Boolean;
@@ -221,32 +161,129 @@ begin
   Result := DotNet462Installed and not DotNet48Installed;
 end;
 
-procedure CurStepChanged(CurStep: TSetupStep);
-var
-  HostSrcDir: string;
-  DstDir: string;
-  deployScript: string;
+function ShouldUseNet48(): Boolean;
 begin
+  Result := not ShouldUseNet462();
+end;
+
+function NormalizePathSegment(Value: string): string;
+begin
+  Result := Lowercase(RemoveBackslash(Trim(Value)));
+end;
+
+function PathContainsSegment(PathValue: string; Segment: string): Boolean;
+var
+  Remaining: string;
+  Current: string;
+  P: Integer;
+  Target: string;
+begin
+  Result := False;
+  Remaining := PathValue;
+  Target := NormalizePathSegment(Segment);
+
+  while Remaining <> '' do
+  begin
+    P := Pos(';', Remaining);
+    if P > 0 then
+    begin
+      Current := Copy(Remaining, 1, P - 1);
+      Delete(Remaining, 1, P);
+    end
+    else
+    begin
+      Current := Remaining;
+      Remaining := '';
+    end;
+
+    if NormalizePathSegment(Current) = Target then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
+procedure AddCliToUserPath();
+var
+  CurrentPath: string;
+  CliPath: string;
+begin
+  CliPath := ExpandConstant('{app}\CLI');
+  RegQueryStringValue(HKCU, 'Environment', 'Path', CurrentPath);
+
+  if not PathContainsSegment(CurrentPath, CliPath) then
+  begin
+    if CurrentPath = '' then
+      CurrentPath := CliPath
+    else
+      CurrentPath := CurrentPath + ';' + CliPath;
+
+    RegWriteStringValue(HKCU, 'Environment', 'Path', CurrentPath);
+  end;
+end;
+
+procedure RemoveCliFromUserPath();
+var
+  CurrentPath: string;
+  NewPath: string;
+  Current: string;
+  Remaining: string;
+  CliPath: string;
+  P: Integer;
+begin
+  if not RegQueryStringValue(HKCU, 'Environment', 'Path', CurrentPath) then
+    Exit;
+
+  CliPath := NormalizePathSegment(ExpandConstant('{app}\CLI'));
+  Remaining := CurrentPath;
+  NewPath := '';
+
+  while Remaining <> '' do
+  begin
+    P := Pos(';', Remaining);
+    if P > 0 then
+    begin
+      Current := Copy(Remaining, 1, P - 1);
+      Delete(Remaining, 1, P);
+    end
+    else
+    begin
+      Current := Remaining;
+      Remaining := '';
+    end;
+
+    if (Trim(Current) <> '') and (NormalizePathSegment(Current) <> CliPath) then
+    begin
+      if NewPath = '' then
+        NewPath := Current
+      else
+        NewPath := NewPath + ';' + Current;
+    end;
+  end;
+
+  RegWriteStringValue(HKCU, 'Environment', 'Path', NewPath);
+end;
+
+procedure StopRunningHost();
+var
+  ResultCode: Integer;
+begin
+  Exec('taskkill.exe', '/f /im STFormatter.Host.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then
+    StopRunningHost();
+
   if CurStep = ssPostInstall then
   begin
-    if IsComponentSelected('host') then
-    begin
-      DstDir := GetTcXaeShellExtensionsPath('');
+    if WizardIsComponentSelected('host') then
+      RegWriteStringValue(HKLM, AppRegistryKey, 'HostInstallDir', GetTcXaeShellExtensionsPath(''));
 
-      deployScript :=
-        '$ErrorActionPreference = "Stop"' + #10 +
-        '$dst = "' + DstDir + '"' + #10 +
-        'New-Item -ItemType Directory -Path $dst -Force | Out-Null' + #10 +
-        'if (' + BoolToStr(ShouldUseNet462(), True) + ') {' + #10 +
-        '  $src = "' + ExpandConstant('{app}\Host-net462') + '"' + #10 +
-        '} else {' + #10 +
-        '  $src = "' + ExpandConstant('{app}\Host-net48') + '"' + #10 +
-        '}' + #10 +
-        'Copy-Item "$src\*" $dst -Force' + #10 +
-        'Write-Host "Deployed Host to $dst"';
-
-      SaveStringToFile(ExpandConstant('{app}\deploy-host.ps1'), deployScript, False);
-    end;
+    if WizardIsTaskSelected('addtopath') then
+      AddCliToUserPath();
   end;
 end;
 
@@ -256,13 +293,15 @@ var
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    if IsComponentSelected('host') then
-    begin
-      DstDir := GetTcXaeShellExtensionsPath('');
-      if DirExists(DstDir) then
-        DelTree(DstDir, True, True, True);
+    RemoveCliFromUserPath();
 
-      DeleteFile(ExpandConstant('{userappdata}\Microsoft\Windows\Start Menu\Programs\Startup\STFormatter Host.lnk'));
-    end;
+    if not RegQueryStringValue(HKLM, AppRegistryKey, 'HostInstallDir', DstDir) then
+      DstDir := GetTcXaeShellExtensionsPath('');
+
+    if DirExists(DstDir) then
+      DelTree(DstDir, True, True, True);
+
+    RegDeleteValue(HKLM, AppRegistryKey, 'HostInstallDir');
+    RegDeleteKeyIfEmpty(HKLM, AppRegistryKey);
   end;
 end;

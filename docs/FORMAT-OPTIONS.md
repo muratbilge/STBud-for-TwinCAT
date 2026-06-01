@@ -21,7 +21,7 @@ Vollstaendige Referenz aller Konfigurationseigenschaften von `FormattingConfigur
 11. [Presets / Vorlagen](#11-presets--vorlagen)
 12. [EditorConfig Integration / EditorConfig-Integration](#12-editorconfig-integration--editorconfig-integration)
 13. [CLI Configuration / CLI-Konfiguration](#13-cli-configuration--cli-konfiguration)
-14. [VS/XAE Options Page / VS/XAE-Optionenseite](#14-vsxae-options-page--vsxae-optionenseite)
+14. [Host Settings / Host-Einstellungen](#14-host-settings--host-einstellungen)
 
 ---
 
@@ -802,16 +802,15 @@ Diese Option gilt nur, wenn der gesamte Block im Originalcode in eine Zeile pass
 | Type     | `bool` |
 | Default  | `true` |
 
-Enables automatic formatting when a file is saved. This applies only in the Visual Studio and TcXaeShell extensions — the CLI does not use this setting.
+Enables automatic formatting when an editor integration supports save events. The CLI does not use this setting.
 
 Aktiviert die automatische Formatierung beim Speichern einer Datei.
 
-When enabled, the `FormatHelper` intercepts the save event, formats the ST content, and replaces the buffer before the file is written to disk. The original source is never lost because the editor's undo stack tracks the change.
+When enabled by an integration, the formatter runs before or during save and the editor's undo stack should preserve the pre-format state.
 
 When `FormatOnSave` is `true`:
-- Saving a `.st`, `.TcPOU`, `.TcDUT`, or `.TcGVL` file triggers automatic formatting
-- The VS Options page can toggle this on or off independently of other settings
-- The formatting configuration is resolved from `.editorconfig` and VS Options (see [Section 14](#14-vsxae-options-page--vsxae-optionenseite))
+- An editor integration may format `.st`, `.TcPOU`, `.TcDUT`, or `.TcGVL` files automatically.
+- The formatting configuration is resolved from `.editorconfig` plus any integration-specific settings.
 
 ---
 
@@ -1193,18 +1192,18 @@ stfmt import team-style.json
 
 ---
 
-## 14. VS/XAE Options Page / VS/XAE-Optionenseite
+## 14. Host Settings / Host-Einstellungen
 
-Both the Visual Studio extension (VSIX) and the TwinCAT XAE Shell extension provide an Options page accessible via the Tools menu.
+The TcXaeShell Host provides a tray settings window for runtime formatter options.
 
-Sowohl die Visual Studio-Erweiterung (VSIX) als auch die TwinCAT-XAE-Shell-Erweiterung bieten eine Optionenseite im Extras-Menue.
+Der TcXaeShell Host bietet ein Einstellungsfenster im Tray fuer Formatter-Optionen zur Laufzeit.
 
 ### Access / Zugriff
 
-- **Visual Studio 2022**: `Tools` > `Options` > `ST Formatter`
-- **TcXaeShell**: `Extras` > `Optionen` > `ST Formatter`
+- Right-click the `STFormatter.Host` tray icon.
+- Select **Settings**.
 
-The options page is implemented in `STFormatterOptionPage.cs` in both the VSIX and TcXaeShell projects. Both projects expose the same set of options.
+Settings are stored in `%LOCALAPPDATA%\STFormatter\settings.json`. Team defaults should still live in `.editorconfig`.
 
 ### Available Options / Verfuegbare Optionen
 
@@ -1222,30 +1221,23 @@ The Indent Style dropdown offers `spaces` and `tabs`. The Keyword Casing dropdow
 
 Das Indent-Style-Dropdown bietet `spaces` und `tabs`. Das Keyword-Casing-Dropdown bietet `upper`, `lower`, `pascal` und `original`.
 
-### Configuration Resolution in IDE / Konfigurationsaufloesung in der IDE
+### Configuration Resolution in Host / Konfigurationsaufloesung im Host
 
-When the formatter runs inside Visual Studio or TcXaeShell, configuration is resolved as:
+When the formatter runs from the TcXaeShell Host, configuration is resolved as:
 
-1. **VS Options page values** — user settings from the dialog
+1. **Host settings** — user settings from the tray settings window
 2. **`.editorconfig` files** — discovered from the file's directory upward
 3. **`FormattingConfiguration.Default`** — fallback
 
-The VS Options values override `.editorconfig`. This ensures that the IDE user's personal preferences always take effect, while team-shared settings in `.editorconfig` provide sensible defaults for options the user has not explicitly configured.
+Host settings override `.editorconfig`. This ensures the user's personal preferences take effect, while team-shared settings in `.editorconfig` provide sensible defaults for options the user has not explicitly configured.
 
-Die VS-Optionen ueberschreiben `.editorconfig`. Dadurch haben persoenliche Einstellungen Vorrang, waehrend Team-Einstellungen in `.editorconfig` als Standardvorgaben dienen.
+Host-Einstellungen ueberschreiben `.editorconfig`. Dadurch haben persoenliche Einstellungen Vorrang, waehrend Team-Einstellungen in `.editorconfig` als Standardvorgaben dienen.
 
 ### Format on Save / Bei Speichern formatieren
 
-When `FormatOnSave` is `true`, the `FormatOnSaveHelper` intercepts the save event in the IDE:
+The current production TcXaeShell Host exposes manual context-menu formatting commands. `FormatOnSave` remains a configuration hint for integrations that implement save-event formatting.
 
-1. The `DocumentSaved` event fires
-2. `FormatOnSaveHelper` checks if the file is an ST source file (`.st`, `.TcPOU`, `.TcDUT`, `.TcGVL`)
-3. For `.TcPOU`/`.TcDUT`/`.TcGVL` files, `FormatHelper` parses the XML, extracts CDATA sections, and formats the ST content
-4. For `.st` files, the content is formatted directly
-5. The formatted content replaces the document buffer
-6. The undo stack preserves the pre-format state
-
-Wenn `FormatOnSave` aktiv ist, wird das Speicher-Ereignis abgefangen und die Formatierung automatisch angewendet.
+Der aktuelle Produktions-Host fuer TcXaeShell stellt manuelle Kontextmenue-Befehle bereit. `FormatOnSave` bleibt ein Konfigurationshinweis fuer Integrationen, die Speicher-Ereignisse implementieren.
 
 ### Format Commands / Formatierungsbefehle
 
@@ -1254,9 +1246,9 @@ Wenn `FormatOnSave` aktiv ist, wird das Speicher-Ereignis abgefangen und die For
 | Format Document    | `Ctrl+K, D` | Format the entire active document        |
 | Format Selection   | `Ctrl+K, F` | Format the selected text range           |
 
-These commands are registered in both the VSIX and TcXaeShell packages and invoke `FormattingEngine.Format()` or `FormattingEngine.FormatBody()` depending on context.
+These commands are injected by `STFormatter.Host` into TcXaeShell context menus and invoke `FormattingEngine.Format()`, `FormatDeclaration()`, or `FormatBody()` depending on context.
 
-Diese Befehle sind in beiden Paketen registriert und rufen `FormattingEngine.Format()` bzw. `FormattingEngine.FormatBody()` auf.
+Diese Befehle werden von `STFormatter.Host` in TcXaeShell-Kontextmenues eingefuegt und rufen je nach Kontext `FormattingEngine.Format()`, `FormatDeclaration()` oder `FormatBody()` auf.
 
 ---
 

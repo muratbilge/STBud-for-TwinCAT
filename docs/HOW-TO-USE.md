@@ -1,20 +1,19 @@
 # How to Use — TwinCAT ST Formatter
 
-Practical usage guide for all three deployment targets.
+Practical usage guide for the CLI and TcXaeShell Host deployment targets.
 
 ---
 
 ## Quick Reference
 
-| Task | CLI | VS 2022 | TcXaeShell |
-|---|---|---|---|
-| Format current file | `stfmt format file.st` | Ctrl+K, D | Right-click > Format ST Document |
-| Format selection | `stfmt format file.st` (whole file only) | Ctrl+K, F | Right-click > Format ST Selection |
-| Format on save | — | Automatic (when enabled) | — |
-| Format entire project | `stfmt batch ./src --recursive` | — | — |
-| Check formatting | `stfmt check file.st` | — | — |
-| Change settings | `.editorconfig` | Tools > Options or `.editorconfig` | Tray icon > Settings or `.editorconfig` |
-| View log | — | Output window | `%TEMP%\STFormatter_Host.log` |
+| Task | CLI | TcXaeShell |
+|---|---|---|
+| Format current file | `stfmt format file.st` | Right-click > Format ST Document |
+| Format selection | `stfmt format file.st` (whole file only) | Right-click > Format ST Selection |
+| Format entire project | `stfmt batch ./src --recursive` | — |
+| Check formatting | `stfmt check file.st` | — |
+| Change settings | `.editorconfig` | Tray icon > Settings or `.editorconfig` |
+| View log | — | `%TEMP%\STFormatter_Host.log` |
 
 ---
 
@@ -240,63 +239,7 @@ Select-String "ERROR|FAIL|Exception" "$env:TEMP\STFormatter_Host.log"
 
 ---
 
-## 3. Visual Studio 2022 Usage
-
-### Keyboard Shortcuts
-
-| Command | Shortcut | Description |
-|---|---|---|
-| Format Document | **Ctrl+K, Ctrl+D** | Format the entire active file |
-| Format Selection | **Ctrl+K, Ctrl+F** | Format only the selected text |
-
-You can also access these from the menu: **Edit** > **Advanced** > **Format Document** / **Format Selection**.
-
-### Format on Save
-
-When enabled, files are automatically formatted when you save (Ctrl+S). This works for:
-
-- `.st`, `.txt`, `.iecst` — plain ST files (formatted via text buffer)
-- `.TcPOU`, `.TcDUT`, `.TcGVL` — TwinCAT XML files (CDATA sections formatted)
-
-To toggle Format on Save:
-- **Tools** > **Options** > **TwinCAT** > **ST Formatter** > **Format On Save**
-- Or set `st_format_on_save = false` in `.editorconfig`
-
-### Options Page
-
-Access via **Tools** > **Options** > **TwinCAT** > **ST Formatter**:
-
-| Category | Option | Values | Default |
-|---|---|---|---|
-| Indentation | Indent Style | `spaces`, `tabs` | `spaces` |
-| Indentation | Indent Size | 1–8 | 4 |
-| Indentation | Continuation Indent Size | 1–16 | 8 |
-| Formatting | Keyword Casing | `upper`, `lower`, `pascal`, `original` | `upper` |
-| Formatting | Brace Style | `allman`, `compact` | `allman` |
-| Formatting | Space Around Operators | on/off | on |
-| Formatting | Space After Comma | on/off | on |
-| Formatting | Space Before Semicolon | on/off | off |
-| Formatting | Space After Colon | on/off | on |
-| Formatting | Align Assignments | on/off | on |
-| Formatting | Align Variable Declarations | on/off | on |
-| Formatting | Max Line Length | 0–999 (0 = unlimited) | 120 |
-| Formatting | Keep Single-Line Blocks | on/off | off |
-| Formatting | Format On Save | on/off | on |
-| Line Breaks | Empty Lines Between POUs | 0–10 | 2 |
-| Line Breaks | Empty Lines Between Var Sections | 0–10 | 1 |
-| Line Breaks | New Line Style | `crlf`, `lf`, `cr` | `crlf` |
-
-Options page settings override `.editorconfig`.
-
-### Configuration Priority (VS 2022)
-
-1. **VS Options page** → highest priority
-2. **`.editorconfig`** closest to the source file
-3. **Built-in defaults**
-
----
-
-## 4. Presets
+## 3. Presets
 
 Three built-in presets cover common coding styles:
 
@@ -388,7 +331,7 @@ stfmt check "./MyTwinCATProject" --recursive --twincat
 
 2. Commit the `.editorconfig` to version control.
 
-3. All team members using the CLI, VS 2022 extension, or TcXaeShell Host will
+3. All team members using the CLI or TcXaeShell Host will
    automatically pick up the same settings.
 
 ### Configure Different Styles for Different File Types

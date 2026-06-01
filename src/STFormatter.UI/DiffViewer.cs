@@ -77,11 +77,20 @@ namespace STFormatter.UI
                 Orientation = Orientation.Vertical,
                 SplitterDistance = 500,
                 SplitterWidth = 8,
+                Panel1MinSize = 150,
+                Panel2MinSize = 150,
                 BackColor = SystemColors.ControlDark
             };
             splitContainer.SizeChanged += (s, e) =>
             {
-                splitContainer.SplitterDistance = splitContainer.Width / 2;
+                var min = splitContainer.Panel1MinSize;
+                var max = splitContainer.Width - splitContainer.Panel2MinSize;
+                if (max <= min)
+                    return;
+
+                var desired = Math.Max(min, Math.Min(max, splitContainer.Width / 2));
+                if (splitContainer.SplitterDistance != desired)
+                    splitContainer.SplitterDistance = desired;
             };
 
             var leftPanel = new Panel { Dock = DockStyle.Fill };

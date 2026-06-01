@@ -6,6 +6,14 @@ Alle wichtigen Aenderungen an diesem Projekt werden in dieser Datei dokumentiert
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Removed / Entfernt
+
+- Removed legacy Visual Studio VSIX and in-process TcXaeShell VSPackage projects.
+- Removed stale VSIX build and TcXaeShell registration scripts.
+- Removed VSIX packaging documentation; TcXaeShell integration is Host-only.
+
 ## [0.5.0] - 2026-05-21
 
 ### Added / Hinzugefuegt

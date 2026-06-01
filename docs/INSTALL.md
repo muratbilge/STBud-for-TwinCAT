@@ -6,29 +6,28 @@ Choose your installation method:
 
 - [Option 0: One-Click Installer (All Platforms)](#option-0-one-click-installer)
 - [Option 1: CLI Tool (Command Line)](#option-1-cli-tool)
-- [Option 2: Visual Studio 2022 Extension](#option-2-visual-studio-2022-extension)
-- [Option 3: TwinCAT XAE Shell (TcXaeShell)](#option-3-twincat-xae-shell-tcxaeShell)
-- [Option 4: All Platforms (Manual)](#option-4-all-platforms-manual)
+- [Option 2: TwinCAT XAE Shell (TcXaeShell)](#option-2-twincat-xae-shell-tcxaeshell)
+- [Option 3: All Supported Targets (Manual)](#option-3-all-supported-targets-manual)
 
 ---
 
 ## Option 0: One-Click Installer
 
-The easiest way to install all components at once. Download `STFormatter-Setup-1.0.0.exe` and run it.
+The easiest way to install the TcXaeShell Host and optional CLI. Download `STFormatter-Setup-1.0.0.exe` and run it.
 
 The installer lets you choose which components to install:
 
 | Component | Requires | Description |
 |---|---|---|
-| CLI Tool (stfmt) | .NET 8 runtime | Command-line formatter |
-| VS 2022 Extension | Visual Studio 2022 | Installs VSIX silently via VSIXInstaller |
 | TcXaeShell Host | Beckhoff TcXaeShell | Deploys Host to extensions folder, optional auto-start |
+| CLI Tool (stfmt) | .NET 8 runtime | Command-line formatter |
 
 Features:
 
-- Detects .NET 8, VS 2022, and TcXaeShell on your machine
+- Detects TcXaeShell and the installed .NET Framework version
 - Automatically picks net48 or net462 Host binaries based on your .NET Framework version
 - Optional: "Start Host on login" for TcXaeShell
+- Optional: add the CLI folder to the user PATH
 - Clean uninstall via Add/Remove Programs
 - Includes EditorConfig preset templates (default, compact, expanded)
 
@@ -41,14 +40,14 @@ Features:
 # Build binaries only (skip Inno Setup)
 .\installer\build-installer.ps1 -SkipInstaller
 
-# Skip VSIX if VS SDK not installed
-.\installer\build-installer.ps1 -SkipVSIX
+# Build Host only, without CLI
+.\installer\build-installer.ps1 -SkipCLI
 
 # Custom configuration and version
 .\installer\build-installer.ps1 -Configuration Release -Version 1.0.0
 ```
 
-Prerequisites for building: .NET 8 SDK, .NET Framework 4.6.2+4.8 targeting packs, Inno Setup 6, VS 2022 with VSSDK workload (for VSIX).
+Prerequisites for building: .NET 8 SDK, .NET Framework 4.6.2+4.8 targeting packs, and Inno Setup 6.
 
 ---
 
@@ -92,43 +91,7 @@ cd src/STFormatter.CLI/bin/Release/net8.0
 
 ---
 
-## Option 2: Visual Studio 2022 Extension
-
-### Prerequisites / Voraussetzungen
-- Visual Studio 2022 (17.0 or later)
-- Visual Studio SDK workload (for building)
-
-### Method A: Download Pre-built VSIX
-
-1. **Double-click** the `.vsix` file
-2. Click **Install** in the dialog
-3. Restart Visual Studio 2022
-
-### Method B: Build from Source
-
-```bash
-dotnet build TwinCAT.STFormatter.sln -c Release
-# The VSIX will be at:
-# publish/TwinCAT.STFormatter.1.0.0.vsix
-```
-
-### Method C: Install from Visual Studio
-
-1. Open Visual Studio 2022
-2. Go to **Extensions** > **Manage Extensions**
-3. Click the **Settings** (gear) icon > **Install from VSIX...**
-4. Select the `.vsix` file
-5. Restart Visual Studio
-
-### Verify Installation / Installation prüfen
-
-1. Open any `.st`, `.TcPOU`, `.TcDUT`, or `.TcGVL` file
-2. Press `Ctrl+K, Ctrl+D` to format
-3. Check **Tools** > **Options** > **TwinCAT** > **ST Formatter**
-
----
-
-## Option 3: TwinCAT XAE Shell (TcXaeShell)
+## Option 2: TwinCAT XAE Shell (TcXaeShell)
 
 ### Prerequisites / Voraussetzungen
 - TwinCAT XAE Shell (Beckhoff TcXaeShell — version determines the VS Shell generation: 4024+ = 15.0, older builds = 14.0 or 12.0)
@@ -217,10 +180,10 @@ For detailed TcXaeShell integration documentation, see [HOW-TO-INSTALL.md](HOW-T
 
 ---
 
-## Option 4: All Platforms (Manual)
+## Option 3: All Supported Targets (Manual)
 
 ```bash
-# 1. Build everything
+# 1. Build everything supported by the installer
 dotnet build TwinCAT.STFormatter.sln -c Release
 
 # 2. Install CLI tool
@@ -228,10 +191,7 @@ cd src/STFormatter.CLI
 dotnet pack -c Release
 dotnet tool install --global --add-source bin/Release STFormatter.CLI
 
-# 3. Install VSIX extension
-# Double-click: src/STFormatter.VSIX/bin/Release/net8.0-windows/TwinCAT.STFormatter.vsix
-
-# 4. Deploy TcXaeShell Host (requires admin)
+# 3. Deploy TcXaeShell Host (requires admin)
 .\deploy.bat
 ```
 
@@ -267,14 +227,6 @@ stfmt check samples/SampleSTFiles/Sample1.st
 dotnet tool uninstall --global STFormatter.CLI
 ```
 
-### VSIX Extension
-
-1. Open Visual Studio 2022
-2. Go to **Extensions** > **Manage Extensions** > **Installed**
-3. Find **TwinCAT ST Formatter**
-4. Click **Uninstall**
-5. Restart Visual Studio
-
 ### TcXaeShell Host
 
 1. Stop the Host process (right-click tray icon > Exit, or Task Manager)
@@ -295,13 +247,6 @@ dotnet tool uninstall --global STFormatter.CLI
 ### "dotnet command not found"
 Install .NET 8 SDK: https://dotnet.microsoft.com/download/dotnet/8.0
 
-### "VSIXInstaller not found"
-Make sure Visual Studio 2022 is installed with the extension development workload.
-
-### "Extension doesn't appear in Visual Studio"
-- Check **Extensions** > **Manage Extensions** > **Installed**
-- If not listed, try reinstalling the VSIX
-
 ### "Format command doesn't work"
 - Ensure file extension is `.st`, `.TcPOU`, `.TcDUT`, `.TcGVL`, `.tcio`, or `.tcto`
 - Check that the file contains valid ST code
@@ -321,7 +266,6 @@ chmod +x src/STFormatter.CLI/bin/Release/net8.0/STFormatter.CLI
 
 ## Next Steps / Nachste Schritte
 
-- Read the [VSIX Packaging Guide](VSIX-Packaging.md) for distribution
 - Read the [TcXaeShell Integration Guide](TcXaeShell-Integration.md) for advanced TcXaeShell topics
 - See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details
 - See [FORMAT-OPTIONS.md](FORMAT-OPTIONS.md) for configuration reference

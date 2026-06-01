@@ -1,12 +1,12 @@
 # How to Install — TwinCAT ST Formatter
 
-Step-by-step installation instructions for all deployment targets.
+Step-by-step installation instructions for the supported Host and CLI deployment targets.
 
 ---
 
 ## 0. One-Click Installer (Easiest)
 
-Download and run the installer — it covers all three platforms:
+Download and run the installer:
 
 ```
 STFormatter-Setup-1.0.0.exe
@@ -14,17 +14,16 @@ STFormatter-Setup-1.0.0.exe
 
 The installer lets you choose which components to install:
 
-- **CLI Tool** — `stfmt` command (requires .NET 8 runtime)
-- **VS 2022 Extension** — installs VSIX silently
 - **TcXaeShell Host** — deploys to TcXaeShell extensions folder
+- **CLI Tool** — optional `stfmt` command (requires .NET 8 runtime)
 
 ### Building the Installer from Source
 
-Prerequisites: .NET 8 SDK, .NET Framework 4.6.2/4.8 targeting packs, Inno Setup 6, VS 2022 with VSSDK workload (for VSIX)
+Prerequisites: .NET 8 SDK, .NET Framework 4.6.2/4.8 targeting packs, and Inno Setup 6
 
 ```powershell
 .\installer\build-installer.ps1                    # Build everything + create installer
-.\installer\build-installer.ps1 -SkipVSIX           # Skip VSIX if no VS SDK
+.\installer\build-installer.ps1 -SkipCLI            # Build Host installer without CLI payload
 .\installer\build-installer.ps1 -SkipInstaller       # Build binaries only, no installer
 .\installer\build-installer.ps1 -Configuration Release -Version 1.0.0  # Custom config/version
 ```
@@ -76,61 +75,7 @@ dotnet tool uninstall --global STFormatter.CLI
 
 ---
 
-## 2. Visual Studio 2022 Extension (VSIX)
-
-### Prerequisites
-
-- Visual Studio 2022 (Community, Professional, or Enterprise) v17.0+
-- The "Visual Studio extension development" workload (for building from source)
-
-### Option A: Install Pre-built VSIX
-
-1. Navigate to `publish/TwinCAT.STFormatter.1.0.0.vsix`
-2. **Double-click** the `.vsix` file
-3. Click **Install** in the VSIX Installer dialog
-4. Restart Visual Studio 2022
-
-### Option B: Build from Source
-
-```powershell
-# Build using the provided script (requires VS 2022 SDK workload)
-.\build-vsix.ps1 -Configuration Release
-
-# The output will be at:
-# publish/TwinCAT.STFormatter.1.0.0.vsix
-```
-
-If the VS SDK workload is not installed, the script will offer to build CLI-only. To install the workload:
-
-1. Open **Visual Studio Installer**
-2. Click **Modify** on your VS 2022 installation
-3. Select **Visual Studio extension development**
-4. Click **Modify**
-
-### Option C: Install from Within Visual Studio
-
-1. Open Visual Studio 2022
-2. Go to **Extensions** > **Manage Extensions**
-3. Click the gear icon > **Install from VSIX...**
-4. Select `publish/TwinCAT.STFormatter.1.0.0.vsix`
-5. Restart Visual Studio
-
-### Verify Installation
-
-1. Open or create a `.st`, `.TcPOU`, `.TcDUT`, or `.TcGVL` file
-2. Press **Ctrl+K, Ctrl+D** — the file should be formatted
-3. Check **Tools** > **Options** > **TwinCAT** > **ST Formatter** for settings
-
-### Uninstall
-
-1. **Extensions** > **Manage Extensions** > **Installed**
-2. Find **TwinCAT ST Formatter**
-3. Click **Uninstall**
-4. Restart Visual Studio
-
----
-
-## 3. TwinCAT XAE Shell (TcXaeShell)
+## 2. TwinCAT XAE Shell (TcXaeShell)
 
 > **Important**: TcXaeShell's VS 2017 Isolated Shell does **not** support standard VSIX
 > extensions or VSPackages. The formatter must be deployed as an **external Host process**
@@ -283,26 +228,23 @@ The entire operation is wrapped in a DTE `UndoContext`, so pressing Ctrl+Z rever
 
 ---
 
-## 4. Install All Platforms
+## 3. Install All Supported Targets
 
 ```bash
-# 1. Build everything
+# 1. Build everything supported by the installer
 dotnet build TwinCAT.STFormatter.sln -c Release
 
 # 2. Install CLI
 dotnet pack src/STFormatter.CLI -c Release
 dotnet tool install --global --add-source src/STFormatter.CLI/bin/Release STFormatter.CLI
 
-# 3. Install VSIX
-#    Double-click: publish\TwinCAT.STFormatter.1.0.0.vsix
-
-# 4. Deploy TcXaeShell Host (requires admin)
+# 3. Deploy TcXaeShell Host (requires admin)
 .\deploy.bat
 ```
 
 ---
 
-## 5. Configuration After Installation
+## 4. Configuration After Installation
 
 Create an `.editorconfig` in your project directory:
 
@@ -317,8 +259,6 @@ stfmt init . --preset compact
 stfmt init . --preset expanded
 ```
 
-This creates a `.editorconfig` file that all three deployment targets (CLI, VSIX, Host) read automatically.
-
-For VS 2022, you can also configure settings via **Tools > Options > TwinCAT > ST Formatter**. These settings override `.editorconfig`.
+This creates a `.editorconfig` file that the CLI and Host read automatically.
 
 For TcXaeShell, right-click the system tray icon > **Settings** to change formatting options at runtime. These settings are saved to `%LOCALAPPDATA%\STFormatter\settings.json` and persist across restarts.

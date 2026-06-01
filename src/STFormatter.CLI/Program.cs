@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Reflection;
 using STFormatter.Core;
 using STFormatter.Core.Formatting;
 using STFormatter.Core.Text;
@@ -27,6 +28,12 @@ class Program
 
         return command switch
         {
+            "--help" => PrintUsageAndSucceed(),
+            "-h" => PrintUsageAndSucceed(),
+            "help" => PrintUsageAndSucceed(),
+            "--version" => PrintVersion(),
+            "-v" => PrintVersion(),
+            "version" => PrintVersion(),
             "format" => FormatCommand(args[1..]),
             "check" => CheckCommand(args[1..]),
             "batch" => BatchCommand(args[1..]),
@@ -36,6 +43,23 @@ class Program
             "import" => ImportCommand(args[1..]),
             _ => UnknownCommand(command)
         };
+    }
+
+    static string GetVersion() =>
+        typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+        ?? typeof(Program).Assembly.GetName().Version?.ToString(3)
+        ?? "unknown";
+
+    static int PrintUsageAndSucceed()
+    {
+        PrintUsage();
+        return 0;
+    }
+
+    static int PrintVersion()
+    {
+        Console.WriteLine($"TwinCAT ST Formatter CLI {GetVersion()}");
+        return 0;
     }
 
     static int FormatCommand(string[] args)
@@ -503,7 +527,7 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
 
     static void PrintUsage()
     {
-        Console.WriteLine("TwinCAT ST Formatter CLI v1.0");
+        Console.WriteLine($"TwinCAT ST Formatter CLI {GetVersion()}");
         Console.WriteLine();
         Console.WriteLine("Usage:");
         Console.WriteLine("  stfmt format <file> [-o <output>] [--dry-run]");

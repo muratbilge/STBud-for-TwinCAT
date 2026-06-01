@@ -420,7 +420,7 @@ _Wenn `true`, werden kurze Bloecke auf einer Zeile belassen, wenn sie so geschri
 
 #### FormatOnSave
 
-Hint for editor integrations (VSIX, TcXaeShell). When `true`, the formatter runs automatically on save. Default: `true`.
+Hint for editor integrations. When `true`, integrations may run the formatter automatically on save. Default: `true`.
 
 _Hinweis fuer Editor-Integrationen. Wenn `true`, wird beim Speichern automatisch formatiert. Standard: `true`._
 

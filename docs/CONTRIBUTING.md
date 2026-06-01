@@ -7,8 +7,7 @@ Thank you for contributing to TwinCAT ST Formatter! / Vielen Dank für Ihren Bei
 ## Prerequisites / Voraussetzungen
 
 - .NET 8 SDK
-- Visual Studio 2022 with VS SDK workload (for VSIX development)
-- TwinCAT XAE Shell (for TcXaeShell extension testing)
+- TwinCAT XAE Shell (for Host integration testing)
 
 ---
 
@@ -28,17 +27,14 @@ dotnet test tests/STFormatter.Core.Tests
 
 ---
 
-## TcXaeShell Development Workflow / TcXaeShell-Entwicklungsworkflow
+## TcXaeShell Host Development Workflow / TcXaeShell-Host-Entwicklungsworkflow
 
-1. Build: `dotnet build src\STFormatter.TcXaeShell -c Release` (use `-p:TargetFramework=net462` for older TcXaeShell)
-2. Stop TcXaeShell
-3. Run deploy script as admin (copies DLLs to `C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\`)
-4. Clear caches (replace `15.0` with your TcXaeShell version — 15.0, 14.0, or 12.0):
-   - Delete `%LOCALAPPDATA%\Beckhoff\TcXaeShell\15.0_IsoShell\ComponentModelCache\`
-   - Delete `%LOCALAPPDATA%\Beckhoff\TcXaeShell\15.0\Extensions\extensions.en-US.cache`
-5. Restart TcXaeShell
-6. Test: Edit → Format ST Document / Format ST Selection (Ctrl+K,D / Ctrl+K,F)
-7. Check log: `%TEMP%\STFormatter_TcXaeShell.log`
+1. Build: `dotnet build src\STFormatter.Host\STFormatter.Host.csproj -c Release -p:TargetFramework=net48`
+2. Deploy as admin with `deploy.bat` or build the installer with `installer\build-installer.ps1`.
+3. Start `STFormatter.Host.exe` non-elevated from `C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\`.
+4. Open TcXaeShell and a PLC editor window.
+5. Test the context menu commands: **Format ST Document** and **Format ST Selection**.
+6. Check log: `%TEMP%\STFormatter_Host.log`.
 
 ---
 
@@ -55,18 +51,17 @@ dotnet test tests/STFormatter.Core.Tests
 
 - Modify `FormattingEngine` or `FormattingVisitor` in Core
 - Add corresponding unit tests in `STFormatter.Core.Tests`
-- Test with all 3 targets (CLI, VSIX, TcXaeShell)
+- Test with the CLI and TcXaeShell Host targets.
 
 ---
 
 ## TcXaeShell Technical Notes / TcXaeShell-Technische Hinweise
 
-- It is a 32-bit VS Isolated Shell (VS 2017 v15, VS 2015 v14, or VS 2013 v12 depending on TwinCAT build) — must target `net462/x86` or `net48/x86`
-- VS SDK 15.9.3 reference, VSSDK BuildTools 17.12.2069 for sdk-style project
-- Menu resource version must stay at 1
-- Beckhoff DLLs referenced with `Private=false`, loaded via TwinCAT binding path
-- Deploy requires admin (registry entries, program files copy)
-- Log file at `%TEMP%\STFormatter_TcXaeShell.log`
+- TcXaeShell is a 32-bit VS Isolated Shell, so the Host targets x86 `net462`/`net48`.
+- Production integration is an external process that connects through COM DTE ROT monikers.
+- Do not add VSPackage, MEF, VSIX, or AddIn integration for TcXaeShell; those paths do not load reliably.
+- Deploy requires admin for Program Files copy, but run the Host non-elevated so it can see a non-elevated TcXaeShell ROT entry.
+- Log file at `%TEMP%\STFormatter_Host.log`.
 
 ---
 
