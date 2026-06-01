@@ -12,6 +12,7 @@ namespace STFormatter.UI
         private Button _scanBtn;
         private Button _cleanupBtn;
         private Label _statusLabel;
+        private FlowLayoutPanel _toolbar;
         private readonly Func<IReadOnlyDictionary<int, InstanceInfo>> _getInstances;
         private readonly Action _cleanup;
         private readonly Action? _scan;
@@ -28,6 +29,7 @@ namespace STFormatter.UI
             _scan = scan;
             _getStatus = getStatus;
             Dock = DockStyle.Fill;
+            AutoScaleMode = AutoScaleMode.Font;
             BuildUI();
         }
 
@@ -39,9 +41,12 @@ namespace STFormatter.UI
             foreach (var kvp in instances)
             {
                 var item = new ListViewItem(kvp.Key.ToString());
-                item.SubItems.Add(kvp.Value.Connected ? "Connected" : "Disconnected");
+                item.SubItems.Add(kvp.Value.Title);
+                item.SubItems.Add(kvp.Value.Connected
+                    ? Strings.Get("Instances.Status.Connected")
+                    : Strings.Get("Instances.Status.Disconnected"));
                 item.SubItems.Add(kvp.Value.InjectedMenus);
-                item.SubItems.Add(kvp.Value.LastFormatTime?.ToString("HH:mm:ss") ?? "-");
+                item.SubItems.Add(kvp.Value.LastFormatTime?.ToString("HH:mm:ss") ?? Strings.Get("Common.None"));
                 item.SubItems.Add(kvp.Value.FormatCount.ToString());
                 if (!kvp.Value.Connected)
                     item.ForeColor = Color.FromArgb(180, 0, 0);
@@ -49,54 +54,47 @@ namespace STFormatter.UI
             }
             _listView.EndUpdate();
             _statusLabel.Text = instances.Count > 0
-                ? $"{instances.Count} instance(s) connected"
-                : _getStatus?.Invoke() ?? "No instances";
+                ? $"{instances.Count} {Strings.Get("Instances.Status.Connected").ToLowerInvariant()}"
+                : _getStatus?.Invoke() ?? Strings.Get("Instances.None");
+        }
+
+        public void RebuildUi()
+        {
+            BuildUI();
         }
 
         private void BuildUI()
         {
-            var toolbar = new Panel
+            Controls.Clear();
+
+            _toolbar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
-                Height = 44,
-                Padding = new Padding(8, 6, 8, 6)
+                AutoSize = true,
+                WrapContents = false,
+                Padding = new Padding(8, 6, 8, 6),
             };
 
-            _refreshBtn = new Button
-            {
-                Text = "Refresh",
-                Left = 8, Top = 6, Width = 85, Height = 30,
-                Font = new Font("Segoe UI", 9f)
-            };
+            _refreshBtn = new Button { Text = Strings.Get("Instances.Refresh"), AutoSize = true, Margin = new Padding(0, 0, 8, 0) };
             _refreshBtn.Click += (s, e) => RefreshInstances();
 
-            _scanBtn = new Button
-            {
-                Text = "Scan",
-                Left = 100, Top = 6, Width = 85, Height = 30,
-                Font = new Font("Segoe UI", 9f)
-            };
+            _scanBtn = new Button { Text = Strings.Get("Instances.Scan"), AutoSize = true, Margin = new Padding(0, 0, 8, 0) };
             _scanBtn.Click += (s, e) =>
             {
                 _scan?.Invoke();
                 RefreshInstances();
             };
 
-            _cleanupBtn = new Button
-            {
-                Text = "Cleanup Stale",
-                Left = 192, Top = 6, Width = 120, Height = 30,
-                Font = new Font("Segoe UI", 9f)
-            };
+            _cleanupBtn = new Button { Text = Strings.Get("Instances.Cleanup"), AutoSize = true, Margin = new Padding(0, 0, 8, 0) };
             _cleanupBtn.Click += (s, e) =>
             {
                 _cleanup();
                 RefreshInstances();
             };
 
-            toolbar.Controls.Add(_refreshBtn);
-            toolbar.Controls.Add(_scanBtn);
-            toolbar.Controls.Add(_cleanupBtn);
+            _toolbar.Controls.Add(_refreshBtn);
+            _toolbar.Controls.Add(_scanBtn);
+            _toolbar.Controls.Add(_cleanupBtn);
 
             _listView = new ListView
             {
@@ -104,28 +102,27 @@ namespace STFormatter.UI
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
-                Font = new Font("Segoe UI", 9.5f),
-                BorderStyle = BorderStyle.None
+                BorderStyle = BorderStyle.None,
             };
-            _listView.Columns.Add("PID", 80);
-            _listView.Columns.Add("Status", 110);
-            _listView.Columns.Add("Injected Menus", 280);
-            _listView.Columns.Add("Last Format", 120);
-            _listView.Columns.Add("Format Count", 100);
+            _listView.Columns.Add(Strings.Get("Instances.Columns.PID"), 60);
+            _listView.Columns.Add(Strings.Get("Instances.Columns.Title"), 180);
+            _listView.Columns.Add(Strings.Get("Instances.Columns.Status"), 100);
+            _listView.Columns.Add(Strings.Get("Instances.Columns.Menus"), 240);
+            _listView.Columns.Add(Strings.Get("Instances.Columns.LastFormat"), 100);
+            _listView.Columns.Add(Strings.Get("Instances.Columns.Count"), -2);
 
             _statusLabel = new Label
             {
                 Dock = DockStyle.Bottom,
                 Height = 28,
-                Text = "No instances",
+                Text = Strings.Get("Instances.None"),
                 Padding = new Padding(8, 4, 0, 0),
-                Font = new Font("Segoe UI", 9f),
                 BackColor = SystemColors.Control,
-                ForeColor = SystemColors.ControlDarkDark
+                ForeColor = SystemColors.ControlDarkDark,
             };
 
             Controls.Add(_listView);
-            Controls.Add(toolbar);
+            Controls.Add(_toolbar);
             Controls.Add(_statusLabel);
         }
     }
@@ -133,6 +130,7 @@ namespace STFormatter.UI
     public class InstanceInfo
     {
         public bool Connected { get; set; }
+        public string Title { get; set; } = "";
         public string InjectedMenus { get; set; } = "";
         public DateTime? LastFormatTime { get; set; }
         public int FormatCount { get; set; }

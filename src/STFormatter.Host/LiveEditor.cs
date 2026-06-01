@@ -904,11 +904,6 @@ internal static class LiveEditor
 
     private static void Log(string message)
     {
-        try
-        {
-            var path = Path.Combine(Path.GetTempPath(), "STFormatter_Host.log");
-            File.AppendAllText(path, $"[{DateTime.Now:HH:mm:ss.fff}] LiveEditor: {message}{Environment.NewLine}");
-        }
-        catch { }
+        STFormatter.Core.Configuration.HostLog.Append("LiveEditor", message);
     }
 }

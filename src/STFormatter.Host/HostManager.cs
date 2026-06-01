@@ -19,6 +19,7 @@ internal sealed class TcXaeInstance
     public List<CommandBarControl> InjectedControls { get; } = new();
     public int FormatCount { get; set; }
     public DateTime? LastFormatTime { get; set; }
+    public string Title { get; set; } = "";
 
     public TcXaeInstance(int pid, DTE dte)
     {
@@ -36,6 +37,21 @@ internal sealed class TcXaeInstance
         InjectedMenus.Clear();
         InjectedControls.Clear();
     }
+
+    public void RefreshTitle()
+    {
+        try
+        {
+            if (Dte.Solution != null && !string.IsNullOrEmpty(Dte.Solution.FullName))
+                Title = Path.GetFileNameWithoutExtension(Dte.Solution.FullName);
+            else
+                Title = "";
+        }
+        catch
+        {
+            Title = "";
+        }
+    }
 }
 
 internal sealed class HostManager
@@ -45,12 +61,7 @@ internal sealed class HostManager
 
     private static void Log(string message)
     {
-        try
-        {
-            var path = Path.Combine(Path.GetTempPath(), "STFormatter_Host.log");
-            File.AppendAllText(path, $"[{DateTime.Now:HH:mm:ss.fff}] HostManager: {message}{Environment.NewLine}");
-        }
-        catch { }
+        STFormatter.Core.Configuration.HostLog.Append("HostManager", message);
     }
 
     // --- Public API ---
@@ -65,8 +76,9 @@ internal sealed class HostManager
         }
 
         var instance = new TcXaeInstance(pid, dte);
+        instance.RefreshTitle();
         _instances[pid] = instance;
-        Log($"Register: PID {pid} new instance (total tracked: {_instances.Count})");
+        Log($"Register: PID {pid} new instance (total tracked: {_instances.Count}) title='{instance.Title}'");
         return instance;
     }
 
@@ -85,6 +97,15 @@ internal sealed class HostManager
     public int InstanceCount => _instances.Count;
 
     public IReadOnlyDictionary<int, TcXaeInstance> GetAllInstances() => _instances;
+
+    public void RefreshAllTitles()
+    {
+        foreach (var kvp in _instances)
+        {
+            try { kvp.Value.RefreshTitle(); }
+            catch { }
+        }
+    }
 
     public void InjectButtons(TcXaeInstance instance)
     {

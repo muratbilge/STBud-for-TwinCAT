@@ -6,6 +6,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Windows.Forms;
+using STFormatter.Core.Configuration;
 using STFormatter.Core.Formatting;
 
 namespace STFormatter.UI
@@ -13,7 +14,7 @@ namespace STFormatter.UI
     public class MainForm : Form
     {
         private readonly NotifyIcon _trayIcon;
-        private readonly ContextMenuStrip _trayMenu;
+        private ContextMenuStrip _trayMenu;
         private readonly TabControl _tabControl;
         private readonly SettingsPanel _settingsPanel;
         private readonly InstancesPanel _instancesPanel;
@@ -27,6 +28,7 @@ namespace STFormatter.UI
         private readonly int[] _startupScanDelays = { 500, 1000, 2000, 5000, 10000 };
         private int _startupScanIndex;
         private bool _allowVisible;
+        private bool _localizeSuspend;
         internal static readonly Icon AppIcon = LoadAppIcon();
 
         [DllImport("user32.dll")]
@@ -40,7 +42,12 @@ namespace STFormatter.UI
             var resourceName = assembly.GetName().Name + ".Resources.icon.ico";
             using var stream = assembly.GetManifestResourceStream(resourceName);
             if (stream != null)
-                return new Icon(stream);
+            {
+                try { return new Icon(stream); }
+                catch { }
+            }
+            try { return Icon.ExtractAssociatedIcon(assembly.Location); }
+            catch { }
             return SystemIcons.Application;
         }
 
@@ -52,12 +59,14 @@ namespace STFormatter.UI
         {
             _maintainAction = maintainAction;
 
-            Text = "ST Formatter";
+            Text = Strings.Get("App.Title");
             Size = new Size(1100, 750);
             MinimumSize = new Size(800, 500);
             StartPosition = FormStartPosition.CenterScreen;
             Font = new Font("Segoe UI", 9f);
             Icon = AppIcon;
+            AutoScaleMode = AutoScaleMode.Font;
+            KeyPreview = true;
 
             _settingsPanel = new SettingsPanel();
             _settingsPanel.SettingsApplied += OnSettingsApplied;
@@ -72,16 +81,16 @@ namespace STFormatter.UI
                 Padding = new Point(12, 6)
             };
 
-            var settingsTab = new TabPage("Settings") { Padding = new Padding(4) };
+            var settingsTab = new TabPage(Strings.Get("Tab.Settings")) { Padding = new Padding(4) };
             settingsTab.Controls.Add(_settingsPanel);
 
-            var instancesTab = new TabPage("Instances") { Padding = new Padding(4) };
+            var instancesTab = new TabPage(Strings.Get("Tab.Instances")) { Padding = new Padding(4) };
             instancesTab.Controls.Add(_instancesPanel);
 
-            var historyTab = new TabPage("History") { Padding = new Padding(4) };
+            var historyTab = new TabPage(Strings.Get("Tab.History")) { Padding = new Padding(4) };
             historyTab.Controls.Add(_historyPanel);
 
-            var logTab = new TabPage("Log") { Padding = new Padding(4) };
+            var logTab = new TabPage(Strings.Get("Tab.Log")) { Padding = new Padding(4) };
             logTab.Controls.Add(_logPanel);
 
             _tabControl.TabPages.Add(settingsTab);
@@ -93,19 +102,12 @@ namespace STFormatter.UI
 
             Controls.Add(_tabControl);
 
-            _trayMenu = new ContextMenuStrip { Font = new Font("Segoe UI", 9f) };
-            _trayMenu.Items.Add("Settings", null, (s, e) => ShowWindow(0));
-            _trayMenu.Items.Add("Instances", null, (s, e) => ShowWindow(1));
-            _trayMenu.Items.Add("History", null, (s, e) => ShowWindow(2));
-            _trayMenu.Items.Add("Log", null, (s, e) => ShowWindow(3));
-            _trayMenu.Items.Add(new ToolStripSeparator());
-            _trayMenu.Items.Add("Restart", null, OnRestart);
-            _trayMenu.Items.Add("Exit", null, OnExit);
+            BuildTrayMenu();
 
             _trayIcon = new NotifyIcon
             {
                 Icon = AppIcon,
-                Text = "ST Formatter",
+                Text = Strings.Get("Tray.Text"),
                 Visible = true,
                 ContextMenuStrip = _trayMenu
             };
@@ -126,6 +128,48 @@ namespace STFormatter.UI
                 _maintainAction?.Invoke();
             };
             ShowInTaskbar = false;
+        }
+
+        private void BuildTrayMenu()
+        {
+            var old = _trayMenu;
+            _trayMenu = new ContextMenuStrip { Font = new Font("Segoe UI", 9f) };
+            _trayMenu.Items.Add(Strings.Get("Tray.Settings"), null, (s, e) => ShowWindow(0));
+            _trayMenu.Items.Add(Strings.Get("Tray.Instances"), null, (s, e) => ShowWindow(1));
+            _trayMenu.Items.Add(Strings.Get("Tray.History"), null, (s, e) => ShowWindow(2));
+            _trayMenu.Items.Add(Strings.Get("Tray.Log"), null, (s, e) => ShowWindow(3));
+            _trayMenu.Items.Add(new ToolStripSeparator());
+            _trayMenu.Items.Add(Strings.Get("Tray.Restart"), null, OnRestart);
+            _trayMenu.Items.Add(Strings.Get("Tray.Exit"), null, OnExit);
+            old?.Dispose();
+        }
+
+        public void Relocalize()
+        {
+            if (_localizeSuspend) return;
+            _localizeSuspend = true;
+            try
+            {
+                Text = Strings.Get("App.Title");
+                if (_tabControl.TabPages.Count >= 4)
+                {
+                    _tabControl.TabPages[0].Text = Strings.Get("Tab.Settings");
+                    _tabControl.TabPages[1].Text = Strings.Get("Tab.Instances");
+                    _tabControl.TabPages[2].Text = Strings.Get("Tab.History");
+                    _tabControl.TabPages[3].Text = Strings.Get("Tab.Log");
+                }
+                _trayIcon.Text = Strings.Get("Tray.Text");
+                BuildTrayMenu();
+                _trayIcon.ContextMenuStrip = _trayMenu;
+                _settingsPanel.RebuildUi();
+                _instancesPanel.RebuildUi();
+                _historyPanel.RebuildUi();
+                _logPanel.RebuildUi();
+            }
+            finally
+            {
+                _localizeSuspend = false;
+            }
         }
 
         public void ShowWindow(int tabIndex)
@@ -191,9 +235,17 @@ namespace STFormatter.UI
 
         private void OnSettingsApplied(FormattingConfiguration config)
         {
-            _trayIcon.BalloonTipTitle = "ST Formatter";
-            _trayIcon.BalloonTipText = "Settings applied successfully.";
-            _trayIcon.ShowBalloonTip(3000);
+            try
+            {
+                Relocalize();
+                _trayIcon.BalloonTipTitle = Strings.Get("Tray.Saved.Title");
+                _trayIcon.BalloonTipText = Strings.Get("Tray.Saved.Text");
+                _trayIcon.ShowBalloonTip(3000);
+            }
+            catch (Exception ex)
+            {
+                HostLog.Append("MainForm", $"OnSettingsApplied failed: {ex.Message}");
+            }
         }
 
         private void OnExit(object? sender, EventArgs e)

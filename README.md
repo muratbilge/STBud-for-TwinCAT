@@ -349,7 +349,7 @@ st_format_on_save = true
 
 All configuration options work as `.editorconfig` properties with the `st_` prefix.
 
-### 5. Sample Files
+### 4. Sample Files
 
 The `samples/` directory contains test files:
 
@@ -373,10 +373,10 @@ dotnet format ./samples/RealTcFiles/Execute.TcPOU --dry-run
 | Document | Description |
 |---|---|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Engine internals: lexer, parser, tree, visitor |
-| [docs/TcXaeShell-Integration.md](docs/TcXaeShell-Integration.md) | TcXaeShell automation API integration guide |
+| [docs/TcXaeShell-Integration.md](docs/TcXaeShell-Integration.md) | TcXaeShell COM DTE integration reference |
 | [docs/FORMAT-OPTIONS.md](docs/FORMAT-OPTIONS.md) | Complete configuration option reference |
-| [docs/INSTALL.md](docs/INSTALL.md) | Installation instructions for all targets |
-| [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | Contributing guidelines |
+| [docs/HOW-TO-INSTALL.md](docs/HOW-TO-INSTALL.md) | Installation instructions for all targets |
+| [docs/HOW-TO-USE.md](docs/HOW-TO-USE.md) | Practical usage guide |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | Release history |
 | [docs/API-REFERENCE.md](docs/API-REFERENCE.md) | Public API reference for STFormatter.Core |
 
@@ -401,7 +401,6 @@ CodeFormatter/
                                formatting engine integration, auto-reconnect
       STFormatter.Host.csproj  Project file — references Microsoft.VisualStudio.Interop
     STFormatter.UI/            Tray UI, settings, instances, history, diff viewer
-    STFormatter.Discover/      Developer-only TcXaeShell COM discovery tool, not in solution
   tests/
     STFormatter.Core.Tests/    Unit tests
   docs/                        Documentation

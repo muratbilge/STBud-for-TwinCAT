@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <PlatformTarget>x86</PlatformTarget>
     <AssemblyName>STFormatter.Host</AssemblyName>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>

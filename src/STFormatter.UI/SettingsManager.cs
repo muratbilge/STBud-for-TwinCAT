@@ -9,22 +9,9 @@ namespace STFormatter.UI
 {
     public sealed class AppSettings
     {
-        public string VersionProfileName { get; set; } = "auto";
+        public string Language { get; set; } = "en";
+        public DateTime? LastSavedUtc { get; set; }
         public FormattingConfiguration Formatting { get; set; } = new();
-
-        public TcXaeShellVersionProfile ResolveProfile()
-        {
-            if (string.Equals(VersionProfileName, "auto", StringComparison.OrdinalIgnoreCase))
-                return null;
-
-            foreach (var p in TcXaeShellVersionProfile.AllProfiles)
-            {
-                if (string.Equals(p.Name, VersionProfileName, StringComparison.OrdinalIgnoreCase))
-                    return p;
-            }
-
-            return TcXaeShellVersionProfile.FromDteVersion(VersionProfileName);
-        }
     }
 
     public static class SettingsManager
@@ -36,97 +23,96 @@ namespace STFormatter.UI
         private static readonly string SettingsPath = Path.Combine(SettingsDir, "settings.json");
 
         private static AppSettings? _appSettings;
+        private static FormattingConfiguration? _current;
+        private static readonly object _gate = new();
 
         public static AppSettings App
         {
             get
             {
-                if (_appSettings == null)
-                    _appSettings = LoadAppSettings();
-                return _appSettings;
+                EnsureLoaded();
+                return _appSettings!;
             }
-            set => _appSettings = value;
         }
-
-        private static FormattingConfiguration? _current;
 
         public static FormattingConfiguration Current
         {
             get
             {
-                if (_current == null)
-                    _current = App.Formatting;
-                return _current;
+                EnsureLoaded();
+                return _current!;
             }
-            set => _current = value;
-        }
-
-        public static AppSettings LoadAppSettings()
-        {
-            try
+            set
             {
-                if (!File.Exists(SettingsPath))
-                    return new AppSettings();
-
-                string json = File.ReadAllText(SettingsPath);
-                var options = new JsonSerializerOptions
+                lock (_gate)
                 {
-                    PropertyNameCaseInsensitive = true,
-                    WriteIndented = true
-                };
-                return JsonSerializer.Deserialize<AppSettings>(json, options) ?? new AppSettings();
-            }
-            catch
-            {
-                return new AppSettings();
-            }
-        }
-
-        public static FormattingConfiguration Load()
-        {
-            try
-            {
-                if (!File.Exists(SettingsPath))
-                {
-                    _current = FormattingConfiguration.Default;
-                    return _current;
+                    _current = value;
+                    if (_appSettings != null)
+                        _appSettings.Formatting = value;
                 }
-
-                string json = File.ReadAllText(SettingsPath);
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    WriteIndented = true
-                };
-                var appSettings = JsonSerializer.Deserialize<AppSettings>(json, options);
-                _appSettings = appSettings ?? new AppSettings();
-                _current = appSettings?.Formatting ?? FormattingConfiguration.Default;
-                return _current;
-            }
-            catch
-            {
-                _current = FormattingConfiguration.Default;
-                return _current;
             }
         }
+
+        public static void EnsureLoaded()
+        {
+            lock (_gate)
+            {
+                if (_appSettings != null) return;
+                try
+                {
+                    if (!File.Exists(SettingsPath))
+                    {
+                        _appSettings = new AppSettings();
+                        _current = _appSettings.Formatting;
+                        Strings.ApplyLanguage(_appSettings.Language);
+                        return;
+                    }
+
+                    string json = File.ReadAllText(SettingsPath);
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        WriteIndented = true
+                    };
+                    _appSettings = JsonSerializer.Deserialize<AppSettings>(json, options) ?? new AppSettings();
+                    _current = _appSettings.Formatting;
+
+                    if (_appSettings.Language == "de" && _appSettings.LastSavedUtc is null)
+                    {
+                        _appSettings.Language = "en";
+                    }
+                    Strings.ApplyLanguage(_appSettings.Language);
+                }
+                catch (Exception ex)
+                {
+                    HostLog.Append("SettingsManager", $"Load failed: {ex.Message}");
+                    _appSettings = new AppSettings();
+                    _current = _appSettings.Formatting;
+                    Strings.ApplyLanguage(_appSettings.Language);
+                }
+            }
+        }
+
+        public static FormattingConfiguration Load() => Current;
 
         public static void Save(FormattingConfiguration config)
         {
             try
             {
+                EnsureLoaded();
                 Directory.CreateDirectory(SettingsDir);
-                var app = App;
-                app.Formatting = config;
-                var options = new JsonSerializerOptions
+                lock (_gate)
                 {
-                    WriteIndented = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                };
-                string json = JsonSerializer.Serialize(app, options);
-                File.WriteAllText(SettingsPath, json);
-                _current = config;
+                    _appSettings!.Formatting = config;
+                    _appSettings.LastSavedUtc = DateTime.UtcNow;
+                    _current = config;
+                }
+                WriteAppSettings(_appSettings!);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                HostLog.Append("SettingsManager", $"Save failed: {ex.Message}");
+            }
         }
 
         public static void SaveAppSettings(AppSettings appSettings)
@@ -134,28 +120,34 @@ namespace STFormatter.UI
             try
             {
                 Directory.CreateDirectory(SettingsDir);
-                var options = new JsonSerializerOptions
+                Strings.ApplyLanguage(appSettings.Language);
+                WriteAppSettings(appSettings);
+                lock (_gate)
                 {
-                    WriteIndented = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                };
-                string json = JsonSerializer.Serialize(appSettings, options);
-                File.WriteAllText(SettingsPath, json);
-                _appSettings = appSettings;
-                _current = appSettings.Formatting;
+                    _appSettings = appSettings;
+                    _current = appSettings.Formatting;
+                }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                HostLog.Append("SettingsManager", $"SaveAppSettings failed: {ex.Message}");
+            }
+        }
+
+        private static void WriteAppSettings(AppSettings appSettings)
+        {
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+            string json = JsonSerializer.Serialize(appSettings, options);
+            File.WriteAllText(SettingsPath, json);
         }
 
         public static void ResetToDefault()
         {
             _current = FormattingConfiguration.Default;
-            Save(_current);
-        }
-
-        public static void ApplyPreset(string presetName)
-        {
-            _current = FormattingConfiguration.FromPreset(presetName);
             Save(_current);
         }
     }

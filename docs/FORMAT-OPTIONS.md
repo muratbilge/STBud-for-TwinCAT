@@ -1,31 +1,29 @@
-# Formatting Options Reference / Formatierungsoptionen-Referenz
+# Formatting Options Reference
 
 Complete reference for all configuration properties of `FormattingConfiguration`, with before/after examples, preset definitions, and integration guides.
 
-Vollstaendige Referenz aller Konfigurationseigenschaften von `FormattingConfiguration` mit Vorher/Nachher-Beispielen, Preset-Definitionen und Integrationsleitfaeden.
+---
+
+## Table of Contents
+
+1. [Indentation](#1-indentation)
+2. [Line Endings](#2-line-endings)
+3. [Keyword Casing](#3-keyword-casing)
+4. [Brace Style](#4-brace-style)
+5. [Spacing](#5-spacing)
+6. [Alignment](#6-alignment)
+7. [Line Wrapping](#7-line-wrapping)
+8. [Empty Lines](#8-empty-lines)
+9. [Single-Line Blocks](#9-single-line-blocks)
+10. [Format on Save](#10-format-on-save)
+11. [Presets](#11-presets)
+12. [EditorConfig Integration](#12-editorconfig-integration)
+13. [CLI Configuration](#13-cli-configuration)
+14. [Host Settings](#14-host-settings)
 
 ---
 
-## Table of Contents / Inhaltsverzeichnis
-
-1. [Indentation / Einrueckung](#1-indentation--einrueckung)
-2. [Line Endings / Zeilenumbrueche](#2-line-endings--zeilenumbrueche)
-3. [Keyword Casing / Schluesselwort-Großschreibung](#3-keyword-casing--schluesselwort-grossschreibung)
-4. [Brace Style / Klammernstil](#4-brace-style--klammernstil)
-5. [Spacing / Leerzeichen](#5-spacing--leerzeichen)
-6. [Alignment / Ausrichtung](#6-alignment--ausrichtung)
-7. [Line Wrapping / Zeilenumbruch](#7-line-wrapping--zeilenumbruch)
-8. [Empty Lines / Leerzeilen](#8-empty-lines--leerzeilen)
-9. [Single-Line Blocks / Einzeilige Bloecke](#9-single-line-blocks--einzeilige-bloecke)
-10. [Format on Save / Bei Speichern formatieren](#10-format-on-save--bei-speichern-formatieren)
-11. [Presets / Vorlagen](#11-presets--vorlagen)
-12. [EditorConfig Integration / EditorConfig-Integration](#12-editorconfig-integration--editorconfig-integration)
-13. [CLI Configuration / CLI-Konfiguration](#13-cli-configuration--cli-konfiguration)
-14. [Host Settings / Host-Einstellungen](#14-host-settings--host-einstellungen)
-
----
-
-## 1. Indentation / Einrueckung
+## 1. Indentation
 
 ### IndentStyle
 
@@ -36,8 +34,6 @@ Vollstaendige Referenz aller Konfigurationseigenschaften von `FormattingConfigur
 | Values   | `"spaces"` or `"tabs"` |
 
 Controls whether indentation uses space characters or tab characters.
-
-Bestimmt, ob Leerzeichen oder Tabulatoren fuer die Einrueckung verwendet werden.
 
 **Before** (mixed indentation):
 
@@ -90,8 +86,6 @@ END_PROGRAM
 
 Number of spaces per indentation level when `IndentStyle` is `"spaces"`. Also determines the display width of a tab when `IndentStyle` is `"tabs"`.
 
-Anzahl der Leerzeichen pro Einrueckungsebene bei `IndentStyle = "spaces"`.
-
 **After** with `IndentSize = 2`:
 
 ```st
@@ -129,8 +123,6 @@ END_PROGRAM
 
 Extra indentation applied to lines that are continued after a line break. When a statement exceeds `MaxLineLength` and wraps, the continuation line indents by `ContinuationIndentSize` spaces instead of the normal `IndentSize`. This visually distinguishes wrapped lines from nested blocks.
 
-Zusaetzliche Einrueckung fuer Fortsetzungszeilen, die nach einem Zeilenumbruch folgen.
-
 **Before** (unwrapped):
 
 ```st
@@ -159,7 +151,7 @@ END_IF
 
 ---
 
-## 2. Line Endings / Zeilenumbrueche
+## 2. Line Endings
 
 ### NewLineStyle
 
@@ -171,8 +163,6 @@ END_IF
 
 Controls the line ending sequence used in formatted output. Windows traditionally uses CRLF (`\r\n`), while Unix/Linux uses LF (`\n`). CR (`\r`) is rarely used but supported for legacy systems.
 
-Steuert die Zeilenendesequenz im formatierten Output.
-
 | Value    | Sequence | Platform              |
 |----------|----------|-----------------------|
 | `"crlf"` | `\r\n`   | Windows (default)     |
@@ -181,11 +171,9 @@ Steuert die Zeilenendesequenz im formatierten Output.
 
 This setting normalises all line endings in the output regardless of the input format. Mixed line endings in the source file will be unified to the configured style.
 
-Diese Einstellung normalisiert alle Zeilenenden im Output unabhaengig vom Eingabeformat.
-
 ---
 
-## 3. Keyword Casing / Schluesselwort-Grossschreibung
+## 3. Keyword Casing
 
 ### KeywordCasing
 
@@ -196,8 +184,6 @@ Diese Einstellung normalisiert alle Zeilenenden im Output unabhaengig vom Eingab
 | Values   | `"upper"`, `"lower"`, `"pascal"`, `"original"` |
 
 Determines the capitalisation of IEC 61131-3 keywords (`IF`, `THEN`, `VAR`, `END_IF`, `PROGRAM`, etc.). Identifiers, variable names, and type names are never changed.
-
-Bestimmt die Gross-/Kleinschreibung von IEC-61131-3-Schluesselwoertern.
 
 | Value       | Example                        |
 |-------------|--------------------------------|
@@ -262,7 +248,7 @@ EndProgram
 
 ---
 
-## 4. Brace Style / Klammernstil
+## 4. Brace Style
 
 ### BraceStyle
 
@@ -273,8 +259,6 @@ EndProgram
 | Values   | `"allman"`, `"kandr"` |
 
 Controls the placement of structural keywords in POU declarations and body blocks. In IEC 61131-3 ST, the equivalent of "braces" are the block delimiters such as `THEN`/`END_IF`, `DO`/`END_FOR`, `OF`/`END_CASE`, etc.
-
-Steuert die Platzierung struktureller Schluesselwoerter.
 
 **Allman style** (default) places the opening keyword on its own line:
 
@@ -319,7 +303,7 @@ END_IF
 
 ---
 
-## 5. Spacing / Leerzeichen
+## 5. Spacing
 
 ### SpaceAroundOperators
 
@@ -329,8 +313,6 @@ END_IF
 | Default  | `true` |
 
 Inserts a single space on both sides of operators such as `:=`, `+`, `-`, `*`, `=`, `<>`, `>=`, `<=`, `>`, `<`, `AND`, `OR`, `XOR`, `MOD`.
-
-Fuegt ein Leerzeichen auf beiden Seiten von Operatoren ein.
 
 **Before**:
 
@@ -368,8 +350,6 @@ END_IF
 
 Inserts a single space after each comma in argument lists, array dimensions, and enumeration values.
 
-Fuegt ein Leerzeichen nach jedem Komma ein.
-
 **Before**:
 
 ```st
@@ -400,8 +380,6 @@ aData : ARRAY[1..10] OF INT := [1,2,3,4,5];
 
 Inserts a space before the semicolon at the end of statements and declarations. This is unusual in standard ST but can improve readability in dense code.
 
-Fuegt ein Leerzeichen vor dem Semikolon am Ende von Anweisungen und Deklarationen ein.
-
 **Before**:
 
 ```st
@@ -431,8 +409,6 @@ nTotal := nA + nB;
 | Default  | `true` |
 
 Inserts a space after the colon in variable declarations (the separator between name and type). The colon itself is always emitted; this option only controls the trailing space.
-
-Fuegt ein Leerzeichen nach dem Doppelpunkt in Variablendeklarationen ein.
 
 **Before**:
 
@@ -466,7 +442,7 @@ END_VAR
 
 ---
 
-## 6. Alignment / Ausrichtung
+## 6. Alignment
 
 ### AlignAssignments
 
@@ -476,8 +452,6 @@ END_VAR
 | Default  | `true` |
 
 Aligns the `:=` operator in consecutive assignment statements within a statement block. Consecutive assignments (two or more in a row) are grouped and their assignment operators are aligned to the same column.
-
-Richtet den Zuweisungsoperator `:=` in aufeinanderfolgenden Zuweisungen aus.
 
 **Before**:
 
@@ -514,8 +488,6 @@ sErrorMessage := '';
 | Default  | `true` |
 
 Aligns variable names, types, and initializers in VAR declaration sections. When enabled, columns are aligned so that all colons, type names, and initializers line up vertically within a VAR block.
-
-Richtet Variablennamen, Typen und Initialisierer in VAR-Deklarationsabschnitten aus.
 
 **Before**:
 
@@ -555,13 +527,9 @@ The alignment calculation considers:
 - **Type column**: all `:=` operators align to the widest type name when initializers are present
 - Variables without initializers end after the type and semicolon; no trailing padding is added
 
-Die Ausrichtungsberechnung beruecksichtigt:
-- Namensspalte: alle Doppelpunkte richten sich nach dem breitesten Variablennamen aus
-- Typspalte: alle `:=`-Operatoren richten sich nach dem breitesten Typnamen aus (nur wenn Initialisierer vorhanden)
-
 ---
 
-## 7. Line Wrapping / Zeilenumbruch
+## 7. Line Wrapping
 
 ### MaxLineLength
 
@@ -571,8 +539,6 @@ Die Ausrichtungsberechnung beruecksichtigt:
 | Default  | `120` |
 
 Maximum line length before the formatter wraps long lines. Set to `0` to disable line wrapping entirely. When a line exceeds this limit, continuation lines are indented by `ContinuationIndentSize` spaces from the current indentation level.
-
-Maximale Zeilenlaenge bevor der Formatierer lange Zeilen umbricht. Auf `0` setzen, um den Zeilenumbruch zu deaktivieren.
 
 **Before** (single long line):
 
@@ -608,7 +574,7 @@ END_IF
 
 ---
 
-## 8. Empty Lines / Leerzeilen
+## 8. Empty Lines
 
 ### EmptyLinesBetweenPOUs
 
@@ -618,8 +584,6 @@ END_IF
 | Default  | `2` |
 
 Number of empty lines inserted between top-level Program Organization Units (PROGRAM, FUNCTION_BLOCK, FUNCTION, etc.). This controls the vertical spacing between major code sections.
-
-Anzahl der Leerzeilen zwischen Program Organization Units.
 
 **Before** (inconsistent spacing):
 
@@ -679,8 +643,6 @@ END_FUNCTION_BLOCK
 | Default  | `1` |
 
 Number of empty lines between consecutive VAR sections (VAR, VAR_INPUT, VAR_OUTPUT, VAR_IN_OUT, etc.) within the same POU.
-
-Anzahl der Leerzeilen zwischen aufeinanderfolgenden VAR-Abschnitten.
 
 **Before** (no spacing):
 
@@ -754,7 +716,7 @@ END_FUNCTION_BLOCK
 
 ---
 
-## 9. Single-Line Blocks / Einzeilige Bloecke
+## 9. Single-Line Blocks
 
 ### KeepSingleLineBlocks
 
@@ -764,8 +726,6 @@ END_FUNCTION_BLOCK
 | Default  | `false` |
 
 When `true`, preserves IF/END_IF, FOR/END_FOR, etc. on a single line if the original source already has the body on the same line. When `false` (default), all block statements are expanded to multi-line format regardless of the original layout.
-
-Wenn `true`, werden einzeilige Bloecke beibehalten, wenn sie im Quellcode bereits einzeilig sind.
 
 **Before** (single-line IF in source):
 
@@ -789,11 +749,9 @@ IF bEnable THEN nResult := 1; END_IF
 
 This option only applies when the entire block (condition + body + end keyword) originally fits on one line. Multi-line blocks in the source are always reformatted.
 
-Diese Option gilt nur, wenn der gesamte Block im Originalcode in eine Zeile passt.
-
 ---
 
-## 10. Format on Save / Bei Speichern formatieren
+## 10. Format on Save
 
 ### FormatOnSave
 
@@ -804,8 +762,6 @@ Diese Option gilt nur, wenn der gesamte Block im Originalcode in eine Zeile pass
 
 Enables automatic formatting when an editor integration supports save events. The CLI does not use this setting.
 
-Aktiviert die automatische Formatierung beim Speichern einer Datei.
-
 When enabled by an integration, the formatter runs before or during save and the editor's undo stack should preserve the pre-format state.
 
 When `FormatOnSave` is `true`:
@@ -814,39 +770,13 @@ When `FormatOnSave` is `true`:
 
 ---
 
-## 11. Presets / Vorlagen
+## 11. Presets
 
 Presets provide named collections of formatting settings for common coding styles. They are available via the CLI (`stfmt preset`), the `FormattingConfiguration.FromPreset()` API, and the `.editorconfig` init command.
 
-Presets bieten benannte Sammlungen von Formatierungseinstellungen fuer ggf. gaengige Codestile.
+### Default
 
-### Default / Standard
-
-Matches the built-in defaults of `FormattingConfiguration`.
-
-| Property                      | Value       |
-|-------------------------------|-------------|
-| `IndentStyle`                 | `"spaces"`  |
-| `IndentSize`                  | `4`         |
-| `ContinuationIndentSize`      | `8`         |
-| `NewLineStyle`                | `"crlf"`    |
-| `KeywordCasing`               | `"upper"`   |
-| `BraceStyle`                  | `"allman"`  |
-| `SpaceAroundOperators`        | `true`      |
-| `SpaceAfterComma`             | `true`      |
-| `SpaceBeforeSemicolon`        | `false`     |
-| `SpaceAfterColon`             | `true`      |
-| `AlignAssignments`            | `true`      |
-| `AlignVariableDeclarations`   | `true`      |
-| `MaxLineLength`               | `120`       |
-| `EmptyLinesBetweenPOUs`       | `2`         |
-| `EmptyLinesBetweenVarSections`| `1`         |
-| `KeepSingleLineBlocks`        | `false`     |
-| `FormatOnSave`                | `true`      |
-
-### Default (Preset)
-
-Professional, readable style with generous vertical spacing and aligned declarations.
+Professional, readable style with generous vertical spacing and aligned declarations. Matches the built-in defaults of `FormattingConfiguration`.
 
 | Property                      | Value       |
 |-------------------------------|-------------|
@@ -902,8 +832,6 @@ END_PROGRAM
 
 Minimises vertical and horizontal space. 2-space indent, no alignment, single-line blocks preserved. Suitable for code reviews on small screens or deeply nested logic.
 
-Minimiert vertikalen und horizontalen Platz. 2 Leerzeichen Einrueckung, keine Ausrichtung, einzeilige Bloecke erhalten.
-
 | Property                      | Value       |
 |-------------------------------|-------------|
 | `IndentStyle`                 | `"spaces"`  |
@@ -951,8 +879,6 @@ end_program
 ### ExpandedPreset
 
 Generous vertical spacing with an 80-character line limit. Best for printouts, code reviews, and strict style guides. Aligns declarations and assignments for maximum scanability.
-
-Grosszuegiger vertikaler Abstand mit 80-Zeichen-Limit. Optimal fuer Ausdrucke und Code-Reviews.
 
 | Property                      | Value       |
 |-------------------------------|-------------|
@@ -1015,29 +941,27 @@ FUNCTION CalculateSpeed : REAL
 END_FUNCTION
 ```
 
-### Preset Comparison / Preset-Vergleich
+### Preset Comparison
 
 | Option                         | Default | Compact | Expanded |
-|--------------------------------|---------|--------|---------|----------|
-| `IndentSize`                   | 4       | 4      | 2       | 4        |
-| `ContinuationIndentSize`       | 8       | 8      | 4       | 8        |
-| `KeywordCasing`                | upper   | upper  | lower   | upper    |
-| `MaxLineLength`                | 120     | 120    | 120     | 80       |
-| `AlignAssignments`             | true    | true   | false   | true     |
-| `AlignVariableDeclarations`    | true    | true   | false   | true     |
-| `EmptyLinesBetweenPOUs`        | 2       | 2      | 1       | 3        |
-| `EmptyLinesBetweenVarSections` | 1       | 1      | 0       | 2        |
-| `KeepSingleLineBlocks`         | false   | false  | true    | false    |
+|--------------------------------|---------|---------|----------|
+| `IndentSize`                   | 4       | 2       | 4        |
+| `ContinuationIndentSize`       | 8       | 4       | 8        |
+| `KeywordCasing`                | upper   | lower   | upper    |
+| `MaxLineLength`                | 120     | 120     | 80       |
+| `AlignAssignments`             | true    | false   | true     |
+| `AlignVariableDeclarations`    | true    | false   | true     |
+| `EmptyLinesBetweenPOUs`        | 2       | 1       | 3        |
+| `EmptyLinesBetweenVarSections` | 1       | 0       | 2        |
+| `KeepSingleLineBlocks`         | false   | true    | false    |
 
 ---
 
-## 12. EditorConfig Integration / EditorConfig-Integration
+## 12. EditorConfig Integration
 
 The formatter reads `.editorconfig` files using the standard EditorConfig specification. Files are discovered by walking up the directory tree from the source file, merging sections that match the file pattern. A `.editorconfig` with `root = true` stops the upward search.
 
-Der Formatierer liest `.editorconfig`-Dateien. Die Suche erfolgt aufwaerts im Verzeichnisbaum.
-
-### Standard EditorConfig Properties / Standard-Eigenschaften
+### Standard EditorConfig Properties
 
 The following standard EditorConfig properties are mapped directly to `FormattingConfiguration`:
 
@@ -1049,7 +973,7 @@ The following standard EditorConfig properties are mapped directly to `Formattin
 | `end_of_line`          | `NewLineStyle` (`"crlf"`, `"lf"`, `"cr"`) |
 | `max_line_length`     | `MaxLineLength` (`"off"` sets to `0`) |
 
-### ST-Specific Properties / ST-spezifische Eigenschaften
+### ST-Specific Properties
 
 Custom properties use the `st_` prefix to avoid collisions with other language settings:
 
@@ -1065,9 +989,7 @@ Custom properties use the `st_` prefix to avoid collisions with other language s
 
 Boolean values accept `true`, `yes`, `1`, `on` for truthy and any other value for falsy.
 
-Boolesche Werte akzeptieren `true`, `yes`, `1`, `on` als wahrheitsgemaess.
-
-### Example .editorconfig / Beispiel-.editorconfig
+### Example .editorconfig
 
 ```ini
 root = true
@@ -1088,11 +1010,9 @@ st_empty_lines_between_var_sections = 1
 st_format_on_save = true
 ```
 
-### Configuration Resolution / Konfigurationsaufloesung
+### Configuration Resolution
 
 Settings are resolved in the following priority order (highest to lowest):
-
-Einstellungen werden in folgender Prioritaet aufgeloest (hoechste bis niedrigste):
 
 1. **VS/TcXaeShell Options page** — overrides everything (IDE integrations only)
 2. **CLI command-line flags** — overrides `.editorconfig` (CLI only)
@@ -1102,9 +1022,7 @@ Einstellungen werden in folgender Prioritaet aufgeloest (hoechste bis niedrigste
 
 The `EditorConfigParser` walks the directory tree from the source file location upward, collecting `.editorconfig` files. Each file may contain multiple sections (e.g., `[*]`, `[*.st]`). Properties from sections matching the file pattern are merged, with closer files overriding more distant ones.
 
-Der `EditorConfigParser` durchlaeuft den Verzeichnisbaum aufwaerts und sammelt `.editorconfig`-Dateien.
-
-### Generating .editorconfig / .editorconfig erstellen
+### Generating .editorconfig
 
 Use the CLI to generate an `.editorconfig` from a preset:
 
@@ -1123,13 +1041,11 @@ stfmt import myconfig.json
 
 ---
 
-## 13. CLI Configuration / CLI-Konfiguration
+## 13. CLI Configuration
 
 The `stfmt` command-line tool provides full configuration management.
 
-Das Befehlszeilen-Tool `stfmt` bietet volle Konfigurationsverwaltung.
-
-### Commands / Befehle
+### Commands
 
 | Command                       | Description                                                        |
 |-------------------------------|--------------------------------------------------------------------|
@@ -1147,7 +1063,7 @@ Das Befehlszeilen-Tool `stfmt` bietet volle Konfigurationsverwaltung.
 | `stfmt export [file]`        | Export configuration to JSON                                       |
 | `stfmt import <json-file>`    | Import configuration from JSON and write `.editorconfig`          |
 
-### Configuration Sources / Konfigurationsquellen
+### Configuration Sources
 
 The CLI resolves configuration from multiple sources in priority order:
 
@@ -1156,9 +1072,7 @@ The CLI resolves configuration from multiple sources in priority order:
 
 The `stfmt init` command creates an `.editorconfig` file in the target directory. The `stfmt export` command writes the configuration as JSON for version control or sharing. The `stfmt import` command converts a previously exported JSON file back into an `.editorconfig`.
 
-Der Befehl `stfmt init` erstellt eine `.editorconfig`-Datei. `stfmt export` schreibt die Konfiguration als JSON. `stfmt import` konvertiert eine JSON-Datei zurueck in `.editorconfig`.
-
-### Examples / Beispiele
+### Examples
 
 ```bash
 # Format a single file
@@ -1192,20 +1106,18 @@ stfmt import team-style.json
 
 ---
 
-## 14. Host Settings / Host-Einstellungen
+## 14. Host Settings
 
 The TcXaeShell Host provides a tray settings window for runtime formatter options.
 
-Der TcXaeShell Host bietet ein Einstellungsfenster im Tray fuer Formatter-Optionen zur Laufzeit.
-
-### Access / Zugriff
+### Access
 
 - Right-click the `STFormatter.Host` tray icon.
 - Select **Settings**.
 
 Settings are stored in `%LOCALAPPDATA%\STFormatter\settings.json`. Team defaults should still live in `.editorconfig`.
 
-### Available Options / Verfuegbare Optionen
+### Available Options
 
 | Category       | Option                          | Type    | Default     |
 |----------------|---------------------------------|---------|-------------|
@@ -1219,9 +1131,7 @@ Settings are stored in `%LOCALAPPDATA%\STFormatter\settings.json`. Team defaults
 
 The Indent Style dropdown offers `spaces` and `tabs`. The Keyword Casing dropdown offers `upper`, `lower`, `pascal`, and `original`.
 
-Das Indent-Style-Dropdown bietet `spaces` und `tabs`. Das Keyword-Casing-Dropdown bietet `upper`, `lower`, `pascal` und `original`.
-
-### Configuration Resolution in Host / Konfigurationsaufloesung im Host
+### Configuration Resolution in Host
 
 When the formatter runs from the TcXaeShell Host, configuration is resolved as:
 
@@ -1231,15 +1141,11 @@ When the formatter runs from the TcXaeShell Host, configuration is resolved as:
 
 Host settings override `.editorconfig`. This ensures the user's personal preferences take effect, while team-shared settings in `.editorconfig` provide sensible defaults for options the user has not explicitly configured.
 
-Host-Einstellungen ueberschreiben `.editorconfig`. Dadurch haben persoenliche Einstellungen Vorrang, waehrend Team-Einstellungen in `.editorconfig` als Standardvorgaben dienen.
-
-### Format on Save / Bei Speichern formatieren
+### Format on Save
 
 The current production TcXaeShell Host exposes manual context-menu formatting commands. `FormatOnSave` remains a configuration hint for integrations that implement save-event formatting.
 
-Der aktuelle Produktions-Host fuer TcXaeShell stellt manuelle Kontextmenue-Befehle bereit. `FormatOnSave` bleibt ein Konfigurationshinweis fuer Integrationen, die Speicher-Ereignisse implementieren.
-
-### Format Commands / Formatierungsbefehle
+### Format Commands
 
 | Command            | Shortcut    | Description                             |
 |--------------------|-------------|-----------------------------------------|
@@ -1248,11 +1154,9 @@ Der aktuelle Produktions-Host fuer TcXaeShell stellt manuelle Kontextmenue-Befeh
 
 These commands are injected by `STFormatter.Host` into TcXaeShell context menus and invoke `FormattingEngine.Format()`, `FormatDeclaration()`, or `FormatBody()` depending on context.
 
-Diese Befehle werden von `STFormatter.Host` in TcXaeShell-Kontextmenues eingefuegt und rufen je nach Kontext `FormattingEngine.Format()`, `FormatDeclaration()` oder `FormatBody()` auf.
-
 ---
 
-## Complete Property Reference / Vollstaendige Eigenschaftsreferenz
+## Complete Property Reference
 
 | Property                        | Type    | Default     | CLI/.editorconfig                               |
 |---------------------------------|---------|-------------|-------------------------------------------------|
@@ -1275,5 +1179,3 @@ Diese Befehle werden von `STFormatter.Host` in TcXaeShell-Kontextmenues eingefue
 | `FormatOnSave`                  | bool    | `true`      | `st_format_on_save`                              |
 
 Properties marked "(editorconfig only)" for the last column are supported in `.editorconfig` files via the `st_` prefix but are not currently exposed as separate dropdowns in the VS/XAE Options page. The full set of options is always available through `.editorconfig`.
-
-Eigenschaften, die als "(editorconfig only)" markiert sind, werden ueber den `st_`-Praefix in `.editorconfig`-Dateien unterstuetzt, sind aber aktuell nicht als separate Optionen auf der VS/XAE-Optionenseite verfuegbar.

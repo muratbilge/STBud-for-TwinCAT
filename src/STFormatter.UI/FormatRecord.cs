@@ -1,4 +1,5 @@
 using System;
+using STFormatter.Core.Text;
 
 namespace STFormatter.UI
 {
@@ -10,6 +11,7 @@ namespace STFormatter.UI
         public string OriginalText { get; set; } = "";
         public string FormattedText { get; set; } = "";
         public int Pid { get; set; }
+        public string Title { get; set; } = "";
         public bool Success { get; set; }
         public string Method { get; set; } = "";
 
@@ -17,25 +19,17 @@ namespace STFormatter.UI
             ? ""
             : System.IO.Path.GetFileName(FilePath);
 
-        public string OriginalLineCount
-        {
-            get
-            {
-                if (string.IsNullOrEmpty(OriginalText)) return "0";
-                return OriginalText.Split('\n').Length.ToString();
-            }
-        }
+        public int OriginalLineCountValue => LineCounter.Count(OriginalText);
 
-        public string FormattedLineCount
-        {
-            get
-            {
-                if (string.IsNullOrEmpty(FormattedText)) return "0";
-                return FormattedText.Split('\n').Length.ToString();
-            }
-        }
+        public int FormattedLineCountValue => LineCounter.Count(FormattedText);
+
+        public string OriginalLineCount => OriginalLineCountValue.ToString();
+
+        public string FormattedLineCount => FormattedLineCountValue.ToString();
 
         public string Summary =>
-            $"{Timestamp:HH:mm:ss} | {FileName} | {Section} | {OriginalLineCount}→{FormattedLineCount} lines | {(Success ? "OK" : "FAIL")}";
+            $"{Timestamp:HH:mm:ss} | {FileName} | {Section} | {OriginalLineCountValue}\u2192{FormattedLineCountValue} lines | {(Success ? "OK" : "FAIL")}";
+
+        public bool HasDiff => OriginalText != FormattedText && !(string.IsNullOrEmpty(OriginalText) && string.IsNullOrEmpty(FormattedText));
     }
 }

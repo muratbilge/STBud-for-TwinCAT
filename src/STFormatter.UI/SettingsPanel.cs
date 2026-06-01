@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Globalization;
 using System.Windows.Forms;
 using STFormatter.Core.Formatting;
 
@@ -8,6 +9,7 @@ namespace STFormatter.UI
     public class SettingsPanel : UserControl
     {
         private ComboBox _presetCombo;
+        private ComboBox _languageCombo;
         private ComboBox _indentStyleCombo;
         private NumericUpDown _indentSize;
         private NumericUpDown _continuationIndentSize;
@@ -27,6 +29,11 @@ namespace STFormatter.UI
         private CheckBox _formatOnSave;
         private CheckBox _startWithWindows;
         private RichTextBox _previewBox;
+        private Label _savedAtLabel;
+        private Label _restartNoteLabel;
+        private SplitContainer _split;
+        private Panel _scroll;
+        private TableLayoutPanel _grid;
 
         public event Action<FormattingConfiguration>? SettingsApplied;
 
@@ -54,87 +61,331 @@ END_IF";
         public SettingsPanel()
         {
             Dock = DockStyle.Fill;
+            AutoScaleMode = AutoScaleMode.Font;
             BuildUI();
             LoadFromConfig(SettingsManager.Current);
-            _startWithWindows.Checked = AutoStart.IsEnabled();
+            LoadFromAppSettings();
+            UpdateSavedAtLabel();
+        }
+
+        public void RebuildUi()
+        {
+            var config = BuildConfig();
+            var appLang = _languageCombo.SelectedIndex;
+
+            _split.SuspendLayout();
+            try
+            {
+                _grid.Controls.Clear();
+                _grid.RowStyles.Clear();
+                for (int i = 0; i < 4; i++)
+                    _grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+                var presetRow = BuildPresetRow();
+                _grid.SetColumnSpan(presetRow, 2);
+                _grid.Controls.Add(presetRow, 0, 0);
+
+                _grid.Controls.Add(MakeGroup(Strings.Get("Settings.Group.Indentation"), BuildIndentControls()), 0, 1);
+                _grid.Controls.Add(MakeGroup(Strings.Get("Settings.Group.Spacing"), BuildSpacingControls()), 1, 1);
+                _grid.Controls.Add(MakeGroup(Strings.Get("Settings.Group.Keywords"), BuildKeywordControls()), 0, 2);
+                _grid.Controls.Add(MakeGroup(Strings.Get("Settings.Group.Lines"), BuildLineControls()), 1, 2);
+                _grid.Controls.Add(MakeGroup(Strings.Get("Settings.Group.Behavior"), BuildBehaviorControls()), 0, 3);
+                _grid.Controls.Add(MakeGroup(Strings.Get("Settings.Group.General"), BuildGeneralControls()), 1, 3);
+
+                LoadFromConfig(config);
+            }
+            finally
+            {
+                _split.ResumeLayout(true);
+            }
+
+            if (appLang >= 0)
+                _languageCombo.SelectedIndex = appLang;
+
+            _savedAtLabel.Text = Strings.Get("Settings.NeverSaved");
+            UpdateSavedAtLabel();
         }
 
         private void BuildUI()
         {
-            var split = new SplitContainer
+            _split = new SplitContainer
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Horizontal,
-                SplitterDistance = 340,
                 SplitterWidth = 6,
                 Panel1MinSize = 200,
-                Panel2MinSize = 150,
-                BackColor = SystemColors.Control
+                BackColor = SystemColors.Control,
+            };
+            _split.HandleCreated += (s, e) =>
+            {
+                _split.BeginInvoke(new Action(() =>
+                {
+                    var h = _split.Height;
+                    if (h > 0)
+                    {
+                        _split.Panel2MinSize = Math.Min(100, h / 2);
+                        _split.SplitterDistance = Math.Max(_split.Panel1MinSize, h - _split.Panel2MinSize - _split.SplitterWidth);
+                    }
+                }));
             };
 
-            // --- Top panel: settings controls ---
-            var topFlow = new FlowLayoutPanel
+            _scroll = new Panel
             {
                 Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.TopDown,
                 AutoScroll = true,
-                WrapContents = false,
-                Padding = new Padding(8, 4, 8, 4)
             };
 
-            // Preset bar
-            var presetRow = new Panel { Width = 800, Height = 38, Margin = new Padding(0, 0, 0, 4) };
-            var presetLabel = new Label { Text = "Preset:", Left = 0, Top = 8, Width = 50, Font = new Font("Segoe UI", 9.5f), TextAlign = ContentAlignment.MiddleRight };
-            _presetCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Left = 58, Top = 5, Width = 180, Height = 28, Font = new Font("Segoe UI", 9.5f) };
-            _presetCombo.Items.AddRange(new object[] { "Default", "Compact", "Expanded" });
+            _grid = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                ColumnCount = 2,
+                RowCount = 4,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(4),
+            };
+            _grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+            _grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+            for (int i = 0; i < 4; i++)
+                _grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            var presetRow = BuildPresetRow();
+            _grid.SetColumnSpan(presetRow, 2);
+            _grid.Controls.Add(presetRow, 0, 0);
+
+            _grid.Controls.Add(MakeGroup(Strings.Get("Settings.Group.Indentation"), BuildIndentControls()), 0, 1);
+            _grid.Controls.Add(MakeGroup(Strings.Get("Settings.Group.Spacing"), BuildSpacingControls()), 1, 1);
+            _grid.Controls.Add(MakeGroup(Strings.Get("Settings.Group.Keywords"), BuildKeywordControls()), 0, 2);
+            _grid.Controls.Add(MakeGroup(Strings.Get("Settings.Group.Lines"), BuildLineControls()), 1, 2);
+            _grid.Controls.Add(MakeGroup(Strings.Get("Settings.Group.Behavior"), BuildBehaviorControls()), 0, 3);
+            _grid.Controls.Add(MakeGroup(Strings.Get("Settings.Group.General"), BuildGeneralControls()), 1, 3);
+
+            _scroll.Controls.Add(_grid);
+            _split.Panel1.Controls.Add(_scroll);
+            _split.Panel2.Controls.Add(BuildPreviewPanel());
+
+            Controls.Add(_split);
+        }
+
+        private Control BuildPresetRow()
+        {
+            var row = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                ColumnCount = 6,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            };
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+
+            var presetLabel = new Label
+            {
+                Text = Strings.Get("Settings.Preset"),
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Margin = new Padding(0, 6, 6, 0),
+            };
+            _presetCombo = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 3, 8, 3),
+            };
+            _presetCombo.Items.Add(Strings.Get("Settings.Preset.Default"));
+            _presetCombo.Items.Add(Strings.Get("Settings.Preset.Compact"));
+            _presetCombo.Items.Add(Strings.Get("Settings.Preset.Expanded"));
             _presetCombo.SelectedIndex = 0;
             _presetCombo.SelectedIndexChanged += OnPresetChanged;
-            var previewBtn = new Button { Text = "Preview", Left = 260, Top = 4, Width = 80, Height = 30, Font = new Font("Segoe UI", 9.5f) };
+
+            var previewBtn = new Button
+            {
+                Text = Strings.Get("Settings.Button.Preview"),
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Margin = new Padding(0, 3, 4, 3),
+            };
             previewBtn.Click += OnPreview;
-            var applyBtn = new Button { Text = "Apply", Left = 350, Top = 4, Width = 80, Height = 30, Font = new Font("Segoe UI", 9.5f) };
+
+            var applyBtn = new Button
+            {
+                Text = Strings.Get("Settings.Button.Apply"),
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Margin = new Padding(0, 3, 4, 3),
+            };
             applyBtn.Click += OnApply;
-            var resetBtn = new Button { Text = "Reset", Left = 440, Top = 4, Width = 80, Height = 30, Font = new Font("Segoe UI", 9.5f) };
+
+            var resetBtn = new Button
+            {
+                Text = Strings.Get("Settings.Button.Reset"),
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Margin = new Padding(0, 3, 4, 3),
+            };
             resetBtn.Click += OnReset;
-            presetRow.Controls.AddRange(new Control[] { presetLabel, _presetCombo, previewBtn, applyBtn, resetBtn });
-            topFlow.Controls.Add(presetRow);
 
-            // Settings in two columns side by side
-            var colsPanel = new Panel { Width = 800, Height = 260, Margin = new Padding(0) };
+            row.Controls.Add(presetLabel, 0, 0);
+            row.Controls.Add(_presetCombo, 1, 0);
+            row.Controls.Add(previewBtn, 2, 0);
+            row.Controls.Add(applyBtn, 3, 0);
+            row.Controls.Add(resetBtn, 4, 0);
 
-            var leftCol = new FlowLayoutPanel
+            return row;
+        }
+
+        private Control BuildIndentControls()
+        {
+            var p = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
+            p.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55f));
+            p.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45f));
+
+            _indentStyleCombo = MakeCombo(new[] { "spaces", "tabs" }, 0);
+            _indentSize = MakeNum(1, 16, 4);
+            _continuationIndentSize = MakeNum(1, 16, 8);
+
+            AddRow(p, Strings.Get("Settings.IndentStyle"), _indentStyleCombo);
+            AddRow(p, Strings.Get("Settings.IndentSize"), _indentSize);
+            AddRow(p, Strings.Get("Settings.ContinuationIndent"), _continuationIndentSize);
+            return p;
+        }
+
+        private Control BuildSpacingControls()
+        {
+            var p = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false };
+            _spaceAroundOperators = MakeCheck(Strings.Get("Settings.SpaceAroundOperators"), true);
+            _spaceAfterComma = MakeCheck(Strings.Get("Settings.SpaceAfterComma"), true);
+            _spaceBeforeSemicolon = MakeCheck(Strings.Get("Settings.SpaceBeforeSemicolon"), false);
+            _spaceAfterColon = MakeCheck(Strings.Get("Settings.SpaceAfterColon"), true);
+            p.Controls.AddRange(new Control[] { _spaceAroundOperators, _spaceAfterComma, _spaceBeforeSemicolon, _spaceAfterColon });
+            return p;
+        }
+
+        private Control BuildKeywordControls()
+        {
+            var p = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
+            p.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55f));
+            p.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45f));
+
+            _newLineStyleCombo = MakeCombo(new[] { "crlf", "lf", "cr" }, 0);
+            _keywordCasingCombo = MakeCombo(new[] { "upper", "lower", "pascal", "original" }, 0);
+            _braceStyleCombo = MakeCombo(new[] { "allman", "kr" }, 0);
+
+            AddRow(p, Strings.Get("Settings.Newline"), _newLineStyleCombo);
+            AddRow(p, Strings.Get("Settings.KeywordCasing"), _keywordCasingCombo);
+            AddRow(p, Strings.Get("Settings.BraceStyle"), _braceStyleCombo);
+            return p;
+        }
+
+        private Control BuildLineControls()
+        {
+            var p = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
+            p.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55f));
+            p.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45f));
+
+            _alignAssignments = MakeCheck(Strings.Get("Settings.AlignAssignments"), true);
+            _alignVariableDeclarations = MakeCheck(Strings.Get("Settings.AlignDeclarations"), true);
+            _maxLineLength = MakeNum(40, 200, 120);
+            _emptyLinesBetweenPOUs = MakeNum(0, 10, 2);
+            _emptyLinesBetweenVarSections = MakeNum(0, 10, 1);
+
+            AddRow(p, _alignAssignments);
+            AddRow(p, _alignVariableDeclarations);
+            AddRow(p, Strings.Get("Settings.MaxLineLength"), _maxLineLength);
+            AddRow(p, Strings.Get("Settings.EmptyLinesBetweenPOUs"), _emptyLinesBetweenPOUs);
+            AddRow(p, Strings.Get("Settings.EmptyLinesBetweenVarSections"), _emptyLinesBetweenVarSections);
+            return p;
+        }
+
+        private Control BuildBehaviorControls()
+        {
+            var p = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false };
+            _keepSingleLineBlocks = MakeCheck(Strings.Get("Settings.KeepSingleLineBlocks"), false);
+            _formatOnSave = MakeCheck(Strings.Get("Settings.FormatOnSave"), true);
+            p.Controls.AddRange(new Control[] { _keepSingleLineBlocks, _formatOnSave });
+            return p;
+        }
+
+        private Control BuildGeneralControls()
+        {
+            var p = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
+            p.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55f));
+            p.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45f));
+
+            _startWithWindows = MakeCheck(Strings.Get("Settings.StartWithWindows"), false);
+            _startWithWindows.CheckedChanged += (s, e) =>
             {
-                Left = 0, Top = 0, Width = 390, Height = 260,
-                FlowDirection = FlowDirection.TopDown,
-                WrapContents = false,
-                AutoScroll = true,
-                Padding = new Padding(0),
-                Margin = new Padding(0)
+                if (_startWithWindows.Checked) AutoStart.Enable();
+                else AutoStart.Disable();
             };
-            leftCol.Controls.Add(MakeGroup("Indentation", BuildIndentControls()));
-            leftCol.Controls.Add(MakeGroup("Newlines & Keywords", BuildKeywordControls()));
-            leftCol.Controls.Add(MakeGroup("Spacing", BuildSpacingControls()));
 
-            var rightCol = new FlowLayoutPanel
+            _languageCombo = new ComboBox
             {
-                Left = 400, Top = 0, Width = 390, Height = 260,
-                FlowDirection = FlowDirection.TopDown,
-                WrapContents = false,
-                AutoScroll = true,
-                Padding = new Padding(0),
-                Margin = new Padding(0)
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 3, 0, 3),
             };
-            rightCol.Controls.Add(MakeGroup("Alignment & Limits", BuildAlignmentControls()));
-            rightCol.Controls.Add(MakeGroup("Behavior", BuildBehaviorControls()));
+            _languageCombo.Items.Add("English");
+            _languageCombo.Items.Add("Deutsch");
+            _languageCombo.SelectedIndex = 0;
+            _languageCombo.SelectedIndexChanged += (s, e) =>
+            {
+                string lang = _languageCombo.SelectedIndex == 1 ? "de" : "en";
+                Strings.ApplyLanguage(lang);
+            };
 
-            colsPanel.Controls.Add(leftCol);
-            colsPanel.Controls.Add(rightCol);
-            topFlow.Controls.Add(colsPanel);
+            AddRow(p, _startWithWindows);
+            AddRow(p, Strings.Get("Settings.Language"), _languageCombo);
 
-            split.Panel1.Controls.Add(topFlow);
+            _restartNoteLabel = new Label
+            {
+                Text = Strings.Get("Settings.RestartNote"),
+                AutoSize = true,
+                ForeColor = SystemColors.ControlDarkDark,
+                Margin = new Padding(0, 4, 0, 0),
+            };
+            p.SetColumnSpan(_restartNoteLabel, 2);
+            int ri = p.RowCount++;
+            p.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            p.Controls.Add(_restartNoteLabel, 0, ri);
 
-            // --- Bottom panel: preview ---
-            var previewOuter = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8, 4, 8, 4) };
-            var previewLabel = new Label { Dock = DockStyle.Top, Height = 24, Text = "Preview", Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), Padding = new Padding(0, 2, 0, 0) };
+            return p;
+        }
+
+        private Control BuildPreviewPanel()
+        {
+            var outer = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3,
+                Padding = new Padding(4),
+            };
+            outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+            var previewLabel = new Label
+            {
+                Text = Strings.Get("Settings.Button.Preview"),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+            };
+            outer.Controls.Add(previewLabel, 0, 0);
+
+            _savedAtLabel = new Label
+            {
+                Text = Strings.Get("Settings.NeverSaved"),
+                AutoSize = true,
+                ForeColor = SystemColors.ControlDarkDark,
+            };
+            outer.Controls.Add(_savedAtLabel, 0, 1);
+
             _previewBox = new RichTextBox
             {
                 Dock = DockStyle.Fill,
@@ -142,13 +393,12 @@ END_IF";
                 ReadOnly = true,
                 BackColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle,
-                WordWrap = false
+                WordWrap = false,
+                MaxLength = 0,
             };
-            previewOuter.Controls.Add(_previewBox);
-            previewOuter.Controls.Add(previewLabel);
-            split.Panel2.Controls.Add(previewOuter);
+            outer.Controls.Add(_previewBox, 0, 2);
 
-            Controls.Add(split);
+            return outer;
         }
 
         private static GroupBox MakeGroup(string title, Control inner)
@@ -156,139 +406,147 @@ END_IF";
             var gb = new GroupBox
             {
                 Text = title,
-                Width = 380,
-                Height = inner.Height + 26,
-                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
-                Padding = new Padding(8, 18, 8, 4),
-                Margin = new Padding(0, 2, 0, 2)
+                Dock = DockStyle.Fill,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(8),
+                Margin = new Padding(4, 2, 4, 2),
             };
             inner.Dock = DockStyle.Fill;
             gb.Controls.Add(inner);
             return gb;
         }
 
-        private Control BuildIndentControls()
+        private static void AddRow(TableLayoutPanel p, string labelText, Control inner)
         {
-            var p = new Panel { Width = 360, Height = 98 };
-            p.Controls.Add(MakeRow("Indent style:", _indentStyleCombo = MakeCombo(new[] { "spaces", "tabs" }, 0), 0));
-            p.Controls.Add(MakeRow("Indent size:", _indentSize = MakeNum(1, 16, 4), 1));
-            p.Controls.Add(MakeRow("Continuation indent:", _continuationIndentSize = MakeNum(1, 16, 8), 2));
-            return p;
-        }
-
-        private Control BuildKeywordControls()
-        {
-            var p = new Panel { Width = 360, Height = 98 };
-            p.Controls.Add(MakeRow("Newline style:", _newLineStyleCombo = MakeCombo(new[] { "crlf", "lf", "cr" }, 0), 0));
-            p.Controls.Add(MakeRow("Keyword casing:", _keywordCasingCombo = MakeCombo(new[] { "upper", "lower", "pascal", "original" }, 0), 1));
-            p.Controls.Add(MakeRow("Brace style:", _braceStyleCombo = MakeCombo(new[] { "allman", "kr" }, 0), 2));
-            return p;
-        }
-
-        private Control BuildSpacingControls()
-        {
-            var p = new Panel { Width = 360, Height = 124 };
-            _spaceAroundOperators = MakeCheck("Spaces around operators", true);
-            _spaceAfterComma = MakeCheck("Space after comma", true);
-            _spaceBeforeSemicolon = MakeCheck("Space before semicolon", false);
-            _spaceAfterColon = MakeCheck("Space after colon", true);
-            p.Controls.AddRange(new Control[] { _spaceAroundOperators, _spaceAfterComma, _spaceBeforeSemicolon, _spaceAfterColon });
-            PositionChecks(p);
-            return p;
-        }
-
-        private Control BuildAlignmentControls()
-        {
-            var p = new Panel { Width = 360, Height = 158 };
-            _alignAssignments = MakeCheck("Align assignments", true);
-            _alignVariableDeclarations = MakeCheck("Align variable declarations", true);
-            p.Controls.Add(_alignAssignments);
-            p.Controls.Add(_alignVariableDeclarations);
-            p.Controls.Add(MakeRow("Max line length:", _maxLineLength = MakeNum(40, 200, 120), 2));
-            p.Controls.Add(MakeRow("Empty lines between POUs:", _emptyLinesBetweenPOUs = MakeNum(0, 10, 2), 3));
-            p.Controls.Add(MakeRow("Empty lines between VARs:", _emptyLinesBetweenVarSections = MakeNum(0, 10, 1), 4));
-            _alignAssignments.Top = 0; _alignAssignments.Left = 4;
-            _alignVariableDeclarations.Top = 26; _alignVariableDeclarations.Left = 4;
-            return p;
-        }
-
-        private Control BuildBehaviorControls()
-        {
-            var p = new Panel { Width = 360, Height = 95 };
-            _keepSingleLineBlocks = MakeCheck("Keep single-line blocks on one line", false);
-            _formatOnSave = MakeCheck("Format on save", true);
-            _startWithWindows = MakeCheck("Start with Windows", false);
-            p.Controls.AddRange(new Control[] { _keepSingleLineBlocks, _formatOnSave, _startWithWindows });
-            PositionChecks(p);
-            return p;
-        }
-
-        private static void PositionChecks(Panel p)
-        {
-            int y = 0;
-            foreach (Control c in p.Controls)
+            int rowIndex = p.RowCount++;
+            p.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var lbl = new Label
             {
-                if (c is CheckBox) { c.Top = y; c.Left = 4; y += 28; }
+                Text = labelText,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Margin = new Padding(0, 6, 6, 3),
+            };
+            p.Controls.Add(lbl, 0, rowIndex);
+            if (inner != null)
+            {
+                inner.Dock = DockStyle.Fill;
+                inner.Margin = new Padding(0, 3, 0, 3);
+                p.Controls.Add(inner, 1, rowIndex);
             }
         }
 
-        private static Control MakeRow(string labelText, Control inner, int row)
+        private static void AddRow(TableLayoutPanel p, CheckBox check)
         {
-            var rowPanel = new Panel { Top = row * 30, Left = 0, Width = 360, Height = 28 };
-            var lbl = new Label
-            {
-                Text = labelText, Left = 0, Top = 4, Width = 170,
-                AutoSize = false, Font = new Font("Segoe UI", 9f),
-                TextAlign = ContentAlignment.MiddleRight
-            };
-            inner.Left = 178; inner.Top = 2; inner.Font = new Font("Segoe UI", 9f);
-            rowPanel.Controls.Add(lbl);
-            rowPanel.Controls.Add(inner);
-            return rowPanel;
+            int rowIndex = p.RowCount++;
+            p.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            p.SetColumnSpan(check, 2);
+            check.Margin = new Padding(0, 3, 0, 3);
+            p.Controls.Add(check, 0, rowIndex);
         }
 
         private static ComboBox MakeCombo(string[] items, int idx)
         {
-            var cb = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 170, Height = 26 };
-            cb.Items.AddRange(items); cb.SelectedIndex = idx;
+            var cb = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 3, 0, 3),
+            };
+            cb.Items.AddRange(items);
+            cb.SelectedIndex = idx;
             return cb;
         }
 
         private static NumericUpDown MakeNum(int min, int max, int val)
         {
-            return new NumericUpDown { Minimum = min, Maximum = max, Value = val, Width = 80, Height = 26 };
+            return new NumericUpDown
+            {
+                Minimum = min,
+                Maximum = max,
+                Value = val,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 3, 0, 3),
+            };
         }
 
         private static CheckBox MakeCheck(string text, bool isChecked)
         {
-            return new CheckBox { Text = text, Checked = isChecked, Width = 350, Height = 26, Font = new Font("Segoe UI", 9f) };
+            return new CheckBox
+            {
+                Text = text,
+                Checked = isChecked,
+                AutoSize = true,
+                Margin = new Padding(0, 3, 0, 3),
+            };
         }
 
         private void OnPresetChanged(object? sender, EventArgs e)
         {
-            LoadFromConfig(FormattingConfiguration.FromPreset(_presetCombo.SelectedItem?.ToString() ?? "Default"));
+            string name = _presetCombo.SelectedIndex switch
+            {
+                1 => "Compact",
+                2 => "Expanded",
+                _ => "Default",
+            };
+            LoadFromConfig(FormattingConfiguration.FromPreset(name));
         }
 
         private void OnPreview(object? sender, EventArgs e)
         {
-            try { _previewBox.Text = new FormattingEngine(BuildConfig()).Format(SampleCode); }
-            catch (Exception ex) { _previewBox.Text = $"Preview error: {ex.Message}"; }
+            try
+            {
+                _previewBox.Text = new FormattingEngine(BuildConfig()).Format(SampleCode);
+            }
+            catch (Exception ex)
+            {
+                _previewBox.Text = Strings.Get("Settings.Preview.Error", ex.Message);
+            }
         }
 
         private void OnApply(object? sender, EventArgs e)
         {
             var config = BuildConfig();
-            SettingsManager.Save(config);
-            SettingsManager.Current = config;
-            if (_startWithWindows.Checked) AutoStart.Enable(); else AutoStart.Disable();
-            SettingsApplied?.Invoke(config);
+            var app = SettingsManager.App;
+            app.Formatting = config;
+            app.Language = Strings.Culture;
+            SettingsManager.SaveAppSettings(app);
+
+            if (_startWithWindows.Checked) AutoStart.Enable();
+            else AutoStart.Disable();
+
+            UpdateSavedAtLabel();
+            SafeInvokeSettingsApplied(config);
         }
 
         private void OnReset(object? sender, EventArgs e)
         {
+            var confirm = MessageBox.Show(
+                FindForm(),
+                Strings.Get("Settings.ResetConfirm.Text"),
+                Strings.Get("Settings.ResetConfirm.Title"),
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+            if (confirm != DialogResult.Yes) return;
+
             LoadFromConfig(FormattingConfiguration.Default);
-            SettingsManager.ResetToDefault();
             _presetCombo.SelectedIndex = 0;
+
+            var app = SettingsManager.App;
+            app.Formatting = FormattingConfiguration.Default;
+            SettingsManager.SaveAppSettings(app);
+            UpdateSavedAtLabel();
+        }
+
+        private void SafeInvokeSettingsApplied(FormattingConfiguration config)
+        {
+            try { SettingsApplied?.Invoke(config); }
+            catch (Exception ex)
+            {
+                STFormatter.Core.Configuration.HostLog.Append("SettingsPanel", $"SettingsApplied handler failed: {ex.Message}");
+            }
         }
 
         private FormattingConfiguration BuildConfig() => new FormattingConfiguration
@@ -331,6 +589,27 @@ END_IF";
             _emptyLinesBetweenVarSections.Value = c.EmptyLinesBetweenVarSections;
             _keepSingleLineBlocks.Checked = c.KeepSingleLineBlocks;
             _formatOnSave.Checked = c.FormatOnSave;
+        }
+
+        private void LoadFromAppSettings()
+        {
+            var app = SettingsManager.App;
+            _startWithWindows.Checked = AutoStart.IsEnabled();
+            _languageCombo.SelectedIndex = app.Language?.ToLowerInvariant() == "de" ? 1 : 0;
+        }
+
+        private void UpdateSavedAtLabel()
+        {
+            var app = SettingsManager.App;
+            if (app.LastSavedUtc is DateTime utc)
+            {
+                var local = utc.ToLocalTime();
+                _savedAtLabel.Text = Strings.Get("Settings.SavedAt", local.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.CurrentCulture));
+            }
+            else
+            {
+                _savedAtLabel.Text = Strings.Get("Settings.NeverSaved");
+            }
         }
     }
 }

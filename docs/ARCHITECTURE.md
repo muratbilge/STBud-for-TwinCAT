@@ -21,7 +21,6 @@ TwinCAT.STFormatter.sln
 |   +-- STFormatter.CLI/         net8.0                 Command-line interface
 |   +-- STFormatter.Host/        net462;net48/x86        TcXaeShell external Host
 |   +-- STFormatter.UI/          net462;net48/x86        Tray UI and diagnostics
-|   +-- STFormatter.Discover/    net48/x86               Developer-only COM probe, not in solution
 |
 +-- tests/
 |   +-- STFormatter.Core.Tests/  net8.0                  xUnit tests

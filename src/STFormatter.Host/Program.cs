@@ -39,9 +39,12 @@ internal class Program
         if (consoleHandle != IntPtr.Zero)
             ShowWindow(consoleHandle, SW_HIDE);
 
+        EnableHighDpiIfAvailable();
+
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
+        SettingsManager.EnsureLoaded();
         LogInit();
         Log("=== STFormatter.Host started ===");
 
@@ -101,6 +104,7 @@ internal class Program
             result[kvp.Key] = new InstanceInfo
             {
                 Connected = alive,
+                Title = kvp.Value.Title,
                 InjectedMenus = string.Join(", ", kvp.Value.InjectedMenus),
                 LastFormatTime = kvp.Value.LastFormatTime,
                 FormatCount = kvp.Value.FormatCount
@@ -163,6 +167,8 @@ internal class Program
                     _hostManager.InjectButtons(kvp.Value);
                 }
             }
+
+            _hostManager.RefreshAllTitles();
         }
         catch (Exception ex)
         {
@@ -411,6 +417,7 @@ internal class Program
             OriginalText = original,
             FormattedText = formatted,
             Pid = pid,
+            Title = inst?.Title ?? "",
             Success = success,
             Method = method
         };
@@ -541,21 +548,37 @@ internal class Program
 
     // --- Logging ---
 
-    private static string? _logPath;
+    private static void EnableHighDpiIfAvailable()
+    {
+        try
+        {
+            var setHighDpiMode = typeof(Application).GetMethod(
+                "SetHighDpiMode",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            var enumType = Type.GetType("System.Windows.Forms.HighDpiMode, System.Windows.Forms")
+                ?? Type.GetType("System.Windows.Forms.HighDpiMode");
+            if (setHighDpiMode != null && enumType != null)
+            {
+                var value = Enum.Parse(enumType, "SystemAware");
+                setHighDpiMode.Invoke(null, new[] { value });
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    // --- Logging ---
+
+    private static string _logPath = HostLog.Path;
 
     private static void LogInit()
     {
-        _logPath = Path.Combine(Path.GetTempPath(), "STFormatter_Host.log");
+        _logPath = HostLog.Path;
     }
 
     internal static void Log(string message)
     {
-        try
-        {
-            if (_logPath != null)
-                File.AppendAllText(_logPath,
-                    $"[{DateTime.Now:HH:mm:ss.fff}] {message}{Environment.NewLine}");
-        }
-        catch { }
+        HostLog.Append("Host", message);
     }
 }

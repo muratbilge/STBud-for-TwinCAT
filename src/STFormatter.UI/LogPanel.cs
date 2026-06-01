@@ -12,15 +12,18 @@ namespace STFormatter.UI
         private Button _copyBtn;
         private Button _openBtn;
         private CheckBox _autoScrollCheck;
+        private FlowLayoutPanel _toolbar;
         private long _lastReadPosition;
+        private bool _firstRead = true;
         private readonly string _logPath;
         private readonly System.Windows.Forms.Timer _tailTimer;
 
         public LogPanel()
         {
-            _logPath = Path.Combine(Path.GetTempPath(), "STFormatter_Host.log");
+            _logPath = STFormatter.Core.Configuration.HostLog.Path;
             _lastReadPosition = 0;
             Dock = DockStyle.Fill;
+            AutoScaleMode = AutoScaleMode.Font;
             BuildUI();
 
             _tailTimer = new System.Windows.Forms.Timer { Interval = 500, Enabled = true };
@@ -32,6 +35,11 @@ namespace STFormatter.UI
             TailLog();
         }
 
+        public void RebuildUi()
+        {
+            BuildUI();
+        }
+
         private void TailLog()
         {
             try
@@ -40,6 +48,13 @@ namespace STFormatter.UI
 
                 using (var fs = new FileStream(_logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
+                    if (_firstRead)
+                    {
+                        _lastReadPosition = fs.Length;
+                        _firstRead = false;
+                        return;
+                    }
+
                     if (fs.Length < _lastReadPosition)
                         _lastReadPosition = 0;
 
@@ -68,24 +83,27 @@ namespace STFormatter.UI
 
         private void BuildUI()
         {
-            var toolbar = new Panel
+            Controls.Clear();
+
+            _toolbar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
-                Height = 40,
-                Padding = new Padding(8, 5, 8, 5)
+                AutoSize = true,
+                WrapContents = false,
+                Padding = new Padding(8, 5, 8, 5),
             };
 
-            _clearBtn = new Button { Text = "Clear", Left = 8, Top = 5, Width = 70, Height = 28, Font = new Font("Segoe UI", 9f) };
+            _clearBtn = new Button { Text = Strings.Get("Log.Clear"), AutoSize = true, Margin = new Padding(0, 0, 8, 0) };
             _clearBtn.Click += (s, e) => { _logBox.Clear(); };
 
-            _copyBtn = new Button { Text = "Copy All", Left = 88, Top = 5, Width = 85, Height = 28, Font = new Font("Segoe UI", 9f) };
+            _copyBtn = new Button { Text = Strings.Get("Log.CopyAll"), AutoSize = true, Margin = new Padding(0, 0, 8, 0) };
             _copyBtn.Click += (s, e) =>
             {
                 if (_logBox.TextLength > 0)
                     Clipboard.SetText(_logBox.Text);
             };
 
-            _openBtn = new Button { Text = "Open in Notepad", Left = 183, Top = 5, Width = 130, Height = 28, Font = new Font("Segoe UI", 9f) };
+            _openBtn = new Button { Text = Strings.Get("Log.Open"), AutoSize = true, Margin = new Padding(0, 0, 8, 0) };
             _openBtn.Click += (s, e) =>
             {
                 try
@@ -98,14 +116,16 @@ namespace STFormatter.UI
 
             _autoScrollCheck = new CheckBox
             {
-                Text = "Auto-scroll",
+                Text = Strings.Get("Log.AutoScroll"),
                 Checked = true,
-                Left = 330, Top = 8,
-                Width = 110, Height = 24,
-                Font = new Font("Segoe UI", 9f)
+                AutoSize = true,
+                Margin = new Padding(0, 3, 0, 3),
             };
 
-            toolbar.Controls.AddRange(new Control[] { _clearBtn, _copyBtn, _openBtn, _autoScrollCheck });
+            _toolbar.Controls.Add(_clearBtn);
+            _toolbar.Controls.Add(_copyBtn);
+            _toolbar.Controls.Add(_openBtn);
+            _toolbar.Controls.Add(_autoScrollCheck);
 
             _logBox = new RichTextBox
             {
@@ -116,11 +136,12 @@ namespace STFormatter.UI
                 ForeColor = Color.FromArgb(200, 200, 200),
                 BorderStyle = BorderStyle.None,
                 WordWrap = false,
-                DetectUrls = false
+                DetectUrls = false,
+                MaxLength = 0,
             };
 
             Controls.Add(_logBox);
-            Controls.Add(toolbar);
+            Controls.Add(_toolbar);
         }
 
         protected override void Dispose(bool disposing)

@@ -301,7 +301,7 @@ st_keep_single_line_blocks = false
 
 ---
 
-## 5. Common Workflows
+## 4. Common Workflows
 
 ### Format a Single POU in TcXaeShell
 
@@ -392,7 +392,7 @@ st_keep_single_line_blocks = true
 
 ---
 
-## 6. Example: Before and After
+## 5. Example: Before and After
 
 ### Before
 
