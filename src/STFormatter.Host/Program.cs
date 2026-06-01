@@ -50,10 +50,6 @@ internal class Program
             maintainAction: () => Maintain()
         );
         _mainForm = mainForm;
-        mainForm.Opacity = 0;
-        mainForm.Show();
-        mainForm.Hide();
-        mainForm.Opacity = 1;
 
         Application.Run(mainForm);
 

@@ -110,17 +110,21 @@ namespace STFormatter.UI
             FormClosing += OnFormClosing;
             Load += (s, e) =>
             {
-                Hide();
+                Visible = false;
                 _maintainAction?.Invoke();
             };
+            Visible = false;
+            WindowState = FormWindowState.Minimized;
+            ShowInTaskbar = false;
         }
 
         public void ShowWindow(int tabIndex)
         {
             if (_tabControl.TabPages.Count > tabIndex)
                 _tabControl.SelectedIndex = tabIndex;
-            Show();
+            ShowInTaskbar = true;
             WindowState = FormWindowState.Normal;
+            Show();
             Activate();
             BringToFront();
             RefreshActiveTab();
