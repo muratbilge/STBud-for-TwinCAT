@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 namespace STFormatter.Core.Formatting;
@@ -139,6 +140,57 @@ public sealed class TwinCatXmlFormatter
         if (hasVar && !hasBodyKeywords) return true;
         if (hasBodyKeywords && !hasVar) return false;
         if (hasProgram) return true;
+
+        if (!hasVar && !hasBodyKeywords)
+        {
+            return HasVariableDeclarationLines(text);
+        }
+
+        return false;
+    }
+
+    private static readonly string[] CommonTypes = new[]
+    {
+        "BOOL", "INT", "SINT", "DINT", "LINT", "USINT", "UINT", "UDINT", "ULINT",
+        "REAL", "LREAL", "STRING", "WSTRING", "TIME", "LTIME", "DATE", "TOD", "DT",
+        "BYTE", "WORD", "DWORD", "LWORD", "TON", "TOF", "CTU", "CTD", "CTUD",
+        "R_TRIG", "F_TRIG", "TP"
+    };
+
+    private static bool HasVariableDeclarationLines(string text)
+    {
+        var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+        if (lines.Length == 0) return false;
+
+        int declLines = 0;
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrEmpty(trimmed)) continue;
+
+            if (IsVariableDeclarationLine(trimmed))
+                declLines++;
+        }
+
+        int nonEmpty = lines.Count(l => !string.IsNullOrWhiteSpace(l));
+        return nonEmpty > 0 && declLines >= nonEmpty * 0.5;
+    }
+
+    private static bool IsVariableDeclarationLine(string line)
+    {
+        var match = Regex.Match(line, @"^\w+\s*:\s*(\w+)");
+        if (!match.Success) return false;
+
+        string typePart = match.Groups[1].Value.ToUpperInvariant();
+        foreach (var ct in CommonTypes)
+        {
+            if (typePart.StartsWith(ct))
+                return true;
+        }
+
+        if (line.Contains(';'))
+            return true;
+
         return false;
     }
 

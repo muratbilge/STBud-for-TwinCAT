@@ -404,4 +404,58 @@ public class ConfigurationPropertyTests
         Assert.Contains("(* block comment *)", result);
         Assert.DoesNotContain("*)y", result);
     }
+
+    [Fact]
+    public void LooksLikeDeclaration_BareVariableLines_Detected()
+    {
+        var text = "    Start         : BOOL;\r\n    Stop          : BOOL;\r\n    Fault         : BOOL;\r\n    InternalLatch : BOOL;";
+        Assert.True(TwinCatXmlFormatter.LooksLikeDeclaration(text));
+    }
+
+    [Fact]
+    public void LooksLikeDeclaration_BareVarLinesWithTwoPerLine_Detected()
+    {
+        var text = "    Fault         : BOOL;    InternalLatch : BOOL;\r\n    Running       : BOOL;";
+        Assert.True(TwinCatXmlFormatter.LooksLikeDeclaration(text));
+    }
+
+    [Fact]
+    public void LooksLikeDeclaration_ImplementationBody_NotDetected()
+    {
+        var text = "IF Start AND NOT Stop THEN\r\n    InternalLatch := TRUE;\r\nEND_IF";
+        Assert.False(TwinCatXmlFormatter.LooksLikeDeclaration(text));
+    }
+
+    [Fact]
+    public void LooksLikeDeclaration_EmptyText_IsDeclaration()
+    {
+        Assert.True(TwinCatXmlFormatter.LooksLikeDeclaration(""));
+        Assert.True(TwinCatXmlFormatter.LooksLikeDeclaration(null));
+    }
+
+    [Fact]
+    public void FormatDeclaration_BareVarLines_FormatsCorrectly()
+    {
+        var engine = new FormattingEngine();
+        var source = "    Start         : BOOL;\r\n    Stop          : BOOL;\r\n    Fault         : BOOL;\r\n    InternalLatch : BOOL;";
+        var result = engine.FormatDeclaration(source);
+        Assert.NotNull(result);
+        Assert.DoesNotContain("VAR_INPUT", result);
+        Assert.DoesNotContain("END_VAR", result);
+        Assert.Contains("Start", result);
+        Assert.Contains("BOOL", result);
+    }
+
+    [Fact]
+    public void FormatDeclaration_BareVarLinesWithMixedTypes_FormatsCorrectly()
+    {
+        var engine = new FormattingEngine();
+        var source = "    TON_Fill : TON;\r\n    LevelHigh : BOOL;\r\n    Mixer     : BOOL;\r\n    TON_Mix : TON;";
+        var result = engine.FormatDeclaration(source);
+        Assert.NotNull(result);
+        Assert.DoesNotContain("VAR_INPUT", result);
+        Assert.DoesNotContain("END_VAR", result);
+        Assert.Contains("TON_Fill", result);
+        Assert.Contains("BOOL", result);
+    }
 }

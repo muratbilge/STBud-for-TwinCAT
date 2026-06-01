@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using System.Text;
 using STFormatter.Core.Syntax;
 
@@ -96,6 +98,12 @@ public sealed class FormattingEngine
         if (string.IsNullOrWhiteSpace(varContent))
             return declaration;
 
+        bool hasVarSection = HasVarSectionKeyword(varContent);
+        if (!hasVarSection)
+        {
+            varContent = $"VAR_INPUT\n{varContent}\nEND_VAR";
+        }
+
         var wrapper = $"PROGRAM __DECL_WRAPPER__\n{varContent}\nEND_PROGRAM";
         var text = Text.SourceText.From(wrapper);
         var parser = new Parsing.Parser(text);
@@ -125,6 +133,11 @@ public sealed class FormattingEngine
                 var extracted = writer.ToString();
                 extracted = StripCommonIndent(extracted);
 
+                if (!hasVarSection)
+                {
+                    extracted = StripSyntheticVarWrapper(extracted);
+                }
+
                 if (!string.IsNullOrEmpty(pouHeader))
                     extracted = pouHeader + _config.GetNewLine() + extracted;
 
@@ -152,6 +165,11 @@ public sealed class FormattingEngine
 
         extractedFallback = StripCommonIndent(extractedFallback);
 
+        if (!hasVarSection)
+        {
+            extractedFallback = StripSyntheticVarWrapper(extractedFallback);
+        }
+
         if (!string.IsNullOrEmpty(pouHeader))
             extractedFallback = pouHeader + _config.GetNewLine() + extractedFallback;
 
@@ -167,6 +185,50 @@ public sealed class FormattingEngine
         "VAR_INPUT", "VAR_OUTPUT", "VAR_IN_OUT", "VAR_TEMP", "VAR_STAT",
         "VAR_GLOBAL", "VAR_ACCESS", "VAR_EXTERNAL", "VAR_CONFIG", "VAR_INST", "VAR"
     };
+
+    private static bool HasVarSectionKeyword(string text)
+    {
+        string upper = text.ToUpperInvariant();
+        foreach (var kw in VarSectionKeywords)
+        {
+            if (upper.Contains(kw))
+                return true;
+        }
+        return false;
+    }
+
+    private static string StripSyntheticVarWrapper(string extracted)
+    {
+        var lines = extracted.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        if (lines.Length < 3) return extracted;
+
+        string first = lines[0].Trim();
+        bool isVarStart = false;
+        foreach (var kw in VarSectionKeywords)
+        {
+            if (first == kw || first.StartsWith(kw + " "))
+            {
+                isVarStart = true;
+                break;
+            }
+        }
+        if (!isVarStart) return extracted;
+
+        int lastIdx = lines.Length - 1;
+        while (lastIdx > 0 && string.IsNullOrWhiteSpace(lines[lastIdx]))
+            lastIdx--;
+
+        string last = lines[lastIdx].Trim();
+        if (last != "END_VAR") return extracted;
+
+        var innerLines = new List<string>();
+        for (int i = 1; i < lastIdx; i++)
+            innerLines.Add(lines[i]);
+
+        var result = string.Join("\n", innerLines);
+        result = StripCommonIndent(result);
+        return result;
+    }
 
     private static void SplitPouHeaderAndVars(string declaration, out string pouHeader, out string varContent)
     {
