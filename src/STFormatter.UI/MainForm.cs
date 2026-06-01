@@ -51,7 +51,7 @@ namespace STFormatter.UI
 
             _settingsPanel = new SettingsPanel();
             _settingsPanel.SettingsApplied += OnSettingsApplied;
-            _instancesPanel = new InstancesPanel(getInstances, cleanup);
+            _instancesPanel = new InstancesPanel(getInstances, cleanup, maintainAction);
             _historyPanel = new HistoryPanel(_formatHistory);
             _logPanel = new LogPanel();
 

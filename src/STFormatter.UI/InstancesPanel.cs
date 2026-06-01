@@ -9,17 +9,21 @@ namespace STFormatter.UI
     {
         private ListView _listView;
         private Button _refreshBtn;
+        private Button _scanBtn;
         private Button _cleanupBtn;
         private Label _statusLabel;
         private readonly Func<IReadOnlyDictionary<int, InstanceInfo>> _getInstances;
         private readonly Action _cleanup;
+        private readonly Action? _scan;
 
         public InstancesPanel(
             Func<IReadOnlyDictionary<int, InstanceInfo>> getInstances,
-            Action cleanup)
+            Action cleanup,
+            Action? scan = null)
         {
             _getInstances = getInstances;
             _cleanup = cleanup;
+            _scan = scan;
             Dock = DockStyle.Fill;
             BuildUI();
         }
@@ -56,15 +60,27 @@ namespace STFormatter.UI
             _refreshBtn = new Button
             {
                 Text = "Refresh",
-                Left = 8, Top = 6, Width = 100, Height = 30,
+                Left = 8, Top = 6, Width = 85, Height = 30,
                 Font = new Font("Segoe UI", 9f)
             };
             _refreshBtn.Click += (s, e) => RefreshInstances();
 
+            _scanBtn = new Button
+            {
+                Text = "Scan",
+                Left = 100, Top = 6, Width = 85, Height = 30,
+                Font = new Font("Segoe UI", 9f)
+            };
+            _scanBtn.Click += (s, e) =>
+            {
+                _scan?.Invoke();
+                RefreshInstances();
+            };
+
             _cleanupBtn = new Button
             {
                 Text = "Cleanup Stale",
-                Left = 120, Top = 6, Width = 120, Height = 30,
+                Left = 192, Top = 6, Width = 120, Height = 30,
                 Font = new Font("Segoe UI", 9f)
             };
             _cleanupBtn.Click += (s, e) =>
@@ -74,6 +90,7 @@ namespace STFormatter.UI
             };
 
             toolbar.Controls.Add(_refreshBtn);
+            toolbar.Controls.Add(_scanBtn);
             toolbar.Controls.Add(_cleanupBtn);
 
             _listView = new ListView
