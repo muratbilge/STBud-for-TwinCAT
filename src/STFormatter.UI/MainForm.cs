@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using STFormatter.Core.Formatting;
 
@@ -21,7 +22,11 @@ namespace STFormatter.UI
         private readonly System.Windows.Forms.Timer _maintainTimer;
         private readonly System.Windows.Forms.Timer _refreshTimer;
         private readonly Action? _maintainAction;
+        private bool _allowVisible;
         internal static readonly Icon AppIcon = LoadAppIcon();
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         public ConcurrentBag<FormatRecord> FormatHistory => _formatHistory;
 
@@ -110,11 +115,8 @@ namespace STFormatter.UI
             FormClosing += OnFormClosing;
             Load += (s, e) =>
             {
-                Visible = false;
                 _maintainAction?.Invoke();
             };
-            Visible = false;
-            WindowState = FormWindowState.Minimized;
             ShowInTaskbar = false;
         }
 
@@ -122,11 +124,13 @@ namespace STFormatter.UI
         {
             if (_tabControl.TabPages.Count > tabIndex)
                 _tabControl.SelectedIndex = tabIndex;
+            _allowVisible = true;
             ShowInTaskbar = true;
-            WindowState = FormWindowState.Normal;
             Show();
+            WindowState = FormWindowState.Normal;
             Activate();
             BringToFront();
+            SetForegroundWindow(Handle);
             RefreshActiveTab();
         }
 
@@ -188,6 +192,8 @@ namespace STFormatter.UI
             if (e.CloseReason == CloseReason.UserClosing)
             {
                 e.Cancel = true;
+                _allowVisible = false;
+                ShowInTaskbar = false;
                 Hide();
             }
             else
@@ -208,6 +214,17 @@ namespace STFormatter.UI
                 _refreshTimer?.Dispose();
             }
             base.Dispose(disposing);
+        }
+
+        protected override void SetVisibleCore(bool value)
+        {
+            if (!_allowVisible && value)
+            {
+                base.SetVisibleCore(false);
+                return;
+            }
+
+            base.SetVisibleCore(value);
         }
     }
 }

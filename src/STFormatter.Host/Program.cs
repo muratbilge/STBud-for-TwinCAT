@@ -30,15 +30,15 @@ internal class Program
     [STAThread]
     static void Main(string[] args)
     {
+        var consoleHandle = GetConsoleWindow();
+        if (consoleHandle != IntPtr.Zero)
+            ShowWindow(consoleHandle, SW_HIDE);
+
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
         LogInit();
         Log("=== STFormatter.Host started ===");
-
-        var consoleHandle = GetConsoleWindow();
-        if (consoleHandle != IntPtr.Zero)
-            ShowWindow(consoleHandle, SW_HIDE);
 
         _hostManager = new HostManager();
 
