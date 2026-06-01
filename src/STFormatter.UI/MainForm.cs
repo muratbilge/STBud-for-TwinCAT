@@ -89,6 +89,7 @@ namespace STFormatter.UI
             _trayMenu.Items.Add("History", null, (s, e) => ShowWindow(2));
             _trayMenu.Items.Add("Log", null, (s, e) => ShowWindow(3));
             _trayMenu.Items.Add(new ToolStripSeparator());
+            _trayMenu.Items.Add("Restart", null, OnRestart);
             _trayMenu.Items.Add("Exit", null, OnExit);
 
             _trayIcon = new NotifyIcon
@@ -161,6 +162,16 @@ namespace STFormatter.UI
             _trayIcon.Visible = false;
             _maintainTimer.Stop();
             _refreshTimer.Stop();
+            Application.Exit();
+        }
+
+        private void OnRestart(object? sender, EventArgs e)
+        {
+            var exePath = Application.ExecutablePath;
+            _trayIcon.Visible = false;
+            _maintainTimer.Stop();
+            _refreshTimer.Stop();
+            System.Diagnostics.Process.Start(exePath);
             Application.Exit();
         }
 
