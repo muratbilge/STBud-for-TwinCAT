@@ -15,15 +15,18 @@ namespace STFormatter.UI
         private readonly Func<IReadOnlyDictionary<int, InstanceInfo>> _getInstances;
         private readonly Action _cleanup;
         private readonly Action? _scan;
+        private readonly Func<string>? _getStatus;
 
         public InstancesPanel(
             Func<IReadOnlyDictionary<int, InstanceInfo>> getInstances,
             Action cleanup,
-            Action? scan = null)
+            Action? scan = null,
+            Func<string>? getStatus = null)
         {
             _getInstances = getInstances;
             _cleanup = cleanup;
             _scan = scan;
+            _getStatus = getStatus;
             Dock = DockStyle.Fill;
             BuildUI();
         }
@@ -45,7 +48,9 @@ namespace STFormatter.UI
                 _listView.Items.Add(item);
             }
             _listView.EndUpdate();
-            _statusLabel.Text = $"{instances.Count} instance(s) connected";
+            _statusLabel.Text = instances.Count > 0
+                ? $"{instances.Count} instance(s) connected"
+                : _getStatus?.Invoke() ?? "No instances";
         }
 
         private void BuildUI()

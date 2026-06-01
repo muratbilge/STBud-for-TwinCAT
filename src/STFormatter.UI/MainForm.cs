@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Windows.Forms;
 using STFormatter.Core.Formatting;
 
@@ -21,7 +22,10 @@ namespace STFormatter.UI
         private readonly ConcurrentBag<FormatRecord> _formatHistory = new();
         private readonly System.Windows.Forms.Timer _maintainTimer;
         private readonly System.Windows.Forms.Timer _refreshTimer;
+        private readonly System.Windows.Forms.Timer _startupScanTimer;
         private readonly Action? _maintainAction;
+        private readonly int[] _startupScanDelays = { 500, 1000, 2000, 5000, 10000 };
+        private int _startupScanIndex;
         private bool _allowVisible;
         internal static readonly Icon AppIcon = LoadAppIcon();
 
@@ -43,7 +47,8 @@ namespace STFormatter.UI
         public MainForm(
             Func<IReadOnlyDictionary<int, InstanceInfo>> getInstances,
             Action cleanup,
-            Action? maintainAction = null)
+            Action? maintainAction = null,
+            Func<string>? getStatus = null)
         {
             _maintainAction = maintainAction;
 
@@ -56,7 +61,7 @@ namespace STFormatter.UI
 
             _settingsPanel = new SettingsPanel();
             _settingsPanel.SettingsApplied += OnSettingsApplied;
-            _instancesPanel = new InstancesPanel(getInstances, cleanup, maintainAction);
+            _instancesPanel = new InstancesPanel(getInstances, cleanup, maintainAction, getStatus);
             _historyPanel = new HistoryPanel(_formatHistory);
             _logPanel = new LogPanel();
 
@@ -112,6 +117,9 @@ namespace STFormatter.UI
             _refreshTimer = new System.Windows.Forms.Timer { Interval = 1000, Enabled = true };
             _refreshTimer.Tick += OnRefreshTick;
 
+            _startupScanTimer = new System.Windows.Forms.Timer { Interval = _startupScanDelays[0], Enabled = true };
+            _startupScanTimer.Tick += OnStartupScanTick;
+
             FormClosing += OnFormClosing;
             Load += (s, e) =>
             {
@@ -162,6 +170,25 @@ namespace STFormatter.UI
             catch { }
         }
 
+        private void OnStartupScanTick(object? sender, EventArgs e)
+        {
+            try
+            {
+                _maintainAction?.Invoke();
+                _instancesPanel.RefreshInstances();
+
+                _startupScanIndex++;
+                if (_startupScanIndex >= _startupScanDelays.Length)
+                {
+                    _startupScanTimer.Stop();
+                    return;
+                }
+
+                _startupScanTimer.Interval = _startupScanDelays[_startupScanIndex];
+            }
+            catch { }
+        }
+
         private void OnSettingsApplied(FormattingConfiguration config)
         {
             _trayIcon.BalloonTipTitle = "ST Formatter";
@@ -174,6 +201,7 @@ namespace STFormatter.UI
             _trayIcon.Visible = false;
             _maintainTimer.Stop();
             _refreshTimer.Stop();
+            _startupScanTimer.Stop();
             Application.Exit();
         }
 
@@ -183,8 +211,34 @@ namespace STFormatter.UI
             _trayIcon.Visible = false;
             _maintainTimer.Stop();
             _refreshTimer.Stop();
-            System.Diagnostics.Process.Start(exePath);
+            _startupScanTimer.Stop();
+            StartReplacementHost(exePath);
             Application.Exit();
+        }
+
+        private static void StartReplacementHost(string exePath)
+        {
+            if (IsElevated())
+            {
+                System.Diagnostics.Process.Start("explorer.exe", "\"" + exePath + "\"");
+                return;
+            }
+
+            System.Diagnostics.Process.Start(exePath);
+        }
+
+        private static bool IsElevated()
+        {
+            try
+            {
+                using var identity = WindowsIdentity.GetCurrent();
+                var principal = new WindowsPrincipal(identity);
+                return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void OnFormClosing(object? sender, FormClosingEventArgs e)
@@ -201,6 +255,7 @@ namespace STFormatter.UI
                 _trayIcon.Visible = false;
                 _maintainTimer.Stop();
                 _refreshTimer.Stop();
+                _startupScanTimer.Stop();
             }
         }
 
@@ -212,6 +267,7 @@ namespace STFormatter.UI
                 _trayMenu?.Dispose();
                 _maintainTimer?.Dispose();
                 _refreshTimer?.Dispose();
+                _startupScanTimer?.Dispose();
             }
             base.Dispose(disposing);
         }

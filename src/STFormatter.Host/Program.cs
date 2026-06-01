@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Threading;
 using System.Windows.Forms;
 using EnvDTE;
@@ -18,6 +20,9 @@ internal class Program
     private static HostManager? _hostManager;
     private static volatile bool _running = true;
     private static MainForm? _mainForm;
+    private static Mutex? _singleInstanceMutex;
+    private static string _lastScanStatus = "Not scanned yet";
+    private static DateTime _lastNoInstanceLog = DateTime.MinValue;
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -40,6 +45,15 @@ internal class Program
         LogInit();
         Log("=== STFormatter.Host started ===");
 
+        _singleInstanceMutex = new Mutex(true, "Global\\STFormatter.Host", out bool createdNew);
+        if (!createdNew)
+        {
+            Log("Another STFormatter.Host instance is already running; exiting duplicate process");
+            return;
+        }
+
+        LogHostEnvironment();
+
         _hostManager = new HostManager();
 
         Maintain();
@@ -47,7 +61,8 @@ internal class Program
         var mainForm = new MainForm(
             getInstances: () => GetInstanceInfos(),
             cleanup: () => CleanupStaleInstances(),
-            maintainAction: () => Maintain()
+            maintainAction: () => Maintain(),
+            getStatus: () => _lastScanStatus
         );
         _mainForm = mainForm;
 
@@ -55,6 +70,24 @@ internal class Program
 
         Log("Host shutting down");
         Shutdown();
+        _singleInstanceMutex?.ReleaseMutex();
+        _singleInstanceMutex?.Dispose();
+    }
+
+    private static void LogHostEnvironment()
+    {
+        try
+        {
+            using var identity = WindowsIdentity.GetCurrent();
+            var principal = new WindowsPrincipal(identity);
+            bool elevated = principal.IsInRole(WindowsBuiltInRole.Administrator);
+            using var current = System.Diagnostics.Process.GetCurrentProcess();
+            Log($"Environment: pid={current.Id}, session={current.SessionId}, elevated={elevated}, user='{identity.Name}', exe='{Application.ExecutablePath}'");
+        }
+        catch (Exception ex)
+        {
+            Log($"Environment: failed to inspect elevation/session: {ex.Message}");
+        }
     }
 
     private static IReadOnlyDictionary<int, InstanceInfo> GetInstanceInfos()
@@ -110,6 +143,16 @@ internal class Program
                 };
 
                 _hostManager.InjectButtons(instance);
+                _lastScanStatus = $"Connected to TcXaeShell PID {pid}";
+            }
+            else if (_hostManager.InstanceCount == 0)
+            {
+                _lastScanStatus = _hostManager.GetScanDiagnostics();
+                if ((DateTime.Now - _lastNoInstanceLog).TotalSeconds >= 10)
+                {
+                    Log($"Scan: {_lastScanStatus}");
+                    _lastNoInstanceLog = DateTime.Now;
+                }
             }
 
             var snapshot = _hostManager.GetAllInstances();

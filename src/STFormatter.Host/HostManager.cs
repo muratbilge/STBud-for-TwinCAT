@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
@@ -210,6 +211,73 @@ internal sealed class HostManager
         Marshal.ReleaseComObject(rot);
 
         return result;
+    }
+
+    public string GetScanDiagnostics()
+    {
+        int processCount = 0;
+        string processPids = "none";
+        try
+        {
+            var processes = System.Diagnostics.Process.GetProcessesByName(TcXaeShellVersionProfile.VS2017.ProcessName);
+            processCount = processes.Length;
+            if (processes.Length > 0)
+                processPids = string.Join(", ", Array.ConvertAll(processes, p => p.Id.ToString()));
+        }
+        catch { }
+
+        int rotDteCount = 0;
+        int tcXaeRotCount = 0;
+        var tcXaeMonikers = new List<string>();
+
+        try
+        {
+            int hr = Ole32.GetRunningObjectTable(0, out IRunningObjectTable rot);
+            if (hr != 0)
+                return $"TcXaeShell processes={processCount} ({processPids}); ROT unavailable hr=0x{hr:X8}";
+
+            rot.EnumRunning(out IEnumMoniker enumMoniker);
+            Ole32.CreateBindCtx(0, out IBindCtx bindCtx);
+
+            var monikers = new IMoniker[1];
+            IntPtr fetched = IntPtr.Zero;
+            while (enumMoniker.Next(1, monikers, fetched) == 0)
+            {
+                try
+                {
+                    monikers[0].GetDisplayName(bindCtx, null, out string displayName);
+                    if (displayName.IndexOf("DTE", StringComparison.OrdinalIgnoreCase) >= 0)
+                        rotDteCount++;
+
+                    if (TcXaeShellVersionProfile.DetectFromRotMoniker(displayName) != null)
+                    {
+                        tcXaeRotCount++;
+                        if (tcXaeMonikers.Count < 3)
+                            tcXaeMonikers.Add(displayName);
+                    }
+                }
+                catch { }
+                finally
+                {
+                    if (monikers[0] != null)
+                        Marshal.ReleaseComObject(monikers[0]);
+                }
+            }
+
+            Marshal.ReleaseComObject(enumMoniker);
+            Marshal.ReleaseComObject(bindCtx);
+            Marshal.ReleaseComObject(rot);
+        }
+        catch (Exception ex)
+        {
+            return $"TcXaeShell processes={processCount} ({processPids}); ROT diagnostics failed: {ex.Message}";
+        }
+
+        string monikerSummary = tcXaeMonikers.Count > 0 ? string.Join(" | ", tcXaeMonikers) : "none";
+        if (processCount > 0 && tcXaeRotCount == 0)
+            return $"TcXaeShell process found ({processPids}), but no TcXaeShell DTE ROT moniker is visible. Likely elevation/session mismatch or TcXaeShell not ready. DTE ROT entries={rotDteCount}";
+
+        return $"TcXaeShell processes={processCount} ({processPids}); TcXaeShell ROT entries={tcXaeRotCount}; DTE ROT entries={rotDteCount}; monikers={monikerSummary}";
     }
 
     public bool IsInstanceAlive(int pid)
