@@ -466,7 +466,14 @@ internal static class LiveEditor
 
                 string? formatted;
                 if (isDecl)
-                    formatted = engine.Format(currentText);
+                {
+                    formatted = engine.FormatDeclaration(currentText);
+                    if (string.IsNullOrEmpty(formatted) || formatted == currentText)
+                    {
+                        Log("TryFormatViaExecuteCommand: FormatDeclaration failed or unchanged, trying Format as fallback");
+                        formatted = engine.Format(currentText);
+                    }
+                }
                 else
                     formatted = engine.FormatBody(currentText);
 

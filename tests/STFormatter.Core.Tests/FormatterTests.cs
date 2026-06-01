@@ -15,9 +15,9 @@ END_VAR
 END_PROGRAM";
 
         var expected = @"PROGRAM MainProgram
-    VAR
-        counter : INT := 0;
-    END_VAR
+VAR
+    counter : INT := 0;
+END_VAR
 END_PROGRAM
 ";
 
@@ -113,9 +113,9 @@ END_VAR
 END_PROGRAM";
 
         var expected = @"PROGRAM Test
-    VAR
-        values : ARRAY[0..9] OF INT;
-    END_VAR
+VAR
+    values : ARRAY[0..9] OF INT;
+END_VAR
 END_PROGRAM
 ";
 
@@ -161,6 +161,54 @@ END_PROGRAM
         var result = engine.Format(source);
 
         Assert.Equal(expected.NormalizeLineEndings(), result.NormalizeLineEndings());
+    }
+    [Fact]
+    public void Formatter_InlineComment_StaysOnSameLine()
+    {
+        var engine = new FormattingEngine();
+        var source = "PROGRAM Test\nVAR\nx:INT; // comment\ny:INT;\nEND_VAR\nEND_PROGRAM";
+        var result = engine.Format(source);
+        Assert.Contains("x : INT;", result);
+        Assert.Contains("// comment", result);
+        var lines = result.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        var commentLine = lines.FirstOrDefault(l => l.Contains("// comment"));
+        Assert.NotNull(commentLine);
+        Assert.True(commentLine.Contains("INT"), "Comment should be on same line as the variable declaration");
+    }
+
+    [Fact]
+    public void Formatter_VarSectionsAtPouLevel()
+    {
+        var engine = new FormattingEngine();
+        var source = "FUNCTION_BLOCK Test\nVAR_INPUT\nx:INT;\nEND_VAR\nEND_FUNCTION_BLOCK";
+        var result = engine.Format(source);
+        var lines = result.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        Assert.Equal("VAR_INPUT", lines[1]);
+        Assert.Equal("END_VAR", lines[3]);
+        Assert.True(!lines[1].StartsWith(" ") && !lines[1].StartsWith("\t"),
+            "VAR_INPUT should not be indented");
+    }
+
+    [Fact]
+    public void Formatter_MethodReturnType()
+    {
+        var engine = new FormattingEngine();
+        var source = "METHOD FB_init : BOOL\nVAR_INPUT\nx:INT;\nEND_VAR\nEND_METHOD";
+        var result = engine.Format(source);
+        Assert.Contains("METHOD", result);
+        Assert.Contains("FB_init", result);
+        Assert.Contains(": BOOL", result);
+        Assert.DoesNotContain(":BOOL", result);
+    }
+
+    [Fact]
+    public void Formatter_OutputArgument_NoValue()
+    {
+        var engine = new FormattingEngine();
+        var source = "PROGRAM Test\nfbtest(in := 112.1, out =>);\nEND_PROGRAM";
+        var result = engine.Format(source);
+        Assert.Contains("=>", result);
+        Assert.DoesNotContain("= >", result);
     }
 }
 

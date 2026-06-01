@@ -205,7 +205,15 @@ public sealed class Parser
         var access = TryMatchAccessModifier();
         var methodKeyword = MatchToken(SyntaxKind.MethodKeyword);
         var name = MatchToken(SyntaxKind.Identifier);
-        var returnType = ParseOptionalReturnType();
+
+        SyntaxToken? colon = null;
+        SyntaxNode? returnType = null;
+        if (Current.Kind == SyntaxKind.Colon)
+        {
+            colon = MatchToken(SyntaxKind.Colon);
+            returnType = ParseType();
+        }
+
         var varSections = ParseVarSections();
         var body = ParseStatementList();
         var endKeyword = MatchToken(SyntaxKind.EndMethodKeyword);
@@ -217,7 +225,9 @@ public sealed class Parser
         if (returnType != null) children.Add(returnType);
         children.Add(body);
 
-        var tokens = new List<SyntaxToken> { methodKeyword, name, endKeyword };
+        var tokens = new List<SyntaxToken> { methodKeyword, name };
+        if (colon != null) tokens.Add(colon);
+        tokens.Add(endKeyword);
         if (access != null) tokens.Insert(0, access);
         if (endName != null) tokens.Add(endName);
 
@@ -409,7 +419,15 @@ public sealed class Parser
         var start = Current.Span.Start;
         var methodKeyword = MatchToken(SyntaxKind.MethodKeyword);
         var name = MatchToken(SyntaxKind.Identifier);
-        var returnType = ParseOptionalReturnType();
+
+        SyntaxToken? colon = null;
+        SyntaxNode? returnType = null;
+        if (Current.Kind == SyntaxKind.Colon)
+        {
+            colon = MatchToken(SyntaxKind.Colon);
+            returnType = ParseType();
+        }
+
         var varSections = ParseVarSections();
         var endKeyword = MatchToken(SyntaxKind.EndMethodKeyword);
 
@@ -418,8 +436,11 @@ public sealed class Parser
         children.AddRange(varSections);
         if (returnType != null) children.Add(returnType);
 
-        return SyntaxFactory.Node(SyntaxKind.MethodDeclaration, span, children,
-            new[] { methodKeyword, name, endKeyword });
+        var tokens = new List<SyntaxToken> { methodKeyword, name };
+        if (colon != null) tokens.Add(colon);
+        tokens.Add(endKeyword);
+
+        return SyntaxFactory.Node(SyntaxKind.MethodDeclaration, span, children, tokens);
     }
 
     private ImmutableArray<SyntaxNode> ParseOptionalAttributes()
@@ -1457,6 +1478,22 @@ public sealed class Parser
             var span = TextSpan.FromBounds(start, value.Span.End);
             return SyntaxFactory.Node(SyntaxKind.NamedArgument, span,
                 new[] { expr, value }, new[] { op });
+        }
+        else if (Current.Kind == SyntaxKind.ArrowOperator)
+        {
+            var arrow = NextToken();
+            if (Current.Kind != SyntaxKind.CloseParen &&
+                Current.Kind != SyntaxKind.Comma &&
+                Current.Kind != SyntaxKind.Semicolon)
+            {
+                var value = ParseExpression();
+                var span2 = TextSpan.FromBounds(start, value.Span.End);
+                return SyntaxFactory.Node(SyntaxKind.NamedArgument, span2,
+                    new[] { expr, value }, new[] { arrow });
+            }
+            var span = TextSpan.FromBounds(start, arrow.Span.End);
+            return SyntaxFactory.Node(SyntaxKind.NamedArgument, span,
+                new[] { expr }, new[] { arrow });
         }
 
         return SyntaxFactory.Node(SyntaxKind.Argument, expr.Span, new[] { expr });

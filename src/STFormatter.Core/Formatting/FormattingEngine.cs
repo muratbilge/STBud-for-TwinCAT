@@ -89,7 +89,14 @@ public sealed class FormattingEngine
         if (string.IsNullOrWhiteSpace(declaration))
             return declaration;
 
-        var wrapper = $"PROGRAM __DECL_WRAPPER__\n{declaration}\nEND_PROGRAM";
+        string pouHeader;
+        string varContent;
+        SplitPouHeaderAndVars(declaration, out pouHeader, out varContent);
+
+        if (string.IsNullOrWhiteSpace(varContent))
+            return declaration;
+
+        var wrapper = $"PROGRAM __DECL_WRAPPER__\n{varContent}\nEND_PROGRAM";
         var text = Text.SourceText.From(wrapper);
         var parser = new Parsing.Parser(text);
         var tree = parser.Parse();
@@ -97,25 +104,29 @@ public sealed class FormattingEngine
         var writer = new FormattingWriter(_config);
         var visitor = new FormattingVisitor(writer, _config);
 
-        // Find the declaration sections inside the wrapper PROGRAM
         var pouDecl = tree.Root.ChildNodes.FirstOrDefault();
         if (pouDecl != null)
         {
-            // Look for VarSection child nodes
-            bool visitedAny = false;
-            foreach (var child in pouDecl.ChildNodes)
+            var varSections = pouDecl.ChildNodes.Where(n => n.Kind == SyntaxKind.VarSection).ToList();
+            if (varSections.Count > 0)
             {
-                if (child.Kind == SyntaxKind.VarSection)
+                for (var i = 0; i < varSections.Count; i++)
                 {
-                    visitor.Visit(child);
-                    visitedAny = true;
+                    visitor.Visit(varSections[i]);
+                    if (i < varSections.Count - 1)
+                    {
+                        if (_config.IsAllmanStyle())
+                            writer.WriteNewLine(_config.EmptyLinesBetweenVarSections);
+                        else
+                            writer.EnsureNewLine();
+                    }
                 }
-            }
 
-            if (visitedAny)
-            {
                 var extracted = writer.ToString();
                 extracted = StripCommonIndent(extracted);
+
+                if (!string.IsNullOrEmpty(pouHeader))
+                    extracted = pouHeader + _config.GetNewLine() + extracted;
 
                 var inputUsesCrLf = declaration.Contains("\r\n");
                 if (inputUsesCrLf && !extracted.Contains("\r\n"))
@@ -141,11 +152,60 @@ public sealed class FormattingEngine
 
         extractedFallback = StripCommonIndent(extractedFallback);
 
+        if (!string.IsNullOrEmpty(pouHeader))
+            extractedFallback = pouHeader + _config.GetNewLine() + extractedFallback;
+
         var usesCrLf = declaration.Contains("\r\n");
         if (usesCrLf && !extractedFallback.Contains("\r\n"))
             extractedFallback = extractedFallback.Replace("\n", "\r\n");
 
         return extractedFallback;
+    }
+
+    private static readonly string[] VarSectionKeywords = new[]
+    {
+        "VAR_INPUT", "VAR_OUTPUT", "VAR_IN_OUT", "VAR_TEMP", "VAR_STAT",
+        "VAR_GLOBAL", "VAR_ACCESS", "VAR_EXTERNAL", "VAR_CONFIG", "VAR_INST", "VAR"
+    };
+
+    private static void SplitPouHeaderAndVars(string declaration, out string pouHeader, out string varContent)
+    {
+        pouHeader = "";
+        varContent = declaration;
+
+        var splits = declaration.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        int varStartLine = -1;
+
+        for (int i = 0; i < splits.Length; i++)
+        {
+            var trimmed = splits[i].TrimStart();
+            if (string.IsNullOrEmpty(trimmed))
+                continue;
+
+            var upper = trimmed.ToUpperInvariant();
+            bool isVarStart = false;
+            foreach (var kw in VarSectionKeywords)
+            {
+                if (upper == kw || upper.StartsWith(kw + " "))
+                {
+                    isVarStart = true;
+                    break;
+                }
+            }
+
+            if (isVarStart)
+            {
+                varStartLine = i;
+                break;
+            }
+        }
+
+        if (varStartLine <= 0)
+            return;
+
+        var nl = declaration.Contains("\r\n") ? "\r\n" : "\n";
+        pouHeader = string.Join(nl, splits.Take(varStartLine));
+        varContent = string.Join(nl, splits.Skip(varStartLine));
     }
 
     private static string StripCommonIndent(string text)
@@ -218,6 +278,31 @@ internal sealed class FormattingWriter
         set => _indentLevel = Math.Max(0, value);
     }
 
+    public bool AtLineStart => _atLineStart;
+
+    public void UndoLastNewLineAndIndent()
+    {
+        var nl = _config.GetNewLine();
+        int nlLen = nl.Length;
+        if (_builder.Length < nlLen)
+            return;
+
+        int pos = _builder.Length;
+        if (nlLen == 2 && pos >= 2 && _builder[pos - 2] == '\r' && _builder[pos - 1] == '\n')
+            pos -= 2;
+        else if (pos >= 1 && _builder[pos - 1] == '\n')
+            pos -= 1;
+        else
+            return;
+
+        while (pos > 0 && (_builder[pos - 1] == ' ' || _builder[pos - 1] == '\t'))
+            pos--;
+
+        _builder.Length = pos;
+        _atLineStart = false;
+        _currentLineLength = 0;
+    }
+
     public void WriteToken(SyntaxToken token, string? overrideText = null)
     {
         var text = overrideText ?? token.Text;
@@ -259,7 +344,6 @@ internal sealed class FormattingWriter
     {
         if (trivia.IsLineBreak || trivia.IsWhitespace)
         {
-            // Skip original whitespace/line breaks - formatter controls spacing
             return;
         }
         else if (trivia.IsComment || trivia.IsPragma)
@@ -278,6 +362,9 @@ internal sealed class FormattingWriter
 
             _builder.Append(trivia.Text);
             _currentLineLength += trivia.Text.Length;
+
+            if (trivia.Kind == SyntaxKind.SingleLineCommentTrivia)
+                EnsureNewLine();
         }
         else
         {
@@ -573,9 +660,7 @@ internal sealed class FormattingVisitor
 
         _writer.EnsureNewLine();
 
-        _writer.IndentLevel++;
-
-        // Write variable sections
+        // Write variable sections at POU level (no extra indent)
         var varSections = nodes.Where(n => n.Kind == SyntaxKind.VarSection).ToList();
         for (var i = 0; i < varSections.Count; i++)
         {
@@ -588,6 +673,8 @@ internal sealed class FormattingVisitor
                     _writer.EnsureNewLine();
             }
         }
+
+        _writer.IndentLevel++;
 
         var bodyNode = nodes.FirstOrDefault(n => n.Kind == SyntaxKind.StatementList);
         var hasBodyStatements = bodyNode != null && bodyNode.ChildNodes.Length > 0;
@@ -636,8 +723,8 @@ internal sealed class FormattingVisitor
     {
         var tokens = node.ChildTokens.ToList();
         var declarations = node.ChildNodes.ToList();
+        bool isEmpty = !declarations.Any(d => d.Kind == SyntaxKind.VariableDeclaration);
 
-        // VAR keyword with optional modifiers
         WriteTokenWithCasing(tokens[0]);
         for (var i = 1; i < tokens.Count; i++)
         {
@@ -649,9 +736,19 @@ internal sealed class FormattingVisitor
         }
         _writer.EnsureNewLine();
 
+        if (isEmpty)
+        {
+            var endVar = tokens.FirstOrDefault(t => t.Kind == SyntaxKind.EndVarKeyword);
+            if (endVar != null)
+            {
+                WriteTokenWithCasing(endVar);
+                _writer.EnsureNewLine();
+            }
+            return;
+        }
+
         _writer.IndentLevel++;
 
-        // Compute alignment if enabled
         var alignment = _config.AlignVariableDeclarations ? ComputeVarAlignment(declarations) : null;
 
         foreach (var decl in declarations)
@@ -667,11 +764,10 @@ internal sealed class FormattingVisitor
         }
         _writer.IndentLevel--;
 
-        // END_VAR
-        var endVar = tokens.FirstOrDefault(t => t.Kind == SyntaxKind.EndVarKeyword);
-        if (endVar != null)
+        var endVar2 = tokens.FirstOrDefault(t => t.Kind == SyntaxKind.EndVarKeyword);
+        if (endVar2 != null)
         {
-            WriteTokenWithCasing(endVar);
+            WriteTokenWithCasing(endVar2);
             _writer.EnsureNewLine();
         }
     }
@@ -1558,9 +1654,12 @@ internal sealed class FormattingVisitor
         {
             Visit(node.ChildNodes[0]); // name
             _writer.WriteSpace();
-            WriteToken(node.ChildTokens[0]); // := or =
-            _writer.WriteSpace();
-            Visit(node.ChildNodes[1]); // value
+            WriteToken(node.ChildTokens[0]); // := or = or =>
+            if (node.ChildNodes.Length > 1)
+            {
+                _writer.WriteSpace();
+                Visit(node.ChildNodes[1]); // value (optional for =>)
+            }
         }
         else
         {
@@ -1708,18 +1807,50 @@ internal sealed class FormattingVisitor
     private void WriteLeadingTrivia(IEnumerable<SyntaxTrivia> triviaList)
     {
         SyntaxTrivia? lastTrivia = null;
+        bool prevWasLineBreak = false;
         foreach (var trivia in triviaList)
         {
+            if (trivia.IsLineBreak)
+            {
+                prevWasLineBreak = true;
+                lastTrivia = trivia;
+                continue;
+            }
+
+            if (trivia.IsWhitespace)
+            {
+                prevWasLineBreak = false;
+                lastTrivia = trivia;
+                continue;
+            }
+
+            if (prevWasLineBreak && (trivia.IsComment || trivia.IsPragma))
+            {
+                _writer.EnsureNewLine();
+            }
+
+            if (!prevWasLineBreak && trivia.Kind == SyntaxKind.SingleLineCommentTrivia && _writer.AtLineStart)
+            {
+                _writer.UndoLastNewLineAndIndent();
+                _writer.WriteSpace();
+            }
+
+            var wasLineBreak = prevWasLineBreak;
+            prevWasLineBreak = false;
             _writer.WriteTrivia(trivia);
             lastTrivia = trivia;
-            // If this is a region pragma, ensure it gets its own line after
+
+            if (trivia.Kind == SyntaxKind.MultiLineCommentTrivia && wasLineBreak)
+            {
+                _writer.EnsureNewLine();
+            }
+
             if (IsRegionPragma(trivia))
             {
                 _writer.EnsureNewLine();
             }
         }
 
-        // If the last trivia was a region pragma, ensure we start on a new line
         if (lastTrivia != null && IsRegionPragma(lastTrivia))
         {
             _writer.EnsureNewLine();

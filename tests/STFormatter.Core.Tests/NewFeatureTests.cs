@@ -238,4 +238,170 @@ public class ConfigurationPropertyTests
         Assert.Contains("GOTO", result.ToUpperInvariant());
         Assert.Contains("Skip", result);
     }
+
+    [Fact]
+    public void FormatDeclaration_WithPouHeader_NoEndKeyword()
+    {
+        var engine = new FormattingEngine();
+        var decl = "FUNCTION_BLOCK POU_1\nVAR_INPUT\nEND_VAR\nVAR_OUTPUT\nEND_VAR\nVAR\naaa: BOOL;\nbbb: BOOL;\nEND_VAR";
+        var result = engine.FormatDeclaration(decl);
+        Assert.Contains("FUNCTION_BLOCK POU_1", result);
+        Assert.Contains("VAR_INPUT", result);
+        Assert.DoesNotContain("END_FUNCTION_BLOCK", result);
+
+        var lines = result.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        Assert.Equal("FUNCTION_BLOCK POU_1", lines[0]);
+        Assert.Equal("VAR_INPUT", lines[1]);
+        Assert.Equal("END_VAR", lines[2]);
+    }
+
+    [Fact]
+    public void FormatDeclaration_VarSectionsAtColumnZero()
+    {
+        var engine = new FormattingEngine();
+        var decl = "FUNCTION_BLOCK POU_1\nVAR_INPUT\nEND_VAR\nVAR_OUTPUT\nEND_VAR\nVAR\naaa: BOOL;\nbbb: BOOL;\nEND_VAR";
+        var result = engine.FormatDeclaration(decl);
+        var lines = result.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        foreach (var line in lines)
+        {
+            if (line.StartsWith("VAR") || line.StartsWith("END_VAR"))
+            {
+                Assert.False(line.StartsWith(" ") || line.StartsWith("\t"),
+                    $"VAR/END_VAR line should not be indented: '{line}'");
+            }
+        }
+    }
+
+    [Fact]
+    public void FormatDeclaration_EmptyVarSections_NoExtraSpacing()
+    {
+        var engine = new FormattingEngine();
+        var decl = "FUNCTION_BLOCK POU_1\nVAR_INPUT\nEND_VAR\nVAR_OUTPUT\nEND_VAR";
+        var result = engine.FormatDeclaration(decl);
+        Assert.Contains("VAR_INPUT", result);
+        Assert.Contains("END_VAR", result);
+        Assert.DoesNotContain("END_FUNCTION_BLOCK", result);
+    }
+
+    [Fact]
+    public void FormatDeclaration_BlankLinesBetweenVarSections()
+    {
+        var config = FormattingConfiguration.Default;
+        var engine = new FormattingEngine(config);
+        var decl = "FUNCTION_BLOCK POU_1\nVAR_INPUT\nEND_VAR\nVAR_OUTPUT\nEND_VAR\nVAR\naaa: BOOL;\nEND_VAR";
+        var result = engine.FormatDeclaration(decl);
+        Assert.Contains("FUNCTION_BLOCK POU_1", result);
+        Assert.Contains("VAR_INPUT", result);
+        Assert.Contains("VAR_OUTPUT", result);
+        Assert.DoesNotContain("END_FUNCTION_BLOCK", result);
+    }
+
+    [Fact]
+    public void FormatDeclaration_WithoutPouHeader_JustVarSections()
+    {
+        var engine = new FormattingEngine();
+        var decl = "VAR_INPUT\nx: INT;\nEND_VAR\nVAR\ny: BOOL;\nEND_VAR";
+        var result = engine.FormatDeclaration(decl);
+        Assert.Contains("VAR_INPUT", result);
+        Assert.Contains("END_VAR", result);
+        Assert.DoesNotContain("FUNCTION_BLOCK", result);
+    }
+
+    [Fact]
+    public void FormatDeclaration_PreservesCrlf()
+    {
+        var engine = new FormattingEngine();
+        var decl = "FUNCTION_BLOCK POU_1\r\nVAR_INPUT\r\nx: INT;\r\nEND_VAR";
+        var result = engine.FormatDeclaration(decl);
+        Assert.Contains("\r\n", result);
+    }
+
+    [Fact]
+    public void FormatDeclaration_ExactOutput_MixedVarSections()
+    {
+        var engine = new FormattingEngine();
+        var decl = "FUNCTION_BLOCK POU_1\nVAR_INPUT\nEND_VAR\nVAR_OUTPUT\nEND_VAR\nVAR\n\taaa: BOOL;\n\tbbb: BOOL;\nEND_VAR";
+        var result = engine.FormatDeclaration(decl);
+        var lines = result.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+
+        Assert.Equal("FUNCTION_BLOCK POU_1", lines[0]);
+        Assert.Equal("VAR_INPUT", lines[1]);
+        Assert.Equal("END_VAR", lines[2]);
+        Assert.Equal("", lines[3]);
+        Assert.Equal("VAR_OUTPUT", lines[4]);
+        Assert.Equal("END_VAR", lines[5]);
+        Assert.Equal("", lines[6]);
+        Assert.Equal("VAR", lines[7]);
+        Assert.Equal("    aaa : BOOL;", lines[8]);
+        Assert.Equal("    bbb : BOOL;", lines[9]);
+        Assert.Equal("END_VAR", lines[10]);
+    }
+
+    [Fact]
+    public void Formatter_OutputArgument_NoValue()
+    {
+        var engine = new FormattingEngine();
+        var source = "PROGRAM Test\nfbtest(in := 112.1, out =>);\nEND_PROGRAM";
+        var result = engine.Format(source);
+        Assert.Contains("=>", result);
+        Assert.DoesNotContain("= >", result);
+    }
+
+    [Fact]
+    public void Formatter_OutputArgument_WithValue()
+    {
+        var engine = new FormattingEngine();
+        var source = "PROGRAM Test\nfbtest(in := 112.1, out => myVar);\nEND_PROGRAM";
+        var result = engine.Format(source);
+        Assert.Contains("=>", result);
+        Assert.DoesNotContain("= >", result);
+        Assert.Contains("myVar", result);
+    }
+
+    [Fact]
+    public void Formatter_MethodWithReturnType()
+    {
+        var engine = new FormattingEngine();
+        var source = "METHOD FB_init : BOOL\nVAR_INPUT\nx:INT;\nEND_VAR\nEND_METHOD";
+        var result = engine.Format(source);
+        Assert.Contains("METHOD", result);
+        Assert.Contains("FB_init", result);
+        Assert.Contains(":", result);
+        Assert.Contains("BOOL", result);
+    }
+
+    [Fact]
+    public void Formatter_SingleLineComment_NotGluedToNextLine()
+    {
+        var engine = new FormattingEngine();
+        var source = "PROGRAM Test\nVAR\nx:INT; // comment\ny:INT;\nEND_VAR\nEND_PROGRAM";
+        var result = engine.Format(source);
+        var lines = result.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        bool foundCommentLine = false;
+        bool nextLineIsSeparate = false;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (lines[i].Contains("// comment"))
+            {
+                foundCommentLine = true;
+                if (i + 1 < lines.Length)
+                {
+                    nextLineIsSeparate = !lines[i + 1].StartsWith("//");
+                }
+                break;
+            }
+        }
+        Assert.True(foundCommentLine, "Comment should be in output");
+        Assert.True(nextLineIsSeparate, "Next declaration should be on a separate line");
+    }
+
+    [Fact]
+    public void Formatter_MultiLineComment_NotGluedToNextLine()
+    {
+        var engine = new FormattingEngine();
+        var source = "PROGRAM Test\nVAR\n(* block comment *)\ny:INT;\nEND_VAR\nEND_PROGRAM";
+        var result = engine.Format(source);
+        Assert.Contains("(* block comment *)", result);
+        Assert.DoesNotContain("*)y", result);
+    }
 }

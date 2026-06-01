@@ -82,8 +82,16 @@ public sealed class Lexer
                 _position++;
                 break;
             case '=':
-                _kind = SyntaxKind.Equal;
-                _position++;
+                if (next == '>')
+                {
+                    _kind = SyntaxKind.ArrowOperator;
+                    _position += 2;
+                }
+                else
+                {
+                    _kind = SyntaxKind.Equal;
+                    _position++;
+                }
                 break;
             case '<':
                 if (next == '>')

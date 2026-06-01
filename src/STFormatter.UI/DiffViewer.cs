@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace STFormatter.UI
@@ -9,70 +11,127 @@ namespace STFormatter.UI
     {
         private readonly RichTextBox _leftBox;
         private readonly RichTextBox _rightBox;
-        private readonly Label _titleLabel;
+        private readonly CheckBox _changesOnlyCheckbox;
+        private readonly Label _statsLabel;
+        private List<DiffLine> _allDiffLines;
+        private bool _syncingScroll;
 
         public DiffViewerForm(string title, string originalText, string formattedText)
         {
             Text = "ST Formatter - Diff";
-            Size = new Size(1000, 600);
-            MinimumSize = new Size(600, 400);
+            Size = new Size(1100, 700);
+            MinimumSize = new Size(800, 500);
             StartPosition = FormStartPosition.CenterParent;
             Font = new Font("Segoe UI", 9f);
 
-            _titleLabel = new Label
+            var topPanel = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 32,
+                Padding = new Padding(6, 4, 6, 0)
+            };
+
+            var titleLabel = new Label
+            {
+                Dock = DockStyle.Fill,
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                Text = title,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+
+            _statsLabel = new Label
+            {
+                Dock = DockStyle.Right,
+                Width = 380,
+                Font = new Font("Segoe UI", 9f),
+                TextAlign = ContentAlignment.MiddleRight,
+                ForeColor = Color.Gray
+            };
+
+            topPanel.Controls.Add(titleLabel);
+            topPanel.Controls.Add(_statsLabel);
+
+            var toolbarPanel = new Panel
             {
                 Dock = DockStyle.Top,
                 Height = 30,
-                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
-                Text = title,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(6, 4, 0, 0)
+                Padding = new Padding(6, 2, 6, 2),
+                BackColor = Color.FromArgb(245, 245, 245)
             };
+
+            _changesOnlyCheckbox = new CheckBox
+            {
+                Text = "Changes only",
+                Checked = false,
+                Dock = DockStyle.Left,
+                Font = new Font("Segoe UI", 9f)
+            };
+            _changesOnlyCheckbox.CheckedChanged += (s, e) => RenderDiff();
+
+            toolbarPanel.Controls.Add(_changesOnlyCheckbox);
 
             var splitContainer = new SplitContainer
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
-                SplitterDistance = 480,
-                SplitterWidth = 6,
+                SplitterDistance = 500,
+                SplitterWidth = 8,
                 BackColor = SystemColors.ControlDark
+            };
+            splitContainer.SizeChanged += (s, e) =>
+            {
+                splitContainer.SplitterDistance = splitContainer.Width / 2;
             };
 
             var leftPanel = new Panel { Dock = DockStyle.Fill };
-            var leftLabel = new Label
+            var leftHeader = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 26,
-                Text = "Original",
-                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(6, 4, 0, 0),
+                Height = 28,
                 BackColor = Color.FromArgb(255, 230, 230)
             };
+            var leftHeaderText = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = "  Original",
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleLeft,
+                BackColor = Color.FromArgb(255, 230, 230)
+            };
+            leftHeader.Controls.Add(leftHeaderText);
             _leftBox = CreateRichTextBox();
             leftPanel.Controls.Add(_leftBox);
-            leftPanel.Controls.Add(leftLabel);
+            leftPanel.Controls.Add(leftHeader);
 
             var rightPanel = new Panel { Dock = DockStyle.Fill };
-            var rightLabel = new Label
+            var rightHeader = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 26,
-                Text = "Formatted",
-                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(6, 4, 0, 0),
+                Height = 28,
                 BackColor = Color.FromArgb(230, 255, 230)
             };
+            var rightHeaderText = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = "  Formatted",
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleLeft,
+                BackColor = Color.FromArgb(230, 255, 230)
+            };
+            rightHeader.Controls.Add(rightHeaderText);
             _rightBox = CreateRichTextBox();
             rightPanel.Controls.Add(_rightBox);
-            rightPanel.Controls.Add(rightLabel);
+            rightPanel.Controls.Add(rightHeader);
 
             splitContainer.Panel1.Controls.Add(leftPanel);
             splitContainer.Panel2.Controls.Add(rightPanel);
 
             Controls.Add(splitContainer);
-            Controls.Add(_titleLabel);
+            Controls.Add(toolbarPanel);
+            Controls.Add(topPanel);
+
+            _leftBox.VScroll += OnLeftScroll;
+            _rightBox.VScroll += OnRightScroll;
 
             LoadDiff(originalText, formattedText);
         }
@@ -91,15 +150,109 @@ namespace STFormatter.UI
             };
         }
 
+        private void OnLeftScroll(object sender, EventArgs e)
+        {
+            if (_syncingScroll) return;
+            _syncingScroll = true;
+            int pos = NativeMethods.GetScrollPos(_leftBox.Handle, NativeMethods.SB_VERT);
+            NativeMethods.SetScrollPos(_rightBox.Handle, NativeMethods.SB_VERT, pos, true);
+            NativeMethods.SendMessage(_rightBox.Handle, NativeMethods.WM_VSCROLL, (IntPtr)NativeMethods.SB_THUMBPOSITION, IntPtr.Zero);
+            _syncingScroll = false;
+        }
+
+        private void OnRightScroll(object sender, EventArgs e)
+        {
+            if (_syncingScroll) return;
+            _syncingScroll = true;
+            int pos = NativeMethods.GetScrollPos(_rightBox.Handle, NativeMethods.SB_VERT);
+            NativeMethods.SetScrollPos(_leftBox.Handle, NativeMethods.SB_VERT, pos, true);
+            NativeMethods.SendMessage(_leftBox.Handle, NativeMethods.WM_VSCROLL, (IntPtr)NativeMethods.SB_THUMBPOSITION, IntPtr.Zero);
+            _syncingScroll = false;
+        }
+
+        private static class NativeMethods
+        {
+            public const int WM_VSCROLL = 0x115;
+            public const int SB_VERT = 1;
+            public const int SB_THUMBPOSITION = 4;
+
+            [DllImport("user32.dll")]
+            public static extern int GetScrollPos(IntPtr hWnd, int nBar);
+
+            [DllImport("user32.dll")]
+            public static extern int SetScrollPos(IntPtr hWnd, int nBar, int nPos, bool bRedraw);
+
+            [DllImport("user32.dll")]
+            public static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+        }
+
         private void LoadDiff(string original, string formatted)
         {
             string[] leftLines = SplitLines(original);
             string[] rightLines = SplitLines(formatted);
 
-            var diff = ComputeDiff(leftLines, rightLines);
+            _allDiffLines = ComputeDiff(leftLines, rightLines);
+            RenderDiff();
+        }
 
-            RenderSide(_leftBox, diff, Side.Left);
-            RenderSide(_rightBox, diff, Side.Right);
+        private void RenderDiff()
+        {
+            var diff = _allDiffLines;
+            bool changesOnly = _changesOnlyCheckbox.Checked;
+
+            var filtered = changesOnly
+                ? FilterToChanges(diff, 3)
+                : diff;
+
+            RenderSide(_leftBox, filtered, Side.Left);
+            RenderSide(_rightBox, filtered, Side.Right);
+
+            int added = diff.Count(d => d.Type == DiffType.Added);
+            int removed = diff.Count(d => d.Type == DiffType.Removed);
+            int changed = diff.Count(d => d.Type == DiffType.Changed);
+            _statsLabel.Text = $"  +{added}  -{removed}  ~{changed}  |  {diff.Count(d => d.Type == DiffType.Unchanged)} unchanged";
+        }
+
+        private static List<DiffLine> FilterToChanges(List<DiffLine> diff, int contextLines)
+        {
+            var result = new List<DiffLine>();
+            var changeIndices = new HashSet<int>();
+            for (int i = 0; i < diff.Count; i++)
+            {
+                if (diff[i].Type != DiffType.Unchanged)
+                    changeIndices.Add(i);
+            }
+
+            var includeIndices = new HashSet<int>();
+            foreach (var idx in changeIndices)
+            {
+                for (int c = -contextLines; c <= contextLines; c++)
+                {
+                    int target = idx + c;
+                    if (target >= 0 && target < diff.Count)
+                        includeIndices.Add(target);
+                }
+            }
+
+            bool prevIncluded = false;
+            for (int i = 0; i < diff.Count; i++)
+            {
+                if (includeIndices.Contains(i))
+                {
+                    if (!prevIncluded && result.Count > 0)
+                    {
+                        result.Add(new DiffLine { Type = DiffType.Snip });
+                    }
+                    result.Add(diff[i]);
+                    prevIncluded = true;
+                }
+                else
+                {
+                    prevIncluded = false;
+                }
+            }
+
+            return result;
         }
 
         private static string[] SplitLines(string text)
@@ -114,6 +267,15 @@ namespace STFormatter.UI
             box.Clear();
             foreach (var line in diff)
             {
+                if (line.Type == DiffType.Snip)
+                {
+                    box.Select(box.TextLength, 0);
+                    box.SelectionBackColor = Color.FromArgb(240, 240, 240);
+                    box.SelectionColor = Color.Gray;
+                    box.SelectedText = "     ···  ···  ···\n";
+                    continue;
+                }
+
                 bool show = line.Type switch
                 {
                     DiffType.Unchanged => true,
@@ -125,9 +287,18 @@ namespace STFormatter.UI
 
                 if (!show) continue;
 
+                string gutterMarker = line.Type switch
+                {
+                    DiffType.Unchanged => " ",
+                    DiffType.Added => "+",
+                    DiffType.Removed => "-",
+                    DiffType.Changed => "~",
+                    _ => " "
+                };
+
                 Color foreColor = line.Type switch
                 {
-                    DiffType.Unchanged => Color.Black,
+                    DiffType.Unchanged => Color.FromArgb(80, 80, 80),
                     DiffType.Added => Color.FromArgb(0, 100, 0),
                     DiffType.Removed => Color.FromArgb(180, 0, 0),
                     DiffType.Changed => Color.FromArgb(0, 0, 160),
@@ -150,13 +321,20 @@ namespace STFormatter.UI
 
                 box.Select(box.TextLength, 0);
                 box.SelectionBackColor = backColor;
-                box.SelectionColor = Color.DarkGray;
-                box.SelectedText = $"{lineNum,4}  ";
+                box.SelectionColor = Color.Gray;
+                box.SelectedText = $"{lineNum,4} ";
 
                 box.Select(box.TextLength, 0);
                 box.SelectionBackColor = backColor;
+                box.SelectionFont = new Font(box.Font, FontStyle.Bold);
                 box.SelectionColor = foreColor;
-                box.SelectedText = text + "\n";
+                box.SelectedText = gutterMarker;
+
+                box.Select(box.TextLength, 0);
+                box.SelectionBackColor = backColor;
+                box.SelectionFont = box.Font;
+                box.SelectionColor = foreColor;
+                box.SelectedText = " " + text + "\n";
             }
 
             box.Select(0, 0);
@@ -164,7 +342,7 @@ namespace STFormatter.UI
 
         private enum Side { Left, Right }
 
-        private enum DiffType { Unchanged, Added, Removed, Changed }
+        private enum DiffType { Unchanged, Added, Removed, Changed, Snip }
 
         private class DiffLine
         {
@@ -243,60 +421,71 @@ namespace STFormatter.UI
 
         private static void MarkChangedLines(List<DiffLine> diff)
         {
-            for (int i = 0; i < diff.Count; i++)
+            int i = 0;
+            while (i < diff.Count)
             {
-                if (diff[i].Type != DiffType.Removed) continue;
-
-                int nextNonRemoved = -1;
-                for (int k = i + 1; k < diff.Count; k++)
+                if (diff[i].Type != DiffType.Removed)
                 {
-                    if (diff[k].Type != DiffType.Added)
-                    {
-                        nextNonRemoved = k;
-                        break;
-                    }
+                    i++;
+                    continue;
                 }
 
+                int removeRunStart = i;
                 int removeRunEnd = i;
-                for (int k = i + 1; k < diff.Count && diff[k].Type == DiffType.Removed; k++)
-                    removeRunEnd = k;
+                while (removeRunEnd + 1 < diff.Count && diff[removeRunEnd + 1].Type == DiffType.Removed)
+                    removeRunEnd++;
 
-                int addStart = removeRunEnd + 1;
-                int addEnd = addStart;
-                for (int k = addStart; k < diff.Count && diff[k].Type == DiffType.Added; k++)
-                    addEnd = k;
-
-                if (addStart < diff.Count && diff[addStart].Type == DiffType.Added)
+                int addRunStart = removeRunEnd + 1;
+                int addRunEnd = addRunStart;
+                if (addRunStart < diff.Count && diff[addRunStart].Type == DiffType.Added)
                 {
-                    int removeCount = removeRunEnd - i + 1;
-                    int addCount = addEnd - addStart + 1;
+                    while (addRunEnd + 1 < diff.Count && diff[addRunEnd + 1].Type == DiffType.Added)
+                        addRunEnd++;
+
+                    int removeCount = removeRunEnd - removeRunStart + 1;
+                    int addCount = addRunEnd - addRunStart + 1;
                     int pairCount = Math.Min(removeCount, addCount);
 
+                    var merged = new List<DiffLine>();
                     for (int p = 0; p < pairCount; p++)
                     {
-                        diff[i + p].Type = DiffType.Changed;
-                        diff[i + p].RightText = diff[addStart + p].RightText;
-                        diff[i + p].RightLine = diff[addStart + p].RightLine;
-                        diff[addStart + p].Type = DiffType.Changed;
-                        diff[addStart + p].LeftText = diff[i + p].LeftText;
-                        diff[addStart + p].LeftLine = diff[i + p].LeftLine;
+                        merged.Add(new DiffLine
+                        {
+                            Type = DiffType.Changed,
+                            LeftText = diff[removeRunStart + p].LeftText,
+                            LeftLine = diff[removeRunStart + p].LeftLine,
+                            RightText = diff[addRunStart + p].RightText,
+                            RightLine = diff[addRunStart + p].RightLine
+                        });
                     }
 
                     for (int p = pairCount; p < removeCount; p++)
                     {
-                        diff[i + p].Type = DiffType.Removed;
+                        merged.Add(new DiffLine
+                        {
+                            Type = DiffType.Removed,
+                            LeftText = diff[removeRunStart + p].LeftText,
+                            LeftLine = diff[removeRunStart + p].LeftLine
+                        });
                     }
 
                     for (int p = pairCount; p < addCount; p++)
                     {
-                        diff[addStart + p].Type = DiffType.Added;
+                        merged.Add(new DiffLine
+                        {
+                            Type = DiffType.Added,
+                            RightText = diff[addRunStart + p].RightText,
+                            RightLine = diff[addRunStart + p].RightLine
+                        });
                     }
 
-                    i = addEnd;
+                    diff.RemoveRange(removeRunStart, addRunEnd - removeRunStart + 1);
+                    diff.InsertRange(removeRunStart, merged);
+                    i = removeRunStart + merged.Count;
                 }
                 else
                 {
-                    i = removeRunEnd;
+                    i = removeRunEnd + 1;
                 }
             }
         }
@@ -306,14 +495,14 @@ namespace STFormatter.UI
             int m = left.Length, n = right.Length;
             var dp = new int[m + 1, n + 1];
 
-            for (int i = 1; i <= m; i++)
+            for (int ii = 1; ii <= m; ii++)
             {
-                for (int j = 1; j <= n; j++)
+                for (int jj = 1; jj <= n; jj++)
                 {
-                    if (left[i - 1] == right[j - 1])
-                        dp[i, j] = dp[i - 1, j - 1] + 1;
+                    if (left[ii - 1] == right[jj - 1])
+                        dp[ii, jj] = dp[ii - 1, jj - 1] + 1;
                     else
-                        dp[i, j] = Math.Max(dp[i - 1, j], dp[i, j - 1]);
+                        dp[ii, jj] = Math.Max(dp[ii - 1, jj], dp[ii, jj - 1]);
                 }
             }
 
