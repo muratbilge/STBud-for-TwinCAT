@@ -42,6 +42,8 @@ internal class Program
 
         _hostManager = new HostManager();
 
+        Maintain();
+
         var mainForm = new MainForm(
             getInstances: () => GetInstanceInfos(),
             cleanup: () => CleanupStaleInstances(),

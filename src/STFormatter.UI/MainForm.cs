@@ -108,7 +108,11 @@ namespace STFormatter.UI
             _refreshTimer.Tick += OnRefreshTick;
 
             FormClosing += OnFormClosing;
-            Load += (s, e) => { Hide(); };
+            Load += (s, e) =>
+            {
+                Hide();
+                _maintainAction?.Invoke();
+            };
         }
 
         public void ShowWindow(int tabIndex)
