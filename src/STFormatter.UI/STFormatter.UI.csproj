@@ -17,4 +17,7 @@
   <ItemGroup>
     <Reference Include="System.Drawing" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\icon.ico" />
+  </ItemGroup>
 </Project>

@@ -23,6 +23,7 @@ namespace STFormatter.UI
             MinimumSize = new Size(800, 500);
             StartPosition = FormStartPosition.CenterParent;
             Font = new Font("Segoe UI", 9f);
+            Icon = MainForm.AppIcon;
 
             var topPanel = new Panel
             {

@@ -21,8 +21,19 @@ namespace STFormatter.UI
         private readonly System.Windows.Forms.Timer _maintainTimer;
         private readonly System.Windows.Forms.Timer _refreshTimer;
         private readonly Action? _maintainAction;
+        internal static readonly Icon AppIcon = LoadAppIcon();
 
         public ConcurrentBag<FormatRecord> FormatHistory => _formatHistory;
+
+        private static Icon LoadAppIcon()
+        {
+            var assembly = typeof(MainForm).Assembly;
+            var resourceName = assembly.GetName().Name + ".Resources.icon.ico";
+            using var stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream != null)
+                return new Icon(stream);
+            return SystemIcons.Application;
+        }
 
         public MainForm(
             Func<IReadOnlyDictionary<int, InstanceInfo>> getInstances,
@@ -36,6 +47,7 @@ namespace STFormatter.UI
             MinimumSize = new Size(800, 500);
             StartPosition = FormStartPosition.CenterScreen;
             Font = new Font("Segoe UI", 9f);
+            Icon = AppIcon;
 
             _settingsPanel = new SettingsPanel();
             _settingsPanel.SettingsApplied += OnSettingsApplied;
@@ -81,7 +93,7 @@ namespace STFormatter.UI
 
             _trayIcon = new NotifyIcon
             {
-                Icon = SystemIcons.Application,
+                Icon = AppIcon,
                 Text = "ST Formatter",
                 Visible = true,
                 ContextMenuStrip = _trayMenu

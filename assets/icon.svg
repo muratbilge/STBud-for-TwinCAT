@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="gearFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1E88E5"/>
+      <stop offset="100%" stop-color="#00569B"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#FFA040"/>
+      <stop offset="100%" stop-color="#FF6600"/>
+    </linearGradient>
+    <!-- Gear: combine circle + 8 rect teeth -->
+    <mask id="gearMask">
+      <rect width="512" height="512" fill="white"/>
+    </mask>
+  </defs>
+
+  <g transform="translate(256,256)">
+    <!-- Gear body: circle -->
+    <circle cx="0" cy="0" r="176" fill="url(#gearFill)"/>
+    <!-- 8 teeth as rounded rects -->
+    <rect x="-30" y="-244" width="60" height="80" rx="10" fill="url(#gearFill)" transform="rotate(0)"/>
+    <rect x="-30" y="-244" width="60" height="80" rx="10" fill="url(#gearFill)" transform="rotate(45)"/>
+    <rect x="-30" y="-244" width="60" height="80" rx="10" fill="url(#gearFill)" transform="rotate(90)"/>
+    <rect x="-30" y="-244" width="60" height="80" rx="10" fill="url(#gearFill)" transform="rotate(135)"/>
+    <rect x="-30" y="-244" width="60" height="80" rx="10" fill="url(#gearFill)" transform="rotate(180)"/>
+    <rect x="-30" y="-244" width="60" height="80" rx="10" fill="url(#gearFill)" transform="rotate(225)"/>
+    <rect x="-30" y="-244" width="60" height="80" rx="10" fill="url(#gearFill)" transform="rotate(270)"/>
+    <rect x="-30" y="-244" width="60" height="80" rx="10" fill="url(#gearFill)" transform="rotate(315)"/>
+    <!-- Outline for definition -->
+    <circle cx="0" cy="0" r="176" fill="none" stroke="#003A6E" stroke-width="2"/>
+    <!-- Inner white circle -->
+    <circle cx="0" cy="0" r="132" fill="#FFFFFF"/>
+    <!-- Orange accent ring -->
+    <circle cx="0" cy="0" r="132" fill="none" stroke="#FF6600" stroke-width="4"/>
+    <!-- Inner subtle shadow -->
+    <circle cx="0" cy="0" r="128" fill="none" stroke="#E8E8E8" stroke-width="1"/>
+
+    <!-- Code gutter decoration (thin bar on left, like IDE) -->
+    <rect x="-108" y="-64" width="5" height="80" rx="2.5" fill="#FF6600" opacity="0.2"/>
+
+    <!-- ST text: S in blue, T in orange -->
+    <text x="-20" y="14" text-anchor="middle" dominant-baseline="middle"
+          font-family="Consolas, 'Courier New', monospace" font-weight="bold" font-size="112"
+          fill="#00569B">S</text>
+    <text x="52" y="14" text-anchor="middle" dominant-baseline="middle"
+          font-family="Consolas, 'Courier New', monospace" font-weight="bold" font-size="112"
+          fill="#FF6600">T</text>
+  </g>
+</svg>
