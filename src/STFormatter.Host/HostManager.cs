@@ -350,7 +350,6 @@ internal sealed class HostManager
     private static int RemoveStaleButtons(CommandBar menu)
     {
         int removed = 0;
-        // Iterate backwards since we modify the collection
         for (int i = menu.Controls.Count; i >= 1; i--)
         {
             try
@@ -366,10 +365,18 @@ internal sealed class HostManager
                         removed++;
                     }
                 }
+                else if (ctrl is CommandBarPopup popup)
+                {
+                    string? tag = popup.Tag as string;
+                    if (!string.IsNullOrEmpty(tag) &&
+                        tag.StartsWith("STFormatter.", StringComparison.OrdinalIgnoreCase))
+                    {
+                        popup.Delete(false);
+                        removed++;
+                    }
+                }
                 else if (ctrl.Caption == "-" && ctrl.BeginGroup)
                 {
-                    // A separator that starts a group - could be ours
-                    // But we can't reliably identify it, skip
                 }
             }
             catch { }
@@ -377,11 +384,23 @@ internal sealed class HostManager
         return removed;
     }
 
+    private static void TrySetIcon(CommandBarButton btn, int faceId)
+    {
+        try
+        {
+            btn.Style = MsoButtonStyle.msoButtonIconAndCaption;
+            btn.FaceId = faceId;
+        }
+        catch
+        {
+            try { btn.Style = MsoButtonStyle.msoButtonCaption; } catch { }
+        }
+    }
+
     private void AddButtons(TcXaeInstance instance, CommandBar targetMenu)
     {
         try
         {
-            // Separator
             var sep = (CommandBarControl)targetMenu.Controls.Add(
                 MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
             sep.BeginGroup = true;
@@ -389,42 +408,215 @@ internal sealed class HostManager
             sep.Visible = false;
             instance.InjectedControls.Add(sep);
 
-            // Format ST Document
             var docBtn = (CommandBarButton)targetMenu.Controls.Add(
                 MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
             docBtn.Caption = "Format ST Document";
             docBtn.TooltipText = "Format the entire ST document";
             docBtn.Tag = "STFormatter.FormatDocument";
+            TrySetIcon(docBtn, 58);
             docBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
                 Program.HandleFormatDocument(instance.Pid);
             instance.InjectedControls.Add(docBtn);
 
-            // Format Selected Code
             var selBtn = (CommandBarButton)targetMenu.Controls.Add(
                 MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
             selBtn.Caption = "Format Selected Code";
             selBtn.TooltipText = "Format the selected ST code (select text first)";
             selBtn.Tag = "STFormatter.FormatSelectedCode";
+            TrySetIcon(selBtn, 593);
             selBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
                 Program.HandleFormatSelection(instance.Pid);
             instance.InjectedControls.Add(selBtn);
 
-            // Open Formatter Settings
             var settingsBtn = (CommandBarButton)targetMenu.Controls.Add(
                 MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
             settingsBtn.Caption = "ST Formatter Settings";
             settingsBtn.TooltipText = "Open the ST Formatter settings window";
             settingsBtn.Tag = "STFormatter.OpenSettings";
+            TrySetIcon(settingsBtn, 277);
             settingsBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
                 Program.ShowSettingsGui();
             instance.InjectedControls.Add(settingsBtn);
 
-            Log($"AddButtons: PID {instance.Pid} +3 buttons to '{targetMenu.Name}'");
+            AddPragmaSubmenu(instance, targetMenu);
+
+            Log($"AddButtons: PID {instance.Pid} +buttons to '{targetMenu.Name}'");
         }
         catch (Exception ex)
         {
             Log($"AddButtons: PID {instance.Pid} FAILED for '{targetMenu.Name}': {ex.Message}");
         }
+    }
+
+    private void AddPragmaSubmenu(TcXaeInstance instance, CommandBar targetMenu)
+    {
+        var addPopup = (CommandBarPopup)targetMenu.Controls.Add(
+            MsoControlType.msoControlPopup, Type.Missing, Type.Missing, Type.Missing, true);
+        addPopup.Caption = STFormatter.UI.Strings.Get("AddMenu.Add");
+        addPopup.Tag = "STFormatter.Add";
+        addPopup.TooltipText = "Insert pragmas, attributes, regions, and warnings";
+        instance.InjectedControls.Add(addPopup);
+
+        // -- Attribute submenu --
+        var attrPopup = (CommandBarPopup)addPopup.Controls.Add(
+            MsoControlType.msoControlPopup, Type.Missing, Type.Missing, Type.Missing, true);
+        attrPopup.Caption = STFormatter.UI.Strings.Get("AddMenu.Attribute");
+        attrPopup.Tag = "STFormatter.Add.Attribute";
+        instance.InjectedControls.Add(attrPopup);
+
+        string[] attributes = {
+            "qualified_only", "strict", "hide", "to_string",
+            "no_analysis", "linkalways", "TcGenerated", "const_non_replaced",
+        };
+        foreach (var attr in attributes)
+        {
+            var btn = (CommandBarButton)attrPopup.Controls.Add(
+                MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+            btn.Caption = "{attribute '" + attr + "'}";
+            btn.Tag = "STFormatter.Add.Attr." + attr;
+            TrySetIcon(btn, 1722);
+            var capturedAttr = attr;
+            btn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+                Program.HandleAddPragma(instance.Pid, capturedAttr);
+            instance.InjectedControls.Add(btn);
+        }
+
+        var monitoringBtn = (CommandBarButton)attrPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        monitoringBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.monitoring");
+        monitoringBtn.Tag = "STFormatter.Add.Attr.monitoring";
+        TrySetIcon(monitoringBtn, 1722);
+        monitoringBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddPragma(instance.Pid, "{attribute 'monitoring' := 'call'}");
+        instance.InjectedControls.Add(monitoringBtn);
+
+        var rpcBtn = (CommandBarButton)attrPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        rpcBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.TcRpcEnable");
+        rpcBtn.Tag = "STFormatter.Add.Attr.TcRpcEnable";
+        TrySetIcon(rpcBtn, 1722);
+        rpcBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddPragma(instance.Pid, "{attribute 'TcRpcEnable' := '1'}");
+        instance.InjectedControls.Add(rpcBtn);
+
+        // Separator before parameterized attributes
+        var attrSepBtn = (CommandBarButton)attrPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        attrSepBtn.BeginGroup = true;
+        attrSepBtn.Caption = "-";
+        attrSepBtn.Tag = "STFormatter.Add.Attr.Sep";
+        attrSepBtn.Visible = false;
+        instance.InjectedControls.Add(attrSepBtn);
+
+        var noExplicitCallBtn = (CommandBarButton)attrPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        noExplicitCallBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.NoExplicitCall");
+        noExplicitCallBtn.Tag = "STFormatter.Add.Attr.NoExplicitCall";
+        TrySetIcon(noExplicitCallBtn, 1722);
+        noExplicitCallBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddNoExplicitCall(instance.Pid);
+        instance.InjectedControls.Add(noExplicitCallBtn);
+
+        var opcUaDaBtn = (CommandBarButton)attrPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        opcUaDaBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.OpcUaDa");
+        opcUaDaBtn.Tag = "STFormatter.Add.Attr.OpcUaDa";
+        TrySetIcon(opcUaDaBtn, 1722);
+        opcUaDaBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddOpcUaDa(instance.Pid);
+        instance.InjectedControls.Add(opcUaDaBtn);
+
+        var alwaysAverageBtn = (CommandBarButton)attrPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        alwaysAverageBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.AlwaysAverage");
+        alwaysAverageBtn.Tag = "STFormatter.Add.Attr.AlwaysAverage";
+        TrySetIcon(alwaysAverageBtn, 1722);
+        alwaysAverageBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddAlwaysAverage(instance.Pid);
+        instance.InjectedControls.Add(alwaysAverageBtn);
+
+        var obsoleteBtn = (CommandBarButton)attrPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        obsoleteBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.Obsolete");
+        obsoleteBtn.Tag = "STFormatter.Add.Attr.Obsolete";
+        TrySetIcon(obsoleteBtn, 1722);
+        obsoleteBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddObsolete(instance.Pid);
+        instance.InjectedControls.Add(obsoleteBtn);
+
+        var noloadBtn = (CommandBarButton)attrPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        noloadBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.NoLoad");
+        noloadBtn.Tag = "STFormatter.Add.Attr.noload";
+        TrySetIcon(noloadBtn, 1722);
+        noloadBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddPragma(instance.Pid, "noload");
+        instance.InjectedControls.Add(noloadBtn);
+
+        var dynCreateBtn = (CommandBarButton)attrPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        dynCreateBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.EnableDynamicCreation");
+        dynCreateBtn.Tag = "STFormatter.Add.Attr.enable_dynamic_creation";
+        TrySetIcon(dynCreateBtn, 1722);
+        dynCreateBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddPragma(instance.Pid, "enable_dynamic_creation");
+        instance.InjectedControls.Add(dynCreateBtn);
+
+        // -- I/O Linking --
+        var ioLinkBtn = (CommandBarButton)addPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        ioLinkBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.IOLinking");
+        ioLinkBtn.Tag = "STFormatter.Add.IOLinking";
+        TrySetIcon(ioLinkBtn, 303);
+        ioLinkBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddIOLinking(instance.Pid);
+        instance.InjectedControls.Add(ioLinkBtn);
+
+        // -- Region submenu --
+        var regionPopup = (CommandBarPopup)addPopup.Controls.Add(
+            MsoControlType.msoControlPopup, Type.Missing, Type.Missing, Type.Missing, true);
+        regionPopup.Caption = STFormatter.UI.Strings.Get("AddMenu.Region");
+        regionPopup.Tag = "STFormatter.Add.Region";
+        instance.InjectedControls.Add(regionPopup);
+
+        var startRegionBtn = (CommandBarButton)regionPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        startRegionBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.StartRegion");
+        startRegionBtn.Tag = "STFormatter.Add.Region.Start";
+        TrySetIcon(startRegionBtn, 309);
+        startRegionBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddRegion(instance.Pid);
+        instance.InjectedControls.Add(startRegionBtn);
+
+        var endRegionBtn = (CommandBarButton)regionPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        endRegionBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.EndRegion");
+        endRegionBtn.Tag = "STFormatter.Add.Region.End";
+        TrySetIcon(endRegionBtn, 309);
+        endRegionBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddPragma(instance.Pid, "{endregion}");
+        instance.InjectedControls.Add(endRegionBtn);
+
+        var startEndRegionBtn = (CommandBarButton)regionPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        startEndRegionBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.StartEndRegion");
+        startEndRegionBtn.Tag = "STFormatter.Add.Region.StartEnd";
+        TrySetIcon(startEndRegionBtn, 309);
+        startEndRegionBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddStartEndRegion(instance.Pid);
+        instance.InjectedControls.Add(startEndRegionBtn);
+
+        // -- Warning --
+        var warningBtn = (CommandBarButton)addPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        warningBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.Warning");
+        warningBtn.Tag = "STFormatter.Add.Warning";
+        TrySetIcon(warningBtn, 308);
+        warningBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddWarning(instance.Pid);
+        instance.InjectedControls.Add(warningBtn);
+
+        Log($"AddPragmaSubmenu: PID {instance.Pid} added Add submenu");
     }
 }
 

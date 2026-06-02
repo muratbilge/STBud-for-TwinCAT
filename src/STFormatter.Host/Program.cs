@@ -68,6 +68,7 @@ internal class Program
             getStatus: () => _lastScanStatus
         );
         _mainForm = mainForm;
+        var dummy = mainForm.Handle; // force handle creation for Invoke
 
         Application.Run(mainForm);
 
@@ -397,6 +398,429 @@ internal class Program
             if (consoleHandle != IntPtr.Zero)
                 ShowWindow(consoleHandle, SW_HIDE);
         }));
+    }
+
+    public static void HandleAddPragma(int pid, string pragmaText)
+    {
+        Log($"HandleAddPragma: PID {pid} pragma=[{pragmaText}]");
+        try
+        {
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddPragma: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddPragma: PID {pid} No active document");
+                return;
+            }
+
+            string fullPragma = pragmaText.Contains("{")
+                ? pragmaText
+                : $"{{attribute '{pragmaText}'}}";
+
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, fullPragma);
+            Log($"HandleAddPragma: PID {pid} result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddPragma: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddWarning(int pid)
+    {
+        Log($"HandleAddWarning: PID {pid}");
+        try
+        {
+            string? warningText = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.WarningTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.WarningPrompt"),
+                    "");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    warningText = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(warningText))
+            {
+                Log("HandleAddWarning: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddWarning: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddWarning: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{warning '{warningText}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddWarning: PID {pid} warning=[{warningText}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddWarning: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddRegion(int pid)
+    {
+        Log($"HandleAddRegion: PID {pid}");
+        try
+        {
+            string? regionName = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.StartRegionTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.StartRegionPrompt"),
+                    "");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    regionName = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(regionName))
+            {
+                Log("HandleAddRegion: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddRegion: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddRegion: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{region '{regionName}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddRegion: PID {pid} region=[{regionName}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddRegion: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddStartEndRegion(int pid)
+    {
+        Log($"HandleAddStartEndRegion: PID {pid}");
+        try
+        {
+            string? regionName = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.StartEndRegionTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.StartEndRegionPrompt"),
+                    "");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    regionName = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(regionName))
+            {
+                Log("HandleAddStartEndRegion: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddStartEndRegion: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddStartEndRegion: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{region '{regionName}'}}\r\n\r\n\r\n{{endregion}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddStartEndRegion: PID {pid} region=[{regionName}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddStartEndRegion: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddNoExplicitCall(int pid)
+    {
+        Log($"HandleAddNoExplicitCall: PID {pid}");
+        try
+        {
+            string? message = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.NoExplicitCallTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.NoExplicitCallPrompt"),
+                    "do not call this POU directly");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    message = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(message))
+            {
+                Log("HandleAddNoExplicitCall: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddNoExplicitCall: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddNoExplicitCall: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{attribute 'no_explicit_call' := '{message}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddNoExplicitCall: PID {pid} message=[{message}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddNoExplicitCall: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddOpcUaDa(int pid)
+    {
+        Log($"HandleAddOpcUaDa: PID {pid}");
+        try
+        {
+            string? param = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.OpcUaDaTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.OpcUaDaPrompt"),
+                    "1");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    param = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(param))
+            {
+                Log("HandleAddOpcUaDa: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddOpcUaDa: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddOpcUaDa: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{attribute 'OPC.UA.DA' := '{param}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddOpcUaDa: PID {pid} param=[{param}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddOpcUaDa: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddAlwaysAverage(int pid)
+    {
+        Log($"HandleAddAlwaysAverage: PID {pid}");
+        try
+        {
+            string? varName = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.AlwaysAverageTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.AlwaysAveragePrompt"),
+                    "");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    varName = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(varName))
+            {
+                Log("HandleAddAlwaysAverage: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddAlwaysAverage: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddAlwaysAverage: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{attribute 'always_average' := '{varName}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddAlwaysAverage: PID {pid} varName=[{varName}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddAlwaysAverage: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddIOLinking(int pid)
+    {
+        Log($"HandleAddIOLinking: PID {pid}");
+        try
+        {
+            string? ioPath = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.IOLinkingTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.IOLinkingPrompt"),
+                    "");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    ioPath = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(ioPath))
+            {
+                Log("HandleAddIOLinking: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddIOLinking: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddIOLinking: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{attribute 'TcLinkTo' := '{ioPath}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddIOLinking: PID {pid} ioPath=[{ioPath}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddIOLinking: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddObsolete(int pid)
+    {
+        Log($"HandleAddObsolete: PID {pid}");
+        try
+        {
+            string? message = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.ObsoleteTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.ObsoletePrompt"),
+                    "use NewPou instead");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    message = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(message))
+            {
+                Log("HandleAddObsolete: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddObsolete: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddObsolete: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{attribute 'obsolete' := '{message}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddObsolete: PID {pid} message=[{message}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddObsolete: PID {pid} FAILED: {ex.Message}");
+        }
     }
 
     private static void RecordFormat(int pid, string filePath, string section,

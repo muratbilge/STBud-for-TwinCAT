@@ -661,6 +661,108 @@ internal static class LiveEditor
         }
     }
 
+    public static bool InsertLineAbove(EnvDTE.DTE dte, string text)
+    {
+        Log($"InsertLineAbove: Inserting text ({text.Length} chars)");
+        try
+        {
+            if (dte.ActiveDocument == null)
+            {
+                Log("InsertLineAbove: No active document");
+                return false;
+            }
+
+            bool undoContextOpened = false;
+            try
+            {
+                if (!dte.UndoContext.IsOpen)
+                {
+                    dte.UndoContext.Open("Insert Line");
+                    undoContextOpened = true;
+                }
+
+                dte.ActiveDocument.Activate();
+
+                string? savedClipboard = null;
+                try { savedClipboard = GetClipboardText(); } catch { }
+
+                if (!SetClipboardText(text + "\r\n"))
+                {
+                    Log("InsertLineAbove: Failed to set clipboard");
+                    if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { } }
+                    return false;
+                }
+
+                try
+                {
+                    dte.ExecuteCommand("Edit.LineStart", "");
+                    System.Threading.Thread.Sleep(30);
+                }
+                catch
+                {
+                    Log("InsertLineAbove: Edit.LineStart not available, using Home key");
+                    System.Windows.Forms.SendKeys.SendWait("{HOME}");
+                    System.Threading.Thread.Sleep(30);
+                }
+
+                try
+                {
+                    dte.ExecuteCommand("Edit.BreakLine", "");
+                    System.Threading.Thread.Sleep(30);
+                }
+                catch
+                {
+                    Log("InsertLineAbove: Edit.BreakLine not available, using Enter key");
+                    System.Windows.Forms.SendKeys.SendWait("{ENTER}");
+                    System.Threading.Thread.Sleep(50);
+                }
+
+                try
+                {
+                    var sel = dte.ActiveDocument.Selection as EnvDTE.TextSelection;
+                    if (sel != null)
+                    {
+                        sel.LineUp(false, 1);
+                        System.Threading.Thread.Sleep(30);
+                    }
+                }
+                catch
+                {
+                    Log("InsertLineAbove: TextSelection.LineUp failed, using Up key");
+                    System.Windows.Forms.SendKeys.SendWait("{UP}");
+                    System.Threading.Thread.Sleep(30);
+                }
+
+                System.Windows.Forms.SendKeys.SendWait("{HOME}");
+                System.Threading.Thread.Sleep(30);
+
+                dte.ExecuteCommand("Edit.Paste", "");
+                System.Threading.Thread.Sleep(50);
+
+                if (savedClipboard != null)
+                {
+                    try { SetClipboardText(savedClipboard); } catch { }
+                }
+
+                Log("InsertLineAbove: SUCCESS");
+                return true;
+            }
+            finally
+            {
+                if (undoContextOpened)
+                {
+                    try { dte.UndoContext.Close(); }
+                    catch { }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"InsertLineAbove: FAILED: {ex.GetType().Name} - {ex.Message}");
+            return false;
+        }
+    }
+
     private static string ReadActiveSectionText(EnvDTE.DTE dte)
     {
         try
