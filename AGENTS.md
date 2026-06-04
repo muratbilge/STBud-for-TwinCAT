@@ -279,7 +279,7 @@ The Host scans the ROT for ALL known TcXaeShell moniker patterns:
 
 ## CRITICAL: External Host Directory Separation
 
-**STBud Host files must live outside Beckhoff's TcXaeShell installation.**
+**STBud Host files must live outside Beckhoff's TcXaeShell installation.** STBud is a toolbox, not a TcXaeShell extension package.
 
 Current deployment target:
 ```

@@ -1,10 +1,10 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-Build script for the STBud for TwinCAT installer.
+Build script for the STBud for TwinCAT toolbox installer.
 
 .DESCRIPTION
-Builds the TcXaeShell Host and optional CLI payload, then creates an Inno Setup
+Builds the TcXaeShell toolbox Host and optional formatter CLI payload, then creates an Inno Setup
 installer. TcXaeShell integration is handled by the external Host process; no
 VSIX or in-process TcXaeShell extension is built or packaged.
 

@@ -6,8 +6,8 @@
 ;   - Run build-installer.ps1 first to populate installer/files/
 ;
 ; This installer deploys:
-;   [x] TcXaeShell Host - external COM DTE integration for TwinCAT XAE Shell
-;   [x] CLI Tool (optional) - requires .NET 8 runtime
+;   [x] TcXaeShell Host - external COM DTE toolbox for TwinCAT XAE Shell
+;   [x] CLI Tool (optional formatter CLI) - requires .NET 8 runtime
 
 #define AppName "STBud for TwinCAT"
 #define AppVersion "1.0.0"
@@ -48,8 +48,8 @@ Name: "full"; Description: "Full installation"
 Name: "custom"; Description: "Custom installation"; Flags: iscustom
 
 [Components]
-Name: "host"; Description: "TcXaeShell Host"; Types: full custom
-Name: "cli"; Description: "CLI Tool (stfmt)"; Types: full custom
+Name: "host"; Description: "TcXaeShell Toolbox Host"; Types: full custom
+Name: "cli"; Description: "Formatter CLI Tool (stfmt)"; Types: full custom
 
 [Tasks]
 Name: "desktopshortcut"; Description: "Create a desktop shortcut for STBud"; Flags: checkedonce; Components: host
@@ -61,7 +61,7 @@ Name: "addtopath"; Description: "Add stfmt to user PATH"; Flags: checkedonce; Co
 ; CLI Tool (net8.0, framework-dependent)
 Components: cli; Flags: ignoreversion recursesubdirs; DestDir: "{app}\CLI"; Source: "files\cli\*"; Excludes: "*.pdb"
 
-; TcXaeShell Host - external process, installed outside Beckhoff's folders.
+; TcXaeShell toolbox Host - external process, installed outside Beckhoff's folders.
 Components: host; Flags: ignoreversion recursesubdirs; DestDir: "{app}"; Source: "files\host-net48\*"; Check: ShouldUseNet48
 Components: host; Flags: ignoreversion recursesubdirs; DestDir: "{app}"; Source: "files\host-net462\*"; Check: ShouldUseNet462
 

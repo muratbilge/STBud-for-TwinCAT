@@ -1,6 +1,6 @@
 # TcXaeShell Integration
 
-Technical reference for integrating STBud for TwinCAT into Beckhoff's TwinCAT XAE Shell (TcXaeShell).
+Technical reference for integrating the STBud for TwinCAT toolbox into Beckhoff's TwinCAT XAE Shell (TcXaeShell).
 
 > **Production approach**: The **external Host process** is the only working integration path. In-process approaches (VSPackage, MEF, AddIn, Automation API) all fail in TcXaeShell's isolated shell. See [AGENTS.md](../AGENTS.md) for the historical failure notes.
 
@@ -60,7 +60,7 @@ Writing the `.TcPOU` file after a live edit triggers TcXaeShell's "file changed 
 
 ## External Host Approach (Production)
 
-Since TcXaeShell's isolated shell blocks VSPackage/MEF/AddIn loading, the production format tool runs as an **external process** that connects via COM DTE.
+Since TcXaeShell's isolated shell blocks VSPackage/MEF/AddIn loading, the production toolbox runs as an **external process** that connects via COM DTE.
 
 ### Architecture
 

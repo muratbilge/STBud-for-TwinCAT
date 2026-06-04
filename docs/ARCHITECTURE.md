@@ -1,10 +1,10 @@
 # Technical Architecture
 
-STBud for TwinCAT is a Structured Text formatter and editor helper for Beckhoff TwinCAT projects. The supported product surface is:
+STBud for TwinCAT is a toolbox for Beckhoff TwinCAT Structured Text work. It combines a formatter with editor helpers, pragma insertion, I/O-linking assistance, and TcXaeShell workflow utilities. The supported product surface is:
 
-- `STFormatter.Core`: shared formatting engine.
+- `STFormatter.Core`: shared formatter engine plus TwinCAT helper models/parsers.
 - `STFormatter.CLI`: command-line formatter and CI checker.
-- `STFormatter.Host`: external TcXaeShell integration through COM DTE.
+- `STFormatter.Host`: external TcXaeShell integration through COM DTE, context-menu tools, and live editor actions.
 - `STFormatter.UI`: tray UI, settings, instances, history, and diff viewer for the Host.
 
 VSIX, VSPackage, MEF, and AddIn integration paths were removed from the product because TcXaeShell's isolated shell does not reliably load them. See `AGENTS.md` for the historical failure notes.
@@ -29,13 +29,13 @@ TwinCAT.STFormatter.sln
 +-- docs/                                                Documentation
 ```
 
-The Core project is multi-targeted so every supported consumer references the same formatter code compiled for its runtime.
+The Core project is multi-targeted so every supported consumer references the same shared formatter/helper code compiled for its runtime.
 
 | Project | Target Framework | Role |
 |---|---|---|
-| `STFormatter.Core` | net8.0;net48;net462 | Lexer, parser, syntax tree, formatter, configuration |
+| `STFormatter.Core` | net8.0;net48;net462 | Lexer, parser, syntax tree, formatter, configuration, TwinCAT helper models |
 | `STFormatter.CLI` | net8.0 | Batch formatting, checks, presets, `.editorconfig` generation |
-| `STFormatter.Host` | net462;net48/x86 | External process that connects to TcXaeShell via COM DTE |
+| `STFormatter.Host` | net462;net48/x86 | External process that connects to TcXaeShell via COM DTE and injects editor tools |
 | `STFormatter.UI` | net462;net48/x86 | Tray UI, settings, instances, history, diff viewer |
 | `STFormatter.Core.Tests` | net8.0 | Unit tests for parser and formatter behavior |
 

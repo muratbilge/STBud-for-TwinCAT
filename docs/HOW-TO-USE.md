@@ -11,6 +11,8 @@ Practical usage guide for the CLI and TcXaeShell Host deployment targets.
 | Format current file | `stfmt format file.st` | Right-click > Format ST Document |
 | Format selection | `stfmt format file.st` (whole file only) | Right-click > Format ST Selection |
 | Format entire project | `stfmt batch ./src --recursive` | — |
+| Insert TwinCAT pragmas/attributes | — | Right-click > Add submenu |
+| Add I/O linking attribute | — | Right-click > Add > I/O Linking... |
 | Check formatting | `stfmt check file.st` | — |
 | Change settings | `.editorconfig` | Tray icon > Settings or `.editorconfig` |
 | View log | — | `%TEMP%\STBud_Host.log` |
@@ -134,7 +136,7 @@ st_keyword_casing = upper
 
 ### Starting the Host
 
-The Host process must be running to provide formatting in TcXaeShell. You can:
+The Host process must be running to provide STBud tools in TcXaeShell. You can:
 
 - **Manual start**: Double-click `STFormatter.Host.exe` or run from PowerShell
 - **Auto-start**: Add a shortcut to the Windows Startup folder (see [HOW-TO-INSTALL.md](HOW-TO-INSTALL.md))
@@ -161,6 +163,12 @@ The Host auto-detects running TcXaeShell instances and auto-reconnects after TcX
 
 The formatter automatically detects whether you're in the declaration or implementation
 section based on the content (VAR/END_VAR keywords → declaration, IF/FOR/:= → implementation).
+
+### Editor Helpers
+
+The same context-menu integration exposes helper commands under the **Add** submenu.
+These commands insert common TwinCAT attributes/pragmas, regions, task attributes,
+warnings, and I/O-linking paths without requiring an in-process TcXaeShell extension.
 
 ### How the Live Edit Works
 
@@ -190,7 +198,7 @@ The Host provides a system tray icon with these options:
 
 | Menu Item | Description |
 |---|---|
-| **Settings** | Opens a settings dialog where you can change all formatting options |
+| **Settings** | Opens a settings dialog where you can change formatting and Host options |
 | **Instances** | Shows connected TcXaeShell processes and their DTE version |
 | **History** | Shows a list of recent format operations with before/after diffs |
 | **Log** | Opens the live log file (`%TEMP%\STBud_Host.log`) |

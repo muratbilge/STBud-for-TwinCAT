@@ -1,16 +1,18 @@
 # STBud for TwinCAT
 
-A Structured Text (IEC 61131-3) code formatter for Beckhoff TwinCAT projects.
+A toolbox for Beckhoff TwinCAT Structured Text work: formatting, editor helpers,
+pragma insertion, I/O linking assistance, and workflow utilities inside TcXaeShell.
 
 ------------------------------------------------------------------------
 
 ## Overview
 
-STBud for TwinCAT automatically formats Structured Text source code to
-consistent style rules. It covers the full IEC 61131-3 ST grammar plus
-TwinCAT-specific extensions (actions, multi-instance FBs, `__TRY`/`__ENDTRY`,
-access modifiers, pragmas, and more). The same formatting engine is exposed
-through the production CLI and TcXaeShell Host targets.
+STBud for TwinCAT is a growing collection of tools for TwinCAT developers. The
+current core is a Structured Text formatter, backed by a TcXaeShell Host that
+also injects practical editor helpers such as pragma insertion, region helpers,
+and I/O linking assistance. The formatter covers the full IEC 61131-3 ST grammar
+plus TwinCAT-specific extensions (actions, multi-instance FBs, `__TRY`/`__ENDTRY`,
+access modifiers, pragmas, and more).
 
 | | CLI | TcXaeShell Host |
 |---|---|---|
@@ -20,6 +22,9 @@ through the production CLI and TcXaeShell Host targets.
 | **Host** | Terminal | External process |
 | **Editor integration** | -- | COM DTE + live edit |
 | **Options UI** | .editorconfig / JSON | Tray UI + .editorconfig |
+
+The internal assemblies still use the `STFormatter.*` prefix because the first
+major tool is the formatter. The product name is broader: **STBud for TwinCAT**.
 
 ------------------------------------------------------------------------
 
@@ -88,6 +93,8 @@ into TcXaeShell via COM DTE from outside the process.
   clipboard to format the active declaration or implementation section in place
 - **Format File** — reads `.TcPOU` / `.TcDUT` / `.TcGVL` XML files, formats the ST code
   inside CDATA sections, and writes them back
+- **Editor helpers** — inserts common TwinCAT attributes/pragmas, regions, task
+  attributes, warnings, and I/O-linking paths from context menus
 - **Auto-reconnect** — survives TcXaeShell restarts, reconnects automatically
 - **Hidden background process** — no console window, runs silently, logs to
   `%TEMP%\STBud_Host.log`

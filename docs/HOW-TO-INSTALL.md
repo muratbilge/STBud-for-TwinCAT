@@ -14,7 +14,7 @@ STBud-for-TwinCAT-Setup-1.0.0.exe
 
 The installer lets you choose which components to install:
 
-- **TcXaeShell Host** — installs the external Host process to `C:\Program Files (x86)\STBud\`
+- **TcXaeShell Host** — installs the external STBud toolbox process to `C:\Program Files (x86)\STBud\`
 - **CLI Tool** — optional `stfmt` command (requires .NET 8 runtime)
 
 ### Building the Installer from Source
@@ -78,7 +78,7 @@ dotnet tool uninstall --global STFormatter.CLI
 ## 2. TwinCAT XAE Shell (TcXaeShell)
 
 > **Important**: TcXaeShell's VS 2017 Isolated Shell does **not** support standard VSIX
-> extensions or VSPackages. The formatter must be deployed as an **external Host process**
+> extensions or VSPackages. STBud must be deployed as an **external Host process**
 > that connects via COM DTE (Running Object Table). This is the only working approach.
 
 ### Prerequisites
