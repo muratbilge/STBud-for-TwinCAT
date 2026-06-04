@@ -4,7 +4,7 @@ namespace STFormatter.Core.Configuration
 {
     public static class HostLog
     {
-        public const string FileName = "STFormatter_Host.log";
+        public const string FileName = "STBud_Host.log";
 
         public static string Path => System.IO.Path.Combine(
             System.IO.Path.GetTempPath(),

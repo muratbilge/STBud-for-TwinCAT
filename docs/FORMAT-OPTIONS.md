@@ -1014,7 +1014,7 @@ st_format_on_save = true
 
 Settings are resolved in the following priority order (highest to lowest):
 
-1. **VS/TcXaeShell Options page** — overrides everything (IDE integrations only)
+1. **Host tray settings** — user settings from the external `STFormatter.Host` tray UI
 2. **CLI command-line flags** — overrides `.editorconfig` (CLI only)
 3. **`.editorconfig` nearest to file** — merges with parent configs
 4. **`.editorconfig` walking up directories** — each closer file overrides more distant ones
@@ -1115,7 +1115,7 @@ The TcXaeShell Host provides a tray settings window for runtime formatter option
 - Right-click the `STFormatter.Host` tray icon.
 - Select **Settings**.
 
-Settings are stored in `%LOCALAPPDATA%\STFormatter\settings.json`. Team defaults should still live in `.editorconfig`.
+Settings are stored in `%APPDATA%\STBud\settings.json`. Team defaults should still live in `.editorconfig`.
 
 ### Available Options
 
@@ -1147,12 +1147,13 @@ The current production TcXaeShell Host exposes manual context-menu formatting co
 
 ### Format Commands
 
-| Command            | Shortcut    | Description                             |
-|--------------------|-------------|-----------------------------------------|
-| Format Document    | `Ctrl+K, D` | Format the entire active document        |
-| Format Selection   | `Ctrl+K, F` | Format the selected text range           |
+| Command | Shortcut | Description |
+|---|---|---|
+| Format ST Document | — | Format the active declaration or implementation section |
+| Format ST Selection | — | Format the selected text range |
+| Format ST File | — | Format the TwinCAT XML file on disk; fallback path, may trigger a reload dialog |
 
-These commands are injected by `STFormatter.Host` into TcXaeShell context menus and invoke `FormattingEngine.Format()`, `FormatDeclaration()`, or `FormatBody()` depending on context.
+These commands are injected by `STFormatter.Host` into TcXaeShell context menus. The Host detects the active section and uses `FormattingEngine.Format()` for declaration text or `FormatBody()` for implementation text.
 
 ---
 

@@ -1,4 +1,4 @@
-# How to Install — TwinCAT ST Formatter
+# How to Install — STBud for TwinCAT
 
 Step-by-step installation instructions for the supported Host and CLI deployment targets.
 
@@ -9,12 +9,12 @@ Step-by-step installation instructions for the supported Host and CLI deployment
 Download and run the installer:
 
 ```
-STFormatter-Setup-1.0.0.exe
+STBud-for-TwinCAT-Setup-1.0.0.exe
 ```
 
 The installer lets you choose which components to install:
 
-- **TcXaeShell Host** — deploys to TcXaeShell extensions folder
+- **TcXaeShell Host** — installs the external Host process to `C:\Program Files (x86)\STBud\`
 - **CLI Tool** — optional `stfmt` command (requires .NET 8 runtime)
 
 ### Building the Installer from Source
@@ -28,7 +28,7 @@ Prerequisites: .NET 8 SDK, .NET Framework 4.6.2/4.8 targeting packs, and Inno Se
 .\installer\build-installer.ps1 -Configuration Release -Version 1.0.0  # Custom config/version
 ```
 
-Output: `publish\STFormatter-Setup-1.0.0.exe`
+Output: `publish\STBud-for-TwinCAT-Setup-1.0.0.exe`
 
 ---
 
@@ -110,7 +110,7 @@ Run the provided deployment script as Administrator:
 ```
 
 This copies the following files to
-`C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\`:
+`C:\Program Files (x86)\STBud\`:
 
 | File | Purpose |
 |---|---|
@@ -124,7 +124,7 @@ To deploy manually:
 ```powershell
 # Run as Administrator
 $src = "src\STFormatter.Host\bin\Debug\net48"
-$dst = "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter"
+$dst = "C:\Program Files (x86)\STBud"
 New-Item -ItemType Directory -Path $dst -Force
 Copy-Item "$src\STFormatter.Host.exe" $dst -Force
 Copy-Item "$src\STFormatter.Core.dll" $dst -Force
@@ -138,7 +138,7 @@ You can start the Host before or after TcXaeShell — it will auto-detect and au
 
 ```powershell
 # Start the Host (it runs as a hidden background process)
-Start-Process "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\STFormatter.Host.exe"
+Start-Process "C:\Program Files (x86)\STBud\STFormatter.Host.exe"
 ```
 
 The Host appears as a **system tray icon** (a small "ST" icon). Right-click it for:
@@ -161,7 +161,7 @@ The Host appears as a **system tray icon** (a small "ST" icon). Right-click it f
 5. Check the log file for confirmation:
 
 ```powershell
-Get-Content "$env:TEMP\STFormatter_Host.log" -Tail 10
+Get-Content "$env:TEMP\STBud_Host.log" -Tail 10
 ```
 
 You should see output like:
@@ -180,7 +180,7 @@ To have the Host start automatically when you log in:
 # Create a shortcut in the Startup folder
 $WshShell = New-Object -ComObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut("$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\STFormatter.Host.lnk")
-$Shortcut.TargetPath = "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\STFormatter.Host.exe"
+$Shortcut.TargetPath = "C:\Program Files (x86)\STBud\STFormatter.Host.exe"
 $Shortcut.WindowStyle = 7  # Minimized
 $Shortcut.Save()
 ```
@@ -189,9 +189,9 @@ $Shortcut.Save()
 
 | Problem | Solution |
 |---|---|
-| **Host won't start** | Check that all 4 DLLs/EXEs are in the Extensions\STFormatter folder. Run `"C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\STFormatter.Host.exe"` from a command prompt and check for errors. |
+| **Host won't start** | Check that all 4 DLLs/EXEs are in `C:\Program Files (x86)\STBud`. Run `"C:\Program Files (x86)\STBud\STFormatter.Host.exe"` from a command prompt and check for errors. |
 | **No context menu items** | The Host could not connect to TcXaeShell. Check the log for errors. Ensure TcXaeShell is running before or after starting the Host. The Host auto-reconnects every 5 seconds. |
-| **Format doesn't work** | Check `%TEMP%\STFormatter_Host.log` for errors. The Host uses the clipboard-based live-edit approach — ensure no clipboard manager is locking the clipboard. Try clicking in the code editor first, then right-click. |
+| **Format doesn't work** | Check `%TEMP%\STBud_Host.log` for errors. The Host uses the clipboard-based live-edit approach — ensure no clipboard manager is locking the clipboard. Try clicking in the code editor first, then right-click. |
 | **"Format ST Document" is grayed out** | This means no active text editor was detected. Click inside the PLC code editor first. |
 | **Host crashes on startup** | Ensure you're using the correct build (net48 for .NET 4.8+, net462 for .NET 4.6.2). Check the Windows Event Viewer for .NET runtime errors. |
 | **Error: DTE not found** | The Host searches for both `!TcXaeShell.DTE` and `!VisualStudio.DTE` monikers. Ensure TcXaeShell is actually running. The Host retries every 5 seconds. |
@@ -215,10 +215,10 @@ The entire operation is wrapped in a DTE `UndoContext`, so pressing Ctrl+Z rever
 ### Uninstall
 
 1. Stop the Host process (right-click tray icon > Exit, or Task Manager)
-2. Delete the extension folder:
+2. Delete the install folder:
    ```powershell
    # Run as Administrator
-   Remove-Item -Recurse -Force "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter"
+   Remove-Item -Recurse -Force "C:\Program Files (x86)\STBud"
    ```
 3. Remove the Startup shortcut if created:
    ```powershell
@@ -261,4 +261,4 @@ stfmt init . --preset expanded
 
 This creates a `.editorconfig` file that the CLI and Host read automatically.
 
-For TcXaeShell, right-click the system tray icon > **Settings** to change formatting options at runtime. These settings are saved to `%LOCALAPPDATA%\STFormatter\settings.json` and persist across restarts.
+For TcXaeShell, right-click the system tray icon > **Settings** to change formatting options at runtime. These settings are saved to `%APPDATA%\STBud\settings.json` and persist across restarts.

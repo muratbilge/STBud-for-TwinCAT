@@ -1,6 +1,6 @@
 # TcXaeShell Integration
 
-Technical reference for integrating the ST Formatter into Beckhoff's TwinCAT XAE Shell (TcXaeShell).
+Technical reference for integrating STBud for TwinCAT into Beckhoff's TwinCAT XAE Shell (TcXaeShell).
 
 > **Production approach**: The **external Host process** is the only working integration path. In-process approaches (VSPackage, MEF, AddIn, Automation API) all fail in TcXaeShell's isolated shell. See [AGENTS.md](../AGENTS.md) for the historical failure notes.
 
@@ -17,7 +17,7 @@ TcXaeShell is a **32-bit Visual Studio Isolated Shell** used for PLC programming
 | TC3 Build <4020 | VS 2013 | 12.0 | `!TcXaeShell.DTE.12.0:{PID}` | 4.5.1+ |
 
 - **Process**: 32-bit (x86), even on 64-bit Windows (all versions)
-- **Install path**: `C:\Program Files (x86)\Beckhoff\TcXaeShell\`
+- **TcXaeShell product path**: `C:\Program Files (x86)\Beckhoff\TcXaeShell\` (STBud is not installed here)
 - **Shell type**: VS Isolated Shell — not a standard VS installation
 
 The PLC editor is a CODESYS-based component embedded in the VS shell. It does not use standard VS editor infrastructure for its text content. The CODESYS engine is the source of truth, not the VS text buffer.
@@ -72,8 +72,8 @@ Since TcXaeShell's isolated shell blocks VSPackage/MEF/AddIn loading, the produc
 |  PlcCodeWinCtx   |  inject buttons via  |  - Connects via ROT      |
 |  Menu (127 ctrl) |  DTE.CommandBars     |  - Injects buttons        |
 |                  |                      |  - Handles click events   |
-|  .TcPOU files    |  read/write via      |  - Live-format via DTE   |
-|  (XML on disk)   |  System.IO (backup)  |  - Auto-reconnects       |
+|  Active text     |  live edit via       |  - Live-format via DTE   |
+|  in PLC editor   |  DTE + clipboard     |  - Auto-reconnects       |
 +------------------+                      +---------------------------+
 ```
 
@@ -309,7 +309,6 @@ TcXaeShell ships in multiple versions depending on the TwinCAT 3 build. The exte
 | `VsShellGeneration` | VS shell generation (e.g. `"2017"`, `"2015"`, `"2013"`) | Yes |
 | `PrimaryRotMonikerPrefix` | `!TcXaeShell.DTE.{version}:` | Yes |
 | `FallbackRotMonikerPrefix` | `!VisualStudio.DTE.{version}:` | Yes |
-| `RegistryRoot` | Registry path (e.g. `Software\Beckhoff\TcXaeShell\15.0`) | Yes |
 | `RequiredFramework` | Minimum .NET Framework (e.g. `"4.6"`, `"4.5.1"`) | Yes |
 | `TargetContextMenuNames` | Context menu names | No (consistent) |
 | `TwinCatFileExtensions` | File extensions (.TcPOU, .TcDUT, etc.) | No (consistent) |
@@ -375,7 +374,7 @@ content = Regex.Replace(content, implPattern,
 Deploy these files (use `deploy.bat`, requires admin privileges):
 
 ```
-C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\
+C:\Program Files (x86)\STBud\
   STFormatter.Host.exe
   STFormatter.Core.dll
   STFormatter.UI.dll
@@ -385,16 +384,16 @@ C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\
 > **Target framework**: The Host is built for `net48` by default. For older machines running .NET 4.6.2, build with the `net462` target instead.
 
 ```powershell
-Start-Process "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\STFormatter.Host.exe"
+Start-Process "C:\Program Files (x86)\STBud\STFormatter.Host.exe"
 ```
 
-Log file: `%TEMP%\STFormatter_Host.log`
+Log file: `%TEMP%\STBud_Host.log`
 
 ---
 
 ## Logging
 
-Debug log file: `%TEMP%\STFormatter_Host.log`
+Debug log file: `%TEMP%\STBud_Host.log`
 
 ### Diagnostic Steps
 

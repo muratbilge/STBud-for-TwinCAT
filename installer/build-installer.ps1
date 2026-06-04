@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-Build script for the TwinCAT ST Formatter installer.
+Build script for the STBud for TwinCAT installer.
 
 .DESCRIPTION
 Builds the TcXaeShell Host and optional CLI payload, then creates an Inno Setup
@@ -36,8 +36,69 @@ $ErrorActionPreference = "Stop"
 $RootDir = Resolve-Path (Join-Path $PSScriptRoot "..")
 $FilesDir = Join-Path $PSScriptRoot "files"
 
+$HostPayloadFiles = @(
+    "STFormatter.Host.exe",
+    "STFormatter.Core.dll",
+    "STFormatter.UI.dll",
+    "Microsoft.VisualStudio.Interop.dll",
+    "Microsoft.Bcl.AsyncInterfaces.dll",
+    "System.Buffers.dll",
+    "System.Collections.Immutable.dll",
+    "System.Memory.dll",
+    "System.Numerics.Vectors.dll",
+    "System.Runtime.CompilerServices.Unsafe.dll",
+    "System.Text.Encodings.Web.dll",
+    "System.Text.Json.dll",
+    "System.Threading.Tasks.Extensions.dll",
+    "System.ValueTuple.dll"
+)
+
+$ForbiddenHostPayloadPatterns = @(
+    "*.vsix",
+    "*.pkgdef",
+    "extension.vsixmanifest",
+    "STFormatter.TcXaeShell.*",
+    "PackageIcon.png",
+    "PreviewImage.png",
+    "Microsoft.VisualStudio.CommandBars.dll",
+    "stdole.dll",
+    "TwinCAT*.dll",
+    "*Object.dll",
+    "*Editor.dll"
+)
+
+function Copy-HostPayload {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceDir,
+        [Parameter(Mandatory = $true)][string]$DestinationDir
+    )
+
+    foreach ($pattern in $ForbiddenHostPayloadPatterns) {
+        $matches = Get-ChildItem -LiteralPath $SourceDir -File -Filter $pattern -ErrorAction SilentlyContinue
+        if ($matches) {
+            $names = ($matches | ForEach-Object { $_.Name }) -join ", "
+            throw "Forbidden Host payload artifact(s) in ${SourceDir}: $names"
+        }
+    }
+
+    foreach ($file in $HostPayloadFiles) {
+        $path = Join-Path $SourceDir $file
+        if (Test-Path -LiteralPath $path) {
+            Copy-Item -LiteralPath $path -Destination $DestinationDir -Force
+        }
+    }
+
+    $required = @("STFormatter.Host.exe", "STFormatter.Core.dll", "STFormatter.UI.dll", "Microsoft.VisualStudio.Interop.dll")
+    foreach ($file in $required) {
+        $path = Join-Path $DestinationDir $file
+        if (-not (Test-Path -LiteralPath $path)) {
+            throw "Required Host payload file missing after copy: $file"
+        }
+    }
+}
+
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "TwinCAT ST Formatter Installer Builder" -ForegroundColor Cyan
+Write-Host "STBud for TwinCAT Installer Builder" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "Version:        $Version" -ForegroundColor Gray
 Write-Host "Configuration:  $Configuration" -ForegroundColor Gray
@@ -98,8 +159,7 @@ if (-not $SkipHost) {
         $buildErrors += "Host-net48"
     } else {
         $srcDir = Join-Path $RootDir "src\STFormatter.Host\bin\$Configuration\net48"
-        Copy-Item "$srcDir\STFormatter.Host.exe" $hostNet48Dir -Force
-        Copy-Item "$srcDir\*.dll" $hostNet48Dir -Force
+        Copy-HostPayload -SourceDir $srcDir -DestinationDir $hostNet48Dir
 
         $hostFileCount = (Get-ChildItem $hostNet48Dir -File).Count
         Write-Host "  Host net48: $hostFileCount files copied to files\host-net48\" -ForegroundColor Green
@@ -123,8 +183,7 @@ if (-not $SkipHost) {
         $buildErrors += "Host-net462"
     } else {
         $srcDir462 = Join-Path $RootDir "src\STFormatter.Host\bin\$Configuration\net462"
-        Copy-Item "$srcDir462\STFormatter.Host.exe" $hostNet462Dir -Force
-        Copy-Item "$srcDir462\*.dll" $hostNet462Dir -Force
+        Copy-HostPayload -SourceDir $srcDir462 -DestinationDir $hostNet462Dir
 
         $host462FileCount = (Get-ChildItem $hostNet462Dir -File).Count
         Write-Host "  Host net462: $host462FileCount files copied to files\host-net462\" -ForegroundColor Green
@@ -270,7 +329,7 @@ if (-not $SkipInstaller -and $buildErrors.Count -eq 0) {
         & $iscc $tempIss
 
         if ($LASTEXITCODE -eq 0) {
-            $installerPath = Join-Path $RootDir "publish\STFormatter-Setup-$Version.exe"
+            $installerPath = Join-Path $RootDir "publish\STBud-for-TwinCAT-Setup-$Version.exe"
             if (Test-Path $installerPath) {
                 $installerSize = [math]::Round((Get-Item $installerPath).Length / 1MB, 1)
                 Write-Host ""
@@ -297,7 +356,7 @@ if (-not $SkipInstaller -and $buildErrors.Count -eq 0) {
         Write-Warning "Install Inno Setup from https://jrsoftware.org/isdl.php and re-run."
         Write-Warning ""
         Write-Warning "Binaries are ready in: $FilesDir"
-        Write-Warning "Manual Host deployment: copy files\host-net48\* to the TcXaeShell Extensions\STFormatter folder."
+        Write-Warning "Manual Host deployment: copy files\host-net48\* to C:\Program Files (x86)\STBud\."
     }
 } elseif ($SkipInstaller) {
     Write-Host ""

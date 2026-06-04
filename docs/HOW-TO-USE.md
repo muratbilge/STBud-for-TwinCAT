@@ -1,4 +1,4 @@
-# How to Use — TwinCAT ST Formatter
+# How to Use — STBud for TwinCAT
 
 Practical usage guide for the CLI and TcXaeShell Host deployment targets.
 
@@ -13,7 +13,7 @@ Practical usage guide for the CLI and TcXaeShell Host deployment targets.
 | Format entire project | `stfmt batch ./src --recursive` | — |
 | Check formatting | `stfmt check file.st` | — |
 | Change settings | `.editorconfig` | Tray icon > Settings or `.editorconfig` |
-| View log | — | `%TEMP%\STFormatter_Host.log` |
+| View log | — | `%TEMP%\STBud_Host.log` |
 
 ---
 
@@ -141,7 +141,7 @@ The Host process must be running to provide formatting in TcXaeShell. You can:
 
 ```powershell
 # Start the Host
-Start-Process "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\STFormatter.Host.exe"
+Start-Process "C:\Program Files (x86)\STBud\STFormatter.Host.exe"
 ```
 
 The Host auto-detects running TcXaeShell instances and auto-reconnects after TcXaeShell restarts.
@@ -170,7 +170,7 @@ When you click **Format ST Document**:
    (`Edit.SelectAll` → `Edit.Copy` → Win32 clipboard read)
 2. It detects the section type (declaration vs. implementation)
 3. It formats the code using `FormattingEngine.Format()` or `.FormatBody()`
-4. It writes the formatted code back using `Edit.Delete` → clipboard write → `Edit.Paste`
+4. It writes the formatted code back by setting the Win32 clipboard, then running `Edit.Delete` → `Edit.Paste`
 5. The entire operation is wrapped in a DTE `UndoContext`, so Ctrl+Z reverts it
 
 > **Note**: During formatting, your clipboard content is saved and restored. Avoid copying
@@ -193,14 +193,14 @@ The Host provides a system tray icon with these options:
 | **Settings** | Opens a settings dialog where you can change all formatting options |
 | **Instances** | Shows connected TcXaeShell processes and their DTE version |
 | **History** | Shows a list of recent format operations with before/after diffs |
-| **Log** | Opens the live log file (`%TEMP%\STFormatter_Host.log`) |
+| **Log** | Opens the live log file (`%TEMP%\STBud_Host.log`) |
 | **Exit** | Stops the Host process |
 
 ### Configuration (TcXaeShell)
 
 The Host reads configuration from two sources, in priority order:
 
-1. **Settings dialog** (tray icon > Settings) — saved to `%LOCALAPPDATA%\STFormatter\settings.json`
+1. **Settings dialog** (tray icon > Settings) — saved to `%APPDATA%\STBud\settings.json`
 2. **`.editorconfig`** files — discovered from the TwinCAT project directory upward
 3. **Built-in defaults**
 
@@ -208,7 +208,7 @@ For project-specific formatting, create an `.editorconfig` in your TwinCAT proje
 
 ```
 MyTwinCATProject/
-├── .editorconfig          ← ST Formatter reads this
+├── .editorconfig          ← STBud reads this
 ├── MyPlc/
 │   ├── MAIN.TcPOU
 │   ├── Motor.TcDUT
@@ -217,14 +217,14 @@ MyTwinCATProject/
 
 ### Log File
 
-The Host writes detailed logs to `%TEMP%\STFormatter_Host.log`. Check this file if formatting isn't working:
+The Host writes detailed logs to `%TEMP%\STBud_Host.log`. Check this file if formatting isn't working:
 
 ```powershell
 # View the last 20 lines
-Get-Content "$env:TEMP\STFormatter_Host.log" -Tail 20
+Get-Content "$env:TEMP\STBud_Host.log" -Tail 20
 
 # Search for errors
-Select-String "ERROR|FAIL|Exception" "$env:TEMP\STFormatter_Host.log"
+Select-String "ERROR|FAIL|Exception" "$env:TEMP\STBud_Host.log"
 ```
 
 ### Supported File Types
@@ -378,7 +378,7 @@ st_keep_single_line_blocks = true
 
 1. **Check the file extension**: Only `.st`, `.txt`, `.iecst`, `.TcPOU`, `.TcDUT`, `.TcGVL`, `.TcIO`, `.TcTO` are processed.
 
-2. **Check the log file** (TcXaeShell): `%TEMP%\STFormatter_Host.log`
+2. **Check the log file** (TcXaeShell): `%TEMP%\STBud_Host.log`
 
 3. **Verify `.editorconfig` location**: Must be in or above the source file's directory.
 

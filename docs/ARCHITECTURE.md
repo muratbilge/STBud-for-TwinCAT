@@ -1,6 +1,6 @@
 # Technical Architecture
 
-TwinCAT ST Formatter is a Structured Text formatter for Beckhoff TwinCAT projects. The supported product surface is:
+STBud for TwinCAT is a Structured Text formatter and editor helper for Beckhoff TwinCAT projects. The supported product surface is:
 
 - `STFormatter.Core`: shared formatting engine.
 - `STFormatter.CLI`: command-line formatter and CI checker.
@@ -139,7 +139,7 @@ Runtime responsibilities:
 - Format the active section using the appropriate Core entry point.
 - Paste the formatted text back through DTE commands inside an undo context.
 - Reconnect automatically when TcXaeShell restarts.
-- Log diagnostics to `%TEMP%\STFormatter_Host.log`.
+- Log diagnostics to `%TEMP%\STBud_Host.log`.
 
 The Host must run at the same elevation level as TcXaeShell. The installer starts it through `explorer.exe` so it runs non-elevated after an elevated install.
 
@@ -183,7 +183,7 @@ Tray settings
     -> FormattingConfiguration.Default
 ```
 
-Team-wide style should be stored in `.editorconfig`. Host settings are user preferences stored under `%LOCALAPPDATA%\STFormatter\settings.json`.
+Team-wide style should be stored in `.editorconfig`. Host settings are user preferences stored under `%APPDATA%\STBud\settings.json`.
 
 ---
 

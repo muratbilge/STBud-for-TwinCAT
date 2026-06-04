@@ -1,4 +1,4 @@
-# TwinCAT ST Formatter
+# STBud for TwinCAT
 
 A Structured Text (IEC 61131-3) code formatter for Beckhoff TwinCAT projects.
 
@@ -6,7 +6,7 @@ A Structured Text (IEC 61131-3) code formatter for Beckhoff TwinCAT projects.
 
 ## Overview
 
-TwinCAT ST Formatter automatically formats Structured Text source code to
+STBud for TwinCAT automatically formats Structured Text source code to
 consistent style rules. It covers the full IEC 61131-3 ST grammar plus
 TwinCAT-specific extensions (actions, multi-instance FBs, `__TRY`/`__ENDTRY`,
 access modifiers, pragmas, and more). The same formatting engine is exposed
@@ -90,8 +90,8 @@ into TcXaeShell via COM DTE from outside the process.
   inside CDATA sections, and writes them back
 - **Auto-reconnect** — survives TcXaeShell restarts, reconnects automatically
 - **Hidden background process** — no console window, runs silently, logs to
-  `%TEMP%\STFormatter_Host.log`
-- **Independent deployment** — copies to `Extensions\STFormatter\` alongside the
+  `%TEMP%\STBud_Host.log`
+- **Independent deployment** — copies to `C:\Program Files (x86)\STBud\` alongside the
   Core DLL, requires `Microsoft.VisualStudio.Interop.dll`
 
 **Why an external process?** TcXaeShell's isolated shell blocks all three standard
@@ -261,7 +261,7 @@ The parser handles the full IEC 61131-3 ST grammar plus TwinCAT extensions:
 - **Comments**: single-line `//`, multi-line `(* ... *)` and `/* ... */`
 - ** pragmas**: `{pragma ...}`, `{region ...}`, `{endregion}`
 
-## Using the ST Formatter
+## Using STBud for TwinCAT
 
 ### 1. CLI — Format Files from the Command Line
 
@@ -300,11 +300,11 @@ dotnet format preset default
 # Build the Host
 dotnet build src/STFormatter.Host -c Debug
 
-# Deploy to TcXaeShell (requires admin)
+# Deploy the external Host (requires admin)
 deploy.bat
 
 # Start the Host (auto-detects running TcXaeShell)
-Start-Process "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\STFormatter.Host.exe"
+Start-Process "C:\Program Files (x86)\STBud\STFormatter.Host.exe"
 ```
 
 Once running, the Host injects **Format ST Document** and **Format ST Selection** buttons
@@ -315,7 +315,7 @@ The Host also provides a system tray icon with:
 - **Settings** — change formatting options at runtime
 - **Instances** — view connected TcXaeShell processes
 - **History** — review past format operations
-- **Log** — live log viewer (`%TEMP%\STFormatter_Host.log`)
+- **Log** — live log viewer (`%TEMP%\STBud_Host.log`)
 
 ### 3. Configuration via .editorconfig
 

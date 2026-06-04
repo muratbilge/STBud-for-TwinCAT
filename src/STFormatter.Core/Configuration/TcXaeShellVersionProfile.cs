@@ -9,7 +9,6 @@ public sealed class TcXaeShellVersionProfile
     public string VsShellGeneration { get; }
     public string PrimaryRotMonikerPrefix { get; }
     public string FallbackRotMonikerPrefix { get; }
-    public string RegistryRoot { get; }
     public string[] TargetContextMenuNames { get; }
     public string[] TwinCatFileExtensions { get; }
     public string ProcessName { get; }
@@ -21,7 +20,6 @@ public sealed class TcXaeShellVersionProfile
         string name,
         string dteVersion,
         string vsShellGeneration,
-        string registryRoot,
         string requiredFramework)
     {
         Name = name;
@@ -29,7 +27,6 @@ public sealed class TcXaeShellVersionProfile
         VsShellGeneration = vsShellGeneration;
         PrimaryRotMonikerPrefix = $"!TcXaeShell.DTE.{dteVersion}:";
         FallbackRotMonikerPrefix = $"!VisualStudio.DTE.{dteVersion}:";
-        RegistryRoot = registryRoot;
         RequiredFramework = requiredFramework;
         TargetContextMenuNames = new[] { "PlcCodeWinContextMenu", "Code Window" };
         TwinCatFileExtensions = new[] { ".TcPOU", ".TcDUT", ".TcGVL", ".TcIO", ".TcTO" };
@@ -42,21 +39,18 @@ public sealed class TcXaeShellVersionProfile
         "TC3-VS2017",
         "15.0",
         "2017",
-        @"Software\Beckhoff\TcXaeShell\15.0",
         "4.6");
 
     public static TcXaeShellVersionProfile VS2015 { get; } = new(
         "TC3-VS2015",
         "14.0",
         "2015",
-        @"Software\Beckhoff\TcXaeShell\14.0",
         "4.6");
 
     public static TcXaeShellVersionProfile VS2013 { get; } = new(
         "TC3-VS2013",
         "12.0",
         "2013",
-        @"Software\Beckhoff\TcXaeShell\12.0",
         "4.5.1");
 
     public static TcXaeShellVersionProfile[] AllProfiles { get; } =
@@ -107,7 +101,6 @@ public sealed class TcXaeShellVersionProfile
             $"TC3-unknown-{dteVersion}",
             dteVersion,
             "unknown",
-            $@"Software\Beckhoff\TcXaeShell\{dteVersion}",
             "4.5.1");
     }
 

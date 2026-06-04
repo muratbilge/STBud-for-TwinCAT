@@ -22,11 +22,6 @@ publish/
 **/*.nuget.g.props
 **/*.nuget.g.targets
 
-## Debug/temp
-debug_lexer/
-debug.cs
-HKLM/
-
 ## IDE
 .idea/
 .vscode/

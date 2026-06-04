@@ -157,9 +157,10 @@ File.WriteAllText(filePath, formattedXml);
 
 #### Dependencies for Deployment
 ```
-Extensions\STFormatter\
+C:\Program Files (x86)\STBud\
   STFormatter.Host.exe
   STFormatter.Core.dll
+  STFormatter.UI.dll
   Microsoft.VisualStudio.Interop.dll    ← MUST be deployed alongside
 ```
 
@@ -218,7 +219,7 @@ ShowWindow(handle, 0); // SW_HIDE
 9. ✅ Hide console window via P/Invoke (not WinExe)
 10. ✅ Implement auto-reconnect when TcXaeShell restarts
 11. ✅ Create `.bak` backup before overwriting TwinCAT XML files (fallback only)
-12. ✅ Log everything to `%TEMP%\STFormatter_Host.log`
+12. ✅ Log everything to `%TEMP%\STBud_Host.log`
 
 ## How to Build and Test
 
@@ -233,10 +234,10 @@ deploy.bat
 deploy.bat net462
 
 # Run
-Start-Process "C:\Program Files (x86)\Beckhoff\TcXaeShell\Common7\IDE\Extensions\STFormatter\STFormatter.Host.exe"
+Start-Process "C:\Program Files (x86)\STBud\STFormatter.Host.exe"
 
 # Check log
-Get-Content "$env:TEMP\STFormatter_Host.log" -Tail 20
+Get-Content "$env:TEMP\STBud_Host.log" -Tail 20
 ```
 
 ## Cross-Version Compatibility
@@ -258,7 +259,6 @@ All version-specific values are encapsulated in `TcXaeShellVersionProfile` (in `
 - **Context menu names** — `PlcCodeWinContextMenu`, `Code Window` (consistent across versions)
 - **Target framework** — net462 or net48 (Host/UI projects multi-target both)
 - **File extensions** — `.TcPOU/.TcDUT/.TcGVL/.TcIO/.TcTO` (consistent across versions)
-- **Registry root** — `Software\Beckhoff\TcXaeShell\{version}`
 - **Install path** — `Beckhoff\TcXaeShell\Common7\IDE\`
 - **Process name** — `TcXaeShell`
 - **Bitness** — Always x86 (32-bit)
@@ -276,3 +276,49 @@ The Host scans the ROT for ALL known TcXaeShell moniker patterns:
 - COM service GUIDs — VS SDK GUIDs, stable across all versions
 - `Microsoft.VisualStudio.Interop` v17.0.32112.339 — backward-compatible for DTE COM access
 - x86 platform target — all TcXaeShell versions are 32-bit
+
+## CRITICAL: External Host Directory Separation
+
+**STBud Host files must live outside Beckhoff's TcXaeShell installation.**
+
+Current deployment target:
+```
+C:\Program Files (x86)\STBud\
+  STFormatter.Host.exe
+  STFormatter.Core.dll
+  STFormatter.UI.dll
+  Microsoft.VisualStudio.Interop.dll
+```
+
+TcXaeShell's extension folders are Beckhoff-owned and must not be used for STFormatter deployment.
+
+TcXaeShell's extensions directory structure:
+```
+Extensions\
+  Beckhoff Automation GmbH\
+    TwinCAT XAE Plc\      ← Beckhoff metadata only (manifest/icon/pkgdef/png)
+    TwinCAT XAE Base\     ← Base extension
+    ...
+```
+
+**What went wrong**: During earlier development, Beckhoff PLC DLLs were accidentally copied into `Extensions\STFormatter\`, and a duplicate `Beckhoff Automation GmbH\STFormatter\` directory was created with VSPackage artifacts (`STFormatter.TcXaeShell.dll`, `.pkgdef`, `extension.vsixmanifest`). We then made the problem worse by copying old PLC DLLs into `Extensions\Beckhoff Automation GmbH\TwinCAT XAE Plc\`. This broke TcXaeShell's PLC project creation because:
+1. `Extensions\Beckhoff Automation GmbH\TwinCAT XAE Plc\` is supposed to contain only four metadata files: `extension.vsixmanifest`, `TwinCAT XAE Plc.ico`, `TwinCAT XAE Plc.pkgdef`, and `TwinCAT XAE Plc.png`
+2. The actual PLC binaries load from `C:\TwinCAT\3.1\Components\Plc\Common\` via pkgdef `CodeBase`, not from the TcXaeShell `Extensions` folder
+3. The VSPackage `.pkgdef` tried to register a broken package, corrupting the extension/cache state
+
+**Recovery**: `tools\fix-tcxeshell.ps1` restores the correct state. It:
+1. Removes extra DLLs from `Beckhoff Automation GmbH\TwinCAT XAE Plc\`, restoring it to metadata-only state
+2. Removes the duplicate `Beckhoff Automation GmbH\STFormatter\` directory
+3. Removes the old `Extensions\STFormatter\` deployment directory
+4. Verifies PLC runtime files under `C:\TwinCAT\3.1\Components\Plc\Common\`
+5. Clears the MEF cache and extension caches to force rebuild
+6. Removes stale VSPackage extension registration entries from `HKCU\Software\Beckhoff\TcXaeShell\15.0*\ExtensionManager\ExtensionAutoUpdateEnrollment` (the key `TwinCAT.STFormatter.TcXaeShell.c5d6e7f8-a9b0-4c1d-8e2f-3a4b5c6d7e8f`)
+7. Clears extension cache hashes to force TcXaeShell to rebuild its extension list
+8. Removes stale old-install autostart state if present
+
+**Rules for deployment**:
+- `deploy.bat` copies ONLY Host runtime files into `C:\Program Files (x86)\STBud\`
+- NEVER deploy STFormatter files into TcXaeShell's `Extensions` tree
+- NEVER copy PLC DLLs into `Extensions\Beckhoff Automation GmbH\TwinCAT XAE Plc\`; keep it metadata-only
+- NEVER create directories under `Extensions\Beckhoff Automation GmbH\`
+- The installer (`STFormatter-Setup.iss`) does not inspect or clean TcXaeShell folders; use `tools\fix-tcxeshell.ps1` manually for historical cleanup

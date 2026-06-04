@@ -430,8 +430,8 @@ internal sealed class HostManager
 
             var settingsBtn = (CommandBarButton)targetMenu.Controls.Add(
                 MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
-            settingsBtn.Caption = "ST Formatter Settings";
-            settingsBtn.TooltipText = "Open the ST Formatter settings window";
+            settingsBtn.Caption = "STBud Settings";
+            settingsBtn.TooltipText = "Open the STBud for TwinCAT settings window";
             settingsBtn.Tag = "STFormatter.OpenSettings";
             TrySetIcon(settingsBtn, 277);
             settingsBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
@@ -571,6 +571,103 @@ internal sealed class HostManager
         ioLinkBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
             Program.HandleAddIOLinking(instance.Pid);
         instance.InjectedControls.Add(ioLinkBtn);
+
+        // -- Task submenu --
+        var taskPopup = (CommandBarPopup)addPopup.Controls.Add(
+            MsoControlType.msoControlPopup, Type.Missing, Type.Missing, Type.Missing, true);
+        taskPopup.Caption = STFormatter.UI.Strings.Get("AddMenu.Task");
+        taskPopup.Tag = "STFormatter.Add.Task";
+        instance.InjectedControls.Add(taskPopup);
+
+        var taskNameBtn = (CommandBarButton)taskPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        taskNameBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.TaskName");
+        taskNameBtn.Tag = "STFormatter.Add.Task.TaskName";
+        TrySetIcon(taskNameBtn, 1722);
+        taskNameBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddTaskName(instance.Pid);
+        instance.InjectedControls.Add(taskNameBtn);
+
+        var callAlwaysBtn = (CommandBarButton)taskPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        callAlwaysBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.CallAlways");
+        callAlwaysBtn.Tag = "STFormatter.Add.Task.CallAlways";
+        TrySetIcon(callAlwaysBtn, 1722);
+        callAlwaysBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddPragma(instance.Pid, "call_always");
+        instance.InjectedControls.Add(callAlwaysBtn);
+
+        var callAfterBtn = (CommandBarButton)taskPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        callAfterBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.CallAfter");
+        callAfterBtn.Tag = "STFormatter.Add.Task.CallAfter";
+        TrySetIcon(callAfterBtn, 1722);
+        callAfterBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddCallAfter(instance.Pid);
+        instance.InjectedControls.Add(callAfterBtn);
+
+        var callBeforeBtn = (CommandBarButton)taskPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        callBeforeBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.CallBefore");
+        callBeforeBtn.Tag = "STFormatter.Add.Task.CallBefore";
+        TrySetIcon(callBeforeBtn, 1722);
+        callBeforeBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddCallBefore(instance.Pid);
+        instance.InjectedControls.Add(callBeforeBtn);
+
+        var callAfterInitBtn = (CommandBarButton)taskPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        callAfterInitBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.CallAfterInit");
+        callAfterInitBtn.Tag = "STFormatter.Add.Task.CallAfterInit";
+        TrySetIcon(callAfterInitBtn, 1722);
+        callAfterInitBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddCallAfterInit(instance.Pid);
+        instance.InjectedControls.Add(callAfterInitBtn);
+
+        var callBeforeInitBtn = (CommandBarButton)taskPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        callBeforeInitBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.CallBeforeInit");
+        callBeforeInitBtn.Tag = "STFormatter.Add.Task.CallBeforeInit";
+        TrySetIcon(callBeforeInitBtn, 1722);
+        callBeforeInitBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddCallBeforeInit(instance.Pid);
+        instance.InjectedControls.Add(callBeforeInitBtn);
+
+        var callAfterExitBtn = (CommandBarButton)taskPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        callAfterExitBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.CallAfterExit");
+        callAfterExitBtn.Tag = "STFormatter.Add.Task.CallAfterExit";
+        TrySetIcon(callAfterExitBtn, 1722);
+        callAfterExitBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddCallAfterExit(instance.Pid);
+        instance.InjectedControls.Add(callAfterExitBtn);
+
+        var callBeforeExitBtn = (CommandBarButton)taskPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        callBeforeExitBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.CallBeforeExit");
+        callBeforeExitBtn.Tag = "STFormatter.Add.Task.CallBeforeExit";
+        TrySetIcon(callBeforeExitBtn, 1722);
+        callBeforeExitBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddCallBeforeExit(instance.Pid);
+        instance.InjectedControls.Add(callBeforeExitBtn);
+
+        var priorityBtn = (CommandBarButton)taskPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        priorityBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.Priority");
+        priorityBtn.Tag = "STFormatter.Add.Task.Priority";
+        TrySetIcon(priorityBtn, 1722);
+        priorityBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddPriority(instance.Pid);
+        instance.InjectedControls.Add(priorityBtn);
+
+        var noCheckBtn = (CommandBarButton)taskPopup.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        noCheckBtn.Caption = STFormatter.UI.Strings.Get("AddMenu.NoCheck");
+        noCheckBtn.Tag = "STFormatter.Add.Task.NoCheck";
+        TrySetIcon(noCheckBtn, 1722);
+        noCheckBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddPragma(instance.Pid, "no_check");
+        instance.InjectedControls.Add(noCheckBtn);
 
         // -- Region submenu --
         var regionPopup = (CommandBarPopup)addPopup.Controls.Add(

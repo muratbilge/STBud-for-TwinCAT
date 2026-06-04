@@ -1,4 +1,4 @@
-; TwinCAT ST Formatter - Inno Setup Installer
+; STBud for TwinCAT - Inno Setup Installer
 ; Version: 1.0.0
 ;
 ; Prerequisites for BUILDING:
@@ -9,9 +9,9 @@
 ;   [x] TcXaeShell Host - external COM DTE integration for TwinCAT XAE Shell
 ;   [x] CLI Tool (optional) - requires .NET 8 runtime
 
-#define AppName "TwinCAT ST Formatter"
+#define AppName "STBud for TwinCAT"
 #define AppVersion "1.0.0"
-#define AppPublisher "TwinCAT ST Formatter Project"
+#define AppPublisher "STBud Project"
 #define AppURL "https://github.com/anomalyco/opencode"
 #define AppExeName "STFormatter.Host.exe"
 #define CliExeName "STFormatter.CLI.exe"
@@ -23,18 +23,17 @@ AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
-DefaultDirName={autopf}\STFormatter
+DefaultDirName={pf32}\STBud
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 OutputDir=..\publish
-OutputBaseFilename=STFormatter-Setup-{#AppVersion}
+OutputBaseFilename=STBud-for-TwinCAT-Setup-{#AppVersion}
 SetupIconFile=..\assets\icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
 ArchitecturesAllowed=x86compatible x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 SetupLogging=yes
 CloseApplications=yes
@@ -53,54 +52,56 @@ Name: "host"; Description: "TcXaeShell Host"; Types: full custom
 Name: "cli"; Description: "CLI Tool (stfmt)"; Types: full custom
 
 [Tasks]
-Name: "desktopshortcut"; Description: "Create a desktop shortcut for STFormatter Host"; Flags: checkedonce; Components: host
-Name: "hostautostart"; Description: "Start STFormatter Host automatically on login"; Flags: unchecked; Components: host
-Name: "starthost"; Description: "Start STFormatter Host after installation"; Flags: unchecked; Components: host
+Name: "desktopshortcut"; Description: "Create a desktop shortcut for STBud"; Flags: checkedonce; Components: host
+Name: "hostautostart"; Description: "Start STBud automatically on login"; Flags: unchecked; Components: host
+Name: "starthost"; Description: "Start STBud after installation"; Flags: unchecked; Components: host
 Name: "addtopath"; Description: "Add stfmt to user PATH"; Flags: checkedonce; Components: cli
 
 [Files]
 ; CLI Tool (net8.0, framework-dependent)
 Components: cli; Flags: ignoreversion recursesubdirs; DestDir: "{app}\CLI"; Source: "files\cli\*"; Excludes: "*.pdb"
 
-; TcXaeShell Host - deploy directly to Beckhoff's extension folder.
-Components: host; Flags: ignoreversion recursesubdirs; DestDir: "{code:GetTcXaeShellExtensionsPath}"; Source: "files\host-net48\*"; Check: ShouldUseNet48
-Components: host; Flags: ignoreversion recursesubdirs; DestDir: "{code:GetTcXaeShellExtensionsPath}"; Source: "files\host-net462\*"; Check: ShouldUseNet462
+; TcXaeShell Host - external process, installed outside Beckhoff's folders.
+Components: host; Flags: ignoreversion recursesubdirs; DestDir: "{app}"; Source: "files\host-net48\*"; Check: ShouldUseNet48
+Components: host; Flags: ignoreversion recursesubdirs; DestDir: "{app}"; Source: "files\host-net462\*"; Check: ShouldUseNet462
 
 ; EditorConfig presets
 Components: cli; Flags: ignoreversion; DestDir: "{app}\presets"; Source: "files\editorconfig-templates\*"
 
 [Icons]
-Name: "{group}\STFormatter Host (TcXaeShell)"; Filename: "{code:GetTcXaeShellHostPath}"; Components: host
-Name: "{group}\STFormatter CLI"; Filename: "{cmd}"; Parameters: "/k ""{app}\CLI\{#CliExeName}"""; Components: cli
-Name: "{group}\Uninstall STFormatter"; Filename: "{uninstallexe}"
-Name: "{userdesktop}\STFormatter Host"; Filename: "{code:GetTcXaeShellHostPath}"; Tasks: desktopshortcut; Components: host
-Name: "{userstartup}\STFormatter Host"; Filename: "{code:GetTcXaeShellHostPath}"; Tasks: hostautostart; Components: host
+Name: "{group}\STBud for TwinCAT"; Filename: "{code:GetTcXaeShellHostPath}"; Components: host
+Name: "{group}\STBud CLI"; Filename: "{cmd}"; Parameters: "/k ""{app}\CLI\{#CliExeName}"""; Components: cli
+Name: "{group}\Uninstall STBud for TwinCAT"; Filename: "{uninstallexe}"
+Name: "{userdesktop}\STBud for TwinCAT"; Filename: "{code:GetTcXaeShellHostPath}"; Tasks: desktopshortcut; Components: host
+Name: "{userstartup}\STBud for TwinCAT"; Filename: "{code:GetTcXaeShellHostPath}"; Tasks: hostautostart; Components: host
 
 [Run]
 ; Verify CLI only when explicitly selected in the final wizard page.
 Components: cli; Filename: "{app}\CLI\{#CliExeName}"; Parameters: "--help"; Flags: runhidden nowait postinstall skipifsilent unchecked; Description: "Verify stfmt CLI"
 
 ; Use explorer.exe so the Host starts non-elevated from an elevated installer.
-Components: host; Filename: "{win}\explorer.exe"; Parameters: """{code:GetTcXaeShellHostPath}"""; Flags: nowait postinstall skipifsilent; Description: "Start STFormatter Host now"; Tasks: starthost
+Components: host; Filename: "{win}\explorer.exe"; Parameters: """{code:GetTcXaeShellHostPath}"""; Flags: nowait postinstall skipifsilent; Description: "Start STBud now"; Tasks: starthost
 
 [UninstallRun]
 Filename: "taskkill.exe"; Parameters: "/f /im STFormatter.Host.exe"; Flags: runhidden; RunOnceId: "kill_host"
 
+[InstallDelete]
+Type: filesandordirs; Name: "{pf32}\STFormatter"
+Type: files; Name: "{userdesktop}\STFormatter Host.lnk"
+Type: files; Name: "{userstartup}\STFormatter Host.lnk"
+Type: filesandordirs; Name: "{autoprograms}\TwinCAT ST Formatter"
+
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\CLI"
 Type: filesandordirs; Name: "{app}\presets"
-Type: files; Name: "{localappdata}\STFormatter\settings.json"
-Type: files; Name: "{userdesktop}\STFormatter Host.lnk"
-Type: files; Name: "{userstartup}\STFormatter Host.lnk"
+Type: files; Name: "{userappdata}\STBud\settings.json"
+Type: files; Name: "{userdesktop}\STBud for TwinCAT.lnk"
+Type: files; Name: "{userstartup}\STBud for TwinCAT.lnk"
 
 [Code]
 var
-  TcXaeShellPath: string;
   DotNet48Installed: Boolean;
   DotNet462Installed: Boolean;
-
-const
-  AppRegistryKey = 'Software\STFormatter';
 
 function GetDotNetRelease(): Cardinal;
 var
@@ -116,11 +117,6 @@ var
   Release: Cardinal;
 begin
   Result := True;
-  TcXaeShellPath := '';
-
-  RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Beckhoff\TcXaeShell\15.0', 'InstallDir', TcXaeShellPath);
-  if TcXaeShellPath = '' then
-    RegQueryStringValue(HKLM, 'SOFTWARE\Beckhoff\TcXaeShell\15.0', 'InstallDir', TcXaeShellPath);
 
   Release := GetDotNetRelease();
   DotNet48Installed := Release >= 528040;
@@ -128,32 +124,14 @@ begin
 
   if not DotNet462Installed then
   begin
-    MsgBox('TwinCAT ST Formatter Host requires .NET Framework 4.6.2 or newer. Install .NET Framework 4.8 and run this setup again.', mbCriticalError, MB_OK);
+    MsgBox('STBud for TwinCAT requires .NET Framework 4.6.2 or newer. Install .NET Framework 4.8 and run this setup again.', mbCriticalError, MB_OK);
     Result := False;
   end;
 end;
 
-function TcXaeShellInstalled(): Boolean;
-begin
-  Result := (TcXaeShellPath <> '') or FileExists(ExpandConstant('{pf32}\Beckhoff\TcXaeShell\Common7\IDE\TcXaeShell.exe'));
-end;
-
-function GetTcXaeShellIdePath(): string;
-begin
-  if TcXaeShellPath <> '' then
-    Result := AddBackslash(TcXaeShellPath) + 'Common7\IDE'
-  else
-    Result := ExpandConstant('{pf32}\Beckhoff\TcXaeShell\Common7\IDE');
-end;
-
-function GetTcXaeShellExtensionsPath(Param: string): string;
-begin
-  Result := AddBackslash(GetTcXaeShellIdePath()) + 'Extensions\STFormatter';
-end;
-
 function GetTcXaeShellHostPath(Param: string): string;
 begin
-  Result := AddBackslash(GetTcXaeShellExtensionsPath('')) + '{#AppExeName}';
+  Result := ExpandConstant('{app}\{#AppExeName}');
 end;
 
 function ShouldUseNet462(): Boolean;
@@ -279,29 +257,15 @@ begin
 
   if CurStep = ssPostInstall then
   begin
-    if WizardIsComponentSelected('host') then
-      RegWriteStringValue(HKLM, AppRegistryKey, 'HostInstallDir', GetTcXaeShellExtensionsPath(''));
-
     if WizardIsTaskSelected('addtopath') then
       AddCliToUserPath();
   end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-var
-  DstDir: string;
 begin
   if CurUninstallStep = usPostUninstall then
   begin
     RemoveCliFromUserPath();
-
-    if not RegQueryStringValue(HKLM, AppRegistryKey, 'HostInstallDir', DstDir) then
-      DstDir := GetTcXaeShellExtensionsPath('');
-
-    if DirExists(DstDir) then
-      DelTree(DstDir, True, True, True);
-
-    RegDeleteValue(HKLM, AppRegistryKey, 'HostInstallDir');
-    RegDeleteKeyIfEmpty(HKLM, AppRegistryKey);
   end;
 end;

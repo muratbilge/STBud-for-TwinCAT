@@ -5,8 +5,8 @@
     <FileVersion Condition="'$(FileVersion)' == ''">$(Version).0</FileVersion>
     <InformationalVersion Condition="'$(InformationalVersion)' == ''">$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <Authors>TwinCAT ST Formatter Project</Authors>
-    <Company>TwinCAT ST Formatter Project</Company>
-    <Product>TwinCAT ST Formatter</Product>
+    <Authors>STBud Project</Authors>
+    <Company>STBud Project</Company>
+    <Product>STBud for TwinCAT</Product>
   </PropertyGroup>
 </Project>

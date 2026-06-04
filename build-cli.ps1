@@ -1,11 +1,11 @@
 #!/usr/bin/env pwsh
-# Build script for TwinCAT ST Formatter - CLI Tool
+# Build script for STBud for TwinCAT - CLI Tool
 # Creates a portable publish folder with all dependencies
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "TwinCAT ST Formatter - CLI Build" -ForegroundColor Cyan
+Write-Host "STBud for TwinCAT - CLI Build" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
 # Check .NET

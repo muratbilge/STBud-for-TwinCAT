@@ -18,9 +18,14 @@ namespace STFormatter.UI
     {
         private static readonly string SettingsDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "STBud");
+
+        private static readonly string LegacySettingsDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "STFormatter");
 
         private static readonly string SettingsPath = Path.Combine(SettingsDir, "settings.json");
+        private static readonly string LegacySettingsPath = Path.Combine(LegacySettingsDir, "settings.json");
 
         private static AppSettings? _appSettings;
         private static FormattingConfiguration? _current;
@@ -60,7 +65,8 @@ namespace STFormatter.UI
                 if (_appSettings != null) return;
                 try
                 {
-                    if (!File.Exists(SettingsPath))
+                    string path = File.Exists(SettingsPath) ? SettingsPath : LegacySettingsPath;
+                    if (!File.Exists(path))
                     {
                         _appSettings = new AppSettings();
                         _current = _appSettings.Formatting;
@@ -68,7 +74,7 @@ namespace STFormatter.UI
                         return;
                     }
 
-                    string json = File.ReadAllText(SettingsPath);
+                    string json = File.ReadAllText(path);
                     var options = new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true,

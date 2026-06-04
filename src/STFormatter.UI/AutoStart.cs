@@ -6,7 +6,8 @@ namespace STFormatter.UI
     public static class AutoStart
     {
         private const string RunKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
-        private const string AppName = "STFormatter";
+        private const string AppName = "STBud for TwinCAT";
+        private const string LegacyAppName = "STFormatter";
 
         public static bool IsEnabled()
         {
@@ -14,7 +15,7 @@ namespace STFormatter.UI
             {
                 using (var key = Registry.CurrentUser.OpenSubKey(RunKey, false))
                 {
-                    return key?.GetValue(AppName) != null;
+                    return key?.GetValue(AppName) != null || key?.GetValue(LegacyAppName) != null;
                 }
             }
             catch { return false; }
@@ -34,6 +35,7 @@ namespace STFormatter.UI
                 using (var key = Registry.CurrentUser.OpenSubKey(RunKey, true))
                 {
                     key?.SetValue(AppName, $"\"{exePath}\"");
+                    key?.DeleteValue(LegacyAppName, false);
                 }
             }
             catch { }
@@ -46,6 +48,7 @@ namespace STFormatter.UI
                 using (var key = Registry.CurrentUser.OpenSubKey(RunKey, true))
                 {
                     key?.DeleteValue(AppName, false);
+                    key?.DeleteValue(LegacyAppName, false);
                 }
             }
             catch { }

@@ -58,7 +58,7 @@ class Program
 
     static int PrintVersion()
     {
-        Console.WriteLine($"TwinCAT ST Formatter CLI {GetVersion()}");
+        Console.WriteLine($"STBud for TwinCAT CLI {GetVersion()}");
         return 0;
     }
 
@@ -527,7 +527,7 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
 
     static void PrintUsage()
     {
-        Console.WriteLine($"TwinCAT ST Formatter CLI {GetVersion()}");
+        Console.WriteLine($"STBud for TwinCAT CLI {GetVersion()}");
         Console.WriteLine();
         Console.WriteLine("Usage:");
         Console.WriteLine("  stfmt format <file> [-o <output>] [--dry-run]");

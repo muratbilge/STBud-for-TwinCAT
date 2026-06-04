@@ -383,7 +383,7 @@ internal class Program
             var consoleHandle = GetConsoleWindow();
             if (consoleHandle != IntPtr.Zero)
                 ShowWindow(consoleHandle, SW_HIDE);
-            System.Windows.Forms.MessageBox.Show(message, "ST Formatter",
+            System.Windows.Forms.MessageBox.Show(message, "STBud for TwinCAT",
                 System.Windows.Forms.MessageBoxButtons.OK,
                 System.Windows.Forms.MessageBoxIcon.Information);
         }));
@@ -730,6 +730,40 @@ internal class Program
         Log($"HandleAddIOLinking: PID {pid}");
         try
         {
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddIOLinking: PID {pid} instance not found/alive");
+                return;
+            }
+
+            string? tsprojPath = null;
+            try
+            {
+                string? solutionPath = instance.Dte.Solution?.FullName;
+                if (!string.IsNullOrEmpty(solutionPath))
+                    tsprojPath = STFormatter.Core.IoTree.IoTreeParser.FindTsprojFile(solutionPath);
+            }
+            catch (Exception ex)
+            {
+                Log($"HandleAddIOLinking: PID {pid} solution path lookup failed: {ex.Message}");
+            }
+
+            STFormatter.Core.IoTree.IoTreeNode? ioTree = null;
+            if (!string.IsNullOrEmpty(tsprojPath))
+            {
+                try
+                {
+                    ioTree = STFormatter.Core.IoTree.IoTreeParser.ParseIoTree(tsprojPath);
+                    Log($"HandleAddIOLinking: PID {pid} parsed I/O tree from {tsprojPath}, children={ioTree?.Children.Count ?? 0}");
+                }
+                catch (Exception ex)
+                {
+                    Log($"HandleAddIOLinking: PID {pid} I/O tree parse failed: {ex.Message}");
+                    ioTree = null;
+                }
+            }
+
             string? ioPath = null;
             _mainForm?.Invoke((Action)(() =>
             {
@@ -737,24 +771,26 @@ internal class Program
                 if (consoleHandle != IntPtr.Zero)
                     ShowWindow(consoleHandle, SW_HIDE);
 
-                using var dlg = new STFormatter.UI.InputDialog(
-                    STFormatter.UI.Strings.Get("AddMenu.IOLinkingTitle"),
-                    STFormatter.UI.Strings.Get("AddMenu.IOLinkingPrompt"),
-                    "");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                    ioPath = dlg.InputText;
+                if (ioTree != null && ioTree.Children.Count > 0)
+                {
+                    using var dlg = new STFormatter.UI.IoTreeBrowserDialog(ioTree);
+                    if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                        ioPath = dlg.SelectedPath;
+                }
+                else
+                {
+                    using var dlg = new STFormatter.UI.InputDialog(
+                        STFormatter.UI.Strings.Get("AddMenu.IOLinkingTitle"),
+                        STFormatter.UI.Strings.Get("AddMenu.IOLinkingPrompt"),
+                        "");
+                    if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                        ioPath = dlg.InputText;
+                }
             }));
 
             if (string.IsNullOrEmpty(ioPath))
             {
                 Log("HandleAddIOLinking: User cancelled or empty input");
-                return;
-            }
-
-            var instance = _hostManager?.GetInstance(pid);
-            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
-            {
-                Log($"HandleAddIOLinking: PID {pid} instance not found/alive");
                 return;
             }
 
@@ -820,6 +856,398 @@ internal class Program
         catch (Exception ex)
         {
             Log($"HandleAddObsolete: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddTaskName(int pid)
+    {
+        Log($"HandleAddTaskName: PID {pid}");
+        try
+        {
+            string? taskName = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.TaskNameTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.TaskNamePrompt"),
+                    "PlcTask");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    taskName = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(taskName))
+            {
+                Log("HandleAddTaskName: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddTaskName: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddTaskName: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{attribute 'task_name' := '{taskName}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddTaskName: PID {pid} taskName=[{taskName}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddTaskName: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddCallAfter(int pid)
+    {
+        Log($"HandleAddCallAfter: PID {pid}");
+        try
+        {
+            string? pouName = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.CallAfterTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.CallAfterPrompt"),
+                    "");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    pouName = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(pouName))
+            {
+                Log("HandleAddCallAfter: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddCallAfter: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddCallAfter: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{attribute 'call_after' := '{pouName}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddCallAfter: PID {pid} pouName=[{pouName}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddCallAfter: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddCallBefore(int pid)
+    {
+        Log($"HandleAddCallBefore: PID {pid}");
+        try
+        {
+            string? pouName = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.CallBeforeTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.CallBeforePrompt"),
+                    "");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    pouName = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(pouName))
+            {
+                Log("HandleAddCallBefore: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddCallBefore: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddCallBefore: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{attribute 'call_before' := '{pouName}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddCallBefore: PID {pid} pouName=[{pouName}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddCallBefore: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddCallAfterInit(int pid)
+    {
+        Log($"HandleAddCallAfterInit: PID {pid}");
+        try
+        {
+            string? pouName = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.CallAfterInitTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.CallAfterInitPrompt"),
+                    "");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    pouName = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(pouName))
+            {
+                Log("HandleAddCallAfterInit: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddCallAfterInit: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddCallAfterInit: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{attribute 'call_after_init' := '{pouName}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddCallAfterInit: PID {pid} pouName=[{pouName}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddCallAfterInit: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddCallBeforeInit(int pid)
+    {
+        Log($"HandleAddCallBeforeInit: PID {pid}");
+        try
+        {
+            string? pouName = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.CallBeforeInitTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.CallBeforeInitPrompt"),
+                    "");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    pouName = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(pouName))
+            {
+                Log("HandleAddCallBeforeInit: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddCallBeforeInit: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddCallBeforeInit: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{attribute 'call_before_init' := '{pouName}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddCallBeforeInit: PID {pid} pouName=[{pouName}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddCallBeforeInit: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddCallAfterExit(int pid)
+    {
+        Log($"HandleAddCallAfterExit: PID {pid}");
+        try
+        {
+            string? pouName = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.CallAfterExitTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.CallAfterExitPrompt"),
+                    "");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    pouName = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(pouName))
+            {
+                Log("HandleAddCallAfterExit: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddCallAfterExit: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddCallAfterExit: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{attribute 'call_after_exit' := '{pouName}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddCallAfterExit: PID {pid} pouName=[{pouName}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddCallAfterExit: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddCallBeforeExit(int pid)
+    {
+        Log($"HandleAddCallBeforeExit: PID {pid}");
+        try
+        {
+            string? pouName = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.CallBeforeExitTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.CallBeforeExitPrompt"),
+                    "");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    pouName = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(pouName))
+            {
+                Log("HandleAddCallBeforeExit: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddCallBeforeExit: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddCallBeforeExit: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{attribute 'call_before_exit' := '{pouName}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddCallBeforeExit: PID {pid} pouName=[{pouName}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddCallBeforeExit: PID {pid} FAILED: {ex.Message}");
+        }
+    }
+
+    public static void HandleAddPriority(int pid)
+    {
+        Log($"HandleAddPriority: PID {pid}");
+        try
+        {
+            string? priority = null;
+            _mainForm?.Invoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero)
+                    ShowWindow(consoleHandle, SW_HIDE);
+
+                using var dlg = new STFormatter.UI.InputDialog(
+                    STFormatter.UI.Strings.Get("AddMenu.PriorityTitle"),
+                    STFormatter.UI.Strings.Get("AddMenu.PriorityPrompt"),
+                    "5");
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    priority = dlg.InputText;
+            }));
+
+            if (string.IsNullOrEmpty(priority))
+            {
+                Log("HandleAddPriority: User cancelled or empty input");
+                return;
+            }
+
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+            {
+                Log($"HandleAddPriority: PID {pid} instance not found/alive");
+                return;
+            }
+
+            if (instance.Dte.ActiveDocument == null)
+            {
+                Log($"HandleAddPriority: PID {pid} No active document");
+                return;
+            }
+
+            string pragmaText = $"{{attribute 'priority' := '{priority}'}}";
+            bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
+            Log($"HandleAddPriority: PID {pid} priority=[{priority}] result={(success ? "OK" : "FAILED")}");
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleAddPriority: PID {pid} FAILED: {ex.Message}");
         }
     }
 

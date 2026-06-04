@@ -1,5 +1,5 @@
 #!/usr/bin/env pwsh
-# Local CLI installation script for TwinCAT ST Formatter.
+# Local CLI installation script for STBud for TwinCAT.
 # For TcXaeShell Host installation, use installer\build-installer.ps1 or deploy.bat.
 
 param(
@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "TwinCAT ST Formatter CLI Installer" -ForegroundColor Cyan
+Write-Host "STBud for TwinCAT CLI Installer" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
