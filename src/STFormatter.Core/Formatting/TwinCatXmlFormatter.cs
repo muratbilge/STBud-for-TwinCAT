@@ -47,7 +47,9 @@ public sealed class TwinCatXmlFormatter
             string formatted;
             if (isDeclaration)
             {
-                formatted = _engine.Format(stCode) ?? stCode;
+                formatted = _engine.FormatDeclaration(stCode);
+                if (string.IsNullOrEmpty(formatted) || formatted == stCode)
+                    formatted = _engine.Format(stCode) ?? stCode;
                 formattedDecl = formatted;
             }
             else
@@ -98,9 +100,13 @@ public sealed class TwinCatXmlFormatter
 
                 if (isDeclaration)
                 {
-                    formatted = _engine.Format(cdata.Value);
-                    if (string.IsNullOrEmpty(formatted))
-                        formatted = null;
+                    formatted = _engine.FormatDeclaration(cdata.Value);
+                    if (string.IsNullOrEmpty(formatted) || formatted == cdata.Value)
+                    {
+                        formatted = _engine.Format(cdata.Value);
+                        if (string.IsNullOrEmpty(formatted))
+                            formatted = null;
+                    }
                 }
 
                 if (formatted == null && (isSt || !isDeclaration))
@@ -135,8 +141,12 @@ public sealed class TwinCatXmlFormatter
         string upper = text.ToUpperInvariant();
         bool hasVar = upper.Contains("VAR") && upper.Contains("END_VAR");
         bool hasProgram = upper.Contains("PROGRAM") || upper.Contains("FUNCTION_BLOCK") || upper.Contains("FUNCTION");
-        bool hasBodyKeywords = upper.Contains("IF ") || upper.Contains("FOR ") || upper.Contains("WHILE ") ||
-                                upper.Contains(":=") || upper.Contains("THEN");
+
+        string stripped = StripPragmas(text);
+        string strippedUpper = stripped.ToUpperInvariant();
+        bool hasBodyKeywords = strippedUpper.Contains("IF ") || strippedUpper.Contains("FOR ") || strippedUpper.Contains("WHILE ") ||
+                                strippedUpper.Contains(":=") || strippedUpper.Contains("THEN");
+
         if (hasVar && !hasBodyKeywords) return true;
         if (hasBodyKeywords && !hasVar) return false;
         if (hasProgram) return true;
@@ -147,6 +157,30 @@ public sealed class TwinCatXmlFormatter
         }
 
         return false;
+    }
+
+    private static string StripPragmas(string text)
+    {
+        var result = new System.Text.StringBuilder(text.Length);
+        int i = 0;
+        while (i < text.Length)
+        {
+            if (text[i] == '{')
+            {
+                int depth = 1;
+                i++;
+                while (i < text.Length && depth > 0)
+                {
+                    if (text[i] == '{') depth++;
+                    else if (text[i] == '}') depth--;
+                    i++;
+                }
+                continue;
+            }
+            result.Append(text[i]);
+            i++;
+        }
+        return result.ToString();
     }
 
     private static readonly string[] CommonTypes = new[]

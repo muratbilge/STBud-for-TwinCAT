@@ -36,7 +36,7 @@ END_VAR
     public void FormatXmlContent_ReturnsUnchanged_WhenAlreadyFormatted()
     {
         var engine = new FormattingEngine();
-        var preFormatted = engine.Format("PROGRAM X\nVAR\ny : INT;\nEND_VAR\nEND_PROGRAM");
+        var preFormatted = engine.FormatDeclaration("PROGRAM X\nVAR\ny : INT;\nEND_VAR\nEND_PROGRAM");
         var xml = $"<Root><Declaration><![CDATA[{preFormatted}]]></Declaration></Root>";
         var formatter = new TwinCatXmlFormatter();
         bool changed = formatter.FormatXmlContent(xml, out var result, out _, out _);

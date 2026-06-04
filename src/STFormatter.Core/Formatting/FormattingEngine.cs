@@ -47,8 +47,10 @@ public sealed class FormattingEngine
         var pouDecl = tree.Root.ChildNodes.FirstOrDefault();
         if (pouDecl != null)
         {
+            var varSections = pouDecl.ChildNodes.Where(n => n.Kind == SyntaxKind.VarSection).ToList();
             var stmtList = pouDecl.ChildNodes.FirstOrDefault(n => n.Kind == SyntaxKind.StatementList);
-            if (stmtList != null)
+
+            if (stmtList != null && stmtList.ChildNodes.Any())
             {
                 visitor.Visit(stmtList);
                 var extracted = writer.ToString();
@@ -59,6 +61,11 @@ public sealed class FormattingEngine
                     extracted = extracted.Replace("\n", "\r\n");
 
                 return extracted;
+            }
+
+            if (varSections.Count > 0)
+            {
+                return body;
             }
         }
 
@@ -1907,13 +1914,13 @@ internal sealed class FormattingVisitor
                 _writer.EnsureNewLine();
             }
 
-            if (IsRegionPragma(trivia))
+            if (trivia.IsPragma)
             {
                 _writer.EnsureNewLine();
             }
         }
 
-        if (lastTrivia != null && IsRegionPragma(lastTrivia))
+        if (lastTrivia != null && lastTrivia.IsPragma)
         {
             _writer.EnsureNewLine();
         }
@@ -1923,8 +1930,7 @@ internal sealed class FormattingVisitor
     {
         foreach (var trivia in triviaList)
         {
-            // If this is a region pragma, ensure it's on its own line
-            if (IsRegionPragma(trivia))
+            if (trivia.IsPragma)
             {
                 _writer.EnsureNewLine();
             }

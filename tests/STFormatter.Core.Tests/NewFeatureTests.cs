@@ -458,4 +458,138 @@ public class ConfigurationPropertyTests
         Assert.Contains("TON_Fill", result);
         Assert.Contains("BOOL", result);
     }
+
+    [Fact]
+    public void LooksLikeDeclaration_VarGlobalWithAttributePragmas_Detected()
+    {
+        var text = "VAR_GLOBAL\r\n\t{attribute 'task_name' := 'PlcTask'}\r\n{attribute 'TcLinkTo' := 'TIID^Device 1 (EtherCAT)^Term 1 (EK1100)^Term 2 (EL2522)^PTO Target Channel 1^Target counter value'}\r\n\ttestrr AT %I* :UDINT;\r\nEND_VAR";
+        Assert.True(TwinCatXmlFormatter.LooksLikeDeclaration(text));
+    }
+
+    [Fact]
+    public void LooksLikeDeclaration_VarGlobalWithAttributeQualifiedOnly_Detected()
+    {
+        var text = "{attribute 'qualified_only'}\r\nVAR_GLOBAL\r\n\tafff\t\t\t\t\tAT \t%I* :BOOL;\r\nEND_VAR";
+        Assert.True(TwinCatXmlFormatter.LooksLikeDeclaration(text));
+    }
+
+    [Fact]
+    public void FormatDeclaration_VarGlobalWithAttribute_AtClause()
+    {
+        var engine = new FormattingEngine();
+        var source = "{attribute 'qualified_only'}\r\nVAR_GLOBAL\r\n\tafff\t\t\t\t\tAT \t%I* :BOOL;\r\nEND_VAR";
+        var result = engine.FormatDeclaration(source);
+        Assert.NotNull(result);
+        Assert.NotEmpty(result);
+        Assert.Contains("afff", result);
+        Assert.Contains("AT", result);
+        Assert.Contains("%I*", result);
+        Assert.Contains("BOOL", result);
+        Assert.Contains("VAR_GLOBAL", result);
+        Assert.Contains("END_VAR", result);
+    }
+
+    [Fact]
+    public void FormatDeclaration_VarGlobalWithNestedAttributes()
+    {
+        var engine = new FormattingEngine();
+        var source = "VAR_GLOBAL\r\n\t{attribute 'task_name' := 'PlcTask'}\r\n{attribute 'TcLinkTo' := 'TIID^Device 1 (EtherCAT)^Term 1 (EK1100)^Term 2 (EL2522)^PTO Target Channel 1^Target counter value'}\r\n\ttestrr AT %I* :UDINT;\r\nEND_VAR";
+        var result = engine.FormatDeclaration(source);
+        Assert.NotNull(result);
+        Assert.NotEmpty(result);
+        Assert.Contains("testrr", result);
+        Assert.Contains("AT", result);
+        Assert.Contains("UDINT", result);
+        Assert.Contains("VAR_GLOBAL", result);
+        Assert.Contains("END_VAR", result);
+    }
+
+    [Fact]
+    public void FormatDeclaration_ProgramMainEmptyVar_()
+    {
+        var engine = new FormattingEngine();
+        var source = "PROGRAM MAIN\r\nVAR\r\nEND_VAR\r\n";
+        var result = engine.FormatDeclaration(source);
+        Assert.NotNull(result);
+        Assert.NotEmpty(result);
+        Assert.Contains("PROGRAM MAIN", result);
+        Assert.Contains("VAR", result);
+        Assert.Contains("END_VAR", result);
+    }
+
+    [Fact]
+    public void FormatBody_VarSectionOnly_FallsBackToOriginal()
+    {
+        var engine = new FormattingEngine();
+        var source = "VAR_OUTPUT\r\nEND_VAR\r\nVAR\r\nEND_VAR\r\n";
+        var result = engine.FormatBody(source);
+        Assert.NotNull(result);
+        Assert.True(result.Length > 0, $"FormatBody returned empty for VAR-section-only text. Expected fallback to original: '{source}'");
+    }
+
+    [Fact]
+    public void Format_FunctionBlockWithVarSections_FormatsDeclaration()
+    {
+        var engine = new FormattingEngine();
+        var source = "FUNCTION_BLOCK POU_1\r\nVAR_INPUT\r\nEND_VAR\r\nVAR_OUTPUT\r\nEND_VAR\r\nVAR\r\nEND_VAR\r\n";
+        var result = engine.Format(source);
+        Assert.NotNull(result);
+        Assert.NotEmpty(result);
+        Assert.Contains("FUNCTION_BLOCK POU_1", result);
+    }
+
+    [Fact]
+    public void Format_VarGlobalWithAttributeAndAt_Formats()
+    {
+        var engine = new FormattingEngine();
+        var source = "{attribute 'qualified_only'}\r\nVAR_GLOBAL\r\n\tafff\t\t\t\t\tAT \t%I* :BOOL;\r\nEND_VAR";
+        var result = engine.FormatDeclaration(source);
+        Assert.NotNull(result);
+        Assert.NotEmpty(result);
+        Assert.Contains("{attribute 'qualified_only'}", result);
+        Assert.Contains("afff", result);
+        Assert.Contains("AT", result);
+        Assert.Contains("%I*", result);
+        Assert.Contains("BOOL", result);
+    }
+
+    [Fact]
+    public void FormatDeclaration_PragmaAfterVarDecl_OnOwnLine()
+    {
+        var engine = new FormattingEngine();
+        var source = "VAR_GLOBAL\r\n    afff AT %I*  : BOOL;\r\n\t\t\t\t\t{attribute 'TcLinkTo' := 'trert'}\r\nEND_VAR";
+        var result = engine.FormatDeclaration(source);
+        Assert.NotNull(result);
+        Assert.NotEmpty(result);
+        Assert.Contains("{attribute 'TcLinkTo' := 'trert'}", result);
+        Assert.Contains("VAR_GLOBAL", result);
+        Assert.Contains("END_VAR", result);
+        Assert.Contains("afff", result);
+
+        var lines = result.Replace("\r\n", "\n").Split('\n');
+        var pragmaLine = Array.FindIndex(lines, l => l.Contains("{attribute 'TcLinkTo'"));
+        var endVarLine = Array.FindIndex(lines, l => l.Trim().StartsWith("END_VAR"));
+        Assert.True(pragmaLine >= 0, "Pragma should be on its own line");
+        Assert.True(endVarLine >= 0, "END_VAR should be on its own line");
+        Assert.True(pragmaLine < endVarLine, "Pragma should appear before END_VAR");
+        Assert.DoesNotContain("}END_VAR", result.Replace("\r\n", "\n"));
+        Assert.DoesNotContain("}END_VAR", result);
+    }
+
+    [Fact]
+    public void FormatDeclaration_PragmaBeforeVarDecl_OnOwnLine()
+    {
+        var engine = new FormattingEngine();
+        var source = "VAR_GLOBAL\r\n{attribute 'qualified_only'}\r\naaaa : BOOL;\r\nEND_VAR";
+        var result = engine.FormatDeclaration(source);
+        Assert.NotNull(result);
+        Assert.NotEmpty(result);
+        Assert.Contains("{attribute 'qualified_only'}", result);
+        Assert.Contains("aaaa", result);
+        Assert.Contains("VAR_GLOBAL", result);
+        Assert.Contains("END_VAR", result);
+
+        Assert.DoesNotContain("}aaaa", result.Replace("\r\n", "\n"));
+        Assert.DoesNotContain("}aaaa", result);
+    }
 }

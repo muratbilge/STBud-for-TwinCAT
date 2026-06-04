@@ -468,6 +468,7 @@ internal static class LiveEditor
                 if (isDecl)
                 {
                     formatted = engine.FormatDeclaration(currentText);
+                    Log($"TryFormatViaExecuteCommand: FormatDeclaration result: [{(formatted ?? "<null>")}]");
                     if (string.IsNullOrEmpty(formatted) || formatted == currentText)
                     {
                         Log("TryFormatViaExecuteCommand: FormatDeclaration failed or unchanged, trying Format as fallback");
@@ -476,6 +477,8 @@ internal static class LiveEditor
                 }
                 else
                     formatted = engine.FormatBody(currentText);
+
+                Log($"TryFormatViaExecuteCommand: Formatted output: [{(formatted ?? "<null>").Replace("\r", "\\r").Replace("\n", "\\n")}]");
 
                 if (string.IsNullOrEmpty(formatted) || formatted == currentText)
                 {
@@ -588,6 +591,7 @@ internal static class LiveEditor
                 {
                     Log("TryFormatSelectionViaExecuteCommand: Detected as Declaration");
                     formatted = engine.FormatDeclaration(selectedText);
+                    Log($"TryFormatSelectionViaExecuteCommand: FormatDeclaration result: [{(formatted ?? "<null>").Replace("\r", "\\r").Replace("\n", "\\n")}]");
                     if (string.IsNullOrEmpty(formatted) || formatted == selectedText)
                     {
                         Log("TryFormatSelectionViaExecuteCommand: FormatDeclaration failed or unchanged, trying Format as fallback");
@@ -598,12 +602,15 @@ internal static class LiveEditor
                 {
                     Log("TryFormatSelectionViaExecuteCommand: Detected as Implementation (body)");
                     formatted = engine.FormatBody(selectedText);
+                    Log($"TryFormatSelectionViaExecuteCommand: FormatBody result: [{(formatted ?? "<null>").Replace("\r", "\\r").Replace("\n", "\\n")}]");
                     if (string.IsNullOrEmpty(formatted) || formatted == selectedText)
                     {
                         Log("TryFormatSelectionViaExecuteCommand: FormatBody failed or unchanged, trying Format as fallback");
                         formatted = engine.Format(selectedText);
                     }
                 }
+
+                Log($"TryFormatSelectionViaExecuteCommand: Final formatted: [{(formatted ?? "<null>").Replace("\r", "\\r").Replace("\n", "\\n")}]");
 
                 if (string.IsNullOrEmpty(formatted))
                 {

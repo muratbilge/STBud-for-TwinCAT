@@ -705,6 +705,13 @@ public sealed class Lexer
         _position++;
 
         var size = char.ToUpperInvariant(Current);
+        if (size == '*')
+        {
+            _position++;
+            _kind = SyntaxKind.DirectVariable;
+            return;
+        }
+
         if (size != 'X' && size != 'B' && size != 'W' && size != 'D' && size != 'L')
         {
             _diagnostics.Add(new Diagnostic(

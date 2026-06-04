@@ -23,6 +23,7 @@ internal class Program
     private static Mutex? _singleInstanceMutex;
     private static string _lastScanStatus = "Not scanned yet";
     private static DateTime _lastNoInstanceLog = DateTime.MinValue;
+    private static KeyboardHook? _keyboardHook;
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -59,6 +60,10 @@ internal class Program
 
         _hostManager = new HostManager();
 
+        _keyboardHook = new KeyboardHook();
+        _keyboardHook.FormatDocumentHotkey += pid => HandleFormatDocument(pid);
+        _keyboardHook.FormatSelectionHotkey += pid => HandleFormatSelection(pid);
+
         Maintain();
 
         var mainForm = new MainForm(
@@ -69,6 +74,8 @@ internal class Program
         );
         _mainForm = mainForm;
         var dummy = mainForm.Handle; // force handle creation for Invoke
+
+        mainForm.BeginInvoke((Action)(() => _keyboardHook.Start()));
 
         Application.Run(mainForm);
 
@@ -179,6 +186,9 @@ internal class Program
 
     private static void Shutdown()
     {
+        _keyboardHook?.Dispose();
+        _keyboardHook = null;
+
         if (_hostManager == null) return;
 
         foreach (var kvp in _hostManager.GetAllInstances())
