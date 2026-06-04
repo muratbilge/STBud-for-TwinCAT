@@ -1,7 +1,10 @@
 # STBud for TwinCAT
 
 A toolbox for Beckhoff TwinCAT Structured Text work: formatting, editor helpers,
-pragma insertion, I/O linking assistance, and workflow utilities inside TcXaeShell.
+pragma insertion, I/O linking assistance, and workflow utilities — all integrated
+directly into TcXaeShell via right-click context menus and keyboard shortcuts.
+
+![STBud for TwinCAT in action](assets/demo.gif)
 
 ------------------------------------------------------------------------
 
@@ -25,6 +28,114 @@ access modifiers, pragmas, and more).
 
 The internal assemblies still use the `STFormatter.*` prefix because the first
 major tool is the formatter. The product name is broader: **STBud for TwinCAT**.
+
+------------------------------------------------------------------------
+
+## Features
+
+### Format from TcXaeShell
+
+Right-click in the PLC editor and choose **STBud for TwinCAT → Format**:
+
+- **Format Document** — format the entire active declaration or implementation section
+- **Format Selection** — format only the selected text
+
+Keyboard shortcuts: **Ctrl+Shift+F** (Format Document) and **Ctrl+Shift+D** (Format Selection)
+work when TcXaeShell has focus.
+
+### Add Attribute
+
+Insert common TwinCAT pragmas and attributes directly from the context menu:
+
+**Visibility:** `qualified_only`, `hide`, `no_explicit_call...`
+
+**Binding:** `linkalways`, I/O Linking... (opens I/O Tree browser)
+
+**Monitoring:** `monitoring := 'call'`, `TcRpcEnable := '1'`
+
+**OPC UA:** `OPC.UA.DA...`, `OPC.UA.DA.Property := '1'`
+
+**Code Generation:** `strict`, `to_string`, `no-analysis`, `const_non_replaced`,
+`TcGenerated`, `enable_dynamic_creation`, `always_average...`, `noload`, `obsolete...`, `no_check`
+
+### Add Task Attribute
+
+Insert task-related pragmas with input dialogs for the parameterized ones:
+
+`task_name...`, `call_always`, `call_after...`, `call_before...`,
+`call_after_init...`, `call_before_init...`, `call_after_exit...`,
+`call_before_exit...`, `priority...`
+
+### Add Region
+
+Insert `{region ...}` / `{endregion}` blocks around selected code.
+
+### Add Warning
+
+Insert `{warning '...'}` with a custom message.
+
+### I/O Linking
+
+Opens an I/O Tree browser that parses the TwinCAT project's `.tsproj` file,
+showing devices, terminals, and channels. Select a channel to insert
+`{attribute 'TcLinkTo' := '...'}` at the cursor position.
+
+### Settings
+
+Open the STBud settings tray UI to configure formatting options at runtime.
+
+------------------------------------------------------------------------
+
+## Context Menu Structure
+
+```
+STBud for TwinCAT
+├── Format
+│   ├── Format Document          Ctrl+Shift+F
+│   └── Format Selection         Ctrl+Shift+D
+├── Add Attribute
+│   ├── Visibility
+│   │   ├── qualified_only
+│   │   ├── hide
+│   │   └── no_explicit_call...
+│   ├── Binding
+│   │   ├── linkalways
+│   │   └── I/O Linking...
+│   ├── Monitoring
+│   │   ├── monitoring := 'call'
+│   │   └── TcRpcEnable := '1'
+│   ├── OPC UA
+│   │   ├── OPC.UA.DA...
+│   │   └── OPC.UA.DA.Property := '1'
+│   └── Code Generation
+│       ├── strict
+│       ├── to_string
+│       ├── no-analysis
+│       ├── const_non_replaced
+│       ├── TcGenerated
+│       ├── enable_dynamic_creation
+│       ├── always_average...
+│       ├── noload
+│       ├── obsolete...
+│       └── no_check
+├── Add Task Attribute
+│   ├── task_name...
+│   ├── call_always
+│   ├── call_after...
+│   ├── call_before...
+│   ├── call_after_init...
+│   ├── call_before_init...
+│   ├── call_after_exit...
+│   ├── call_before_exit...
+│   ├── priority...
+│   └── no_check
+├── Add Region
+│   ├── Start Region...
+│   ├── End Region
+│   └── Start + End Region...
+├── Warning...
+└── Settings...
+```
 
 ------------------------------------------------------------------------
 
@@ -86,19 +197,21 @@ Usage:
 Standalone .NET Framework 4.8 x86 executable that injects context menu buttons
 into TcXaeShell via COM DTE from outside the process.
 
-- **Context menu injection** — hooks into `PlcCodeWinContextMenu` (Beckhoff PLC editor
+- **Context menu injection** -- hooks into `PlcCodeWinContextMenu` (Beckhoff PLC editor
   right-click menu) and `Code Window` (standard VS text editor menu) via
   `DTE.CommandBars` programmatic injection
-- **Format Document** / **Format Selection** — uses DTE editor commands and the Win32
+- **Keyboard shortcuts** -- Ctrl+Shift+F (Format Document) and Ctrl+Shift+D
+  (Format Selection) via low-level keyboard hook, active when TcXaeShell has focus
+- **Format Document / Format Selection** -- uses DTE editor commands and the Win32
   clipboard to format the active declaration or implementation section in place
-- **Format File** — reads `.TcPOU` / `.TcDUT` / `.TcGVL` XML files, formats the ST code
+- **Format File** -- reads `.TcPOU` / `.TcDUT` / `.TcGVL` XML files, formats the ST code
   inside CDATA sections, and writes them back
-- **Editor helpers** — inserts common TwinCAT attributes/pragmas, regions, task
+- **Editor helpers** -- inserts common TwinCAT attributes/pragmas, regions, task
   attributes, warnings, and I/O-linking paths from context menus
-- **Auto-reconnect** — survives TcXaeShell restarts, reconnects automatically
-- **Hidden background process** — no console window, runs silently, logs to
+- **Auto-reconnect** -- survives TcXaeShell restarts, reconnects automatically
+- **Hidden background process** -- no console window, runs silently, logs to
   `%TEMP%\STBud_Host.log`
-- **Independent deployment** — copies to `C:\Program Files (x86)\STBud\` alongside the
+- **Independent deployment** -- copies to `C:\Program Files (x86)\STBud\` alongside the
   Core DLL, requires `Microsoft.VisualStudio.Interop.dll`
 
 **Why an external process?** TcXaeShell's isolated shell blocks all three standard
@@ -149,14 +262,15 @@ SourceText
  FormattingWriter   (emits indented, re-spaced text)
     |
     v
- Formatted output string
+Formatted output string
 ```
 
 The pipeline is stateless: `FormattingEngine.Format(source)` lexes, parses,
 and formats a complete compilation unit. `FormattingEngine.FormatBody(body)`
 wraps a free-standing statement list in a temporary `PROGRAM __BODY_WRAPPER__`
 declaration so that code fragments (implementation bodies) can also be
-formatted.
+formatted. `FormattingEngine.FormatDeclaration(decl)` handles bare VAR sections
+and declarations without a wrapping POU keyword.
 
 ------------------------------------------------------------------------
 
@@ -266,7 +380,9 @@ The parser handles the full IEC 61131-3 ST grammar plus TwinCAT extensions:
 - **Expressions**: binary/unary operators, member access `.`, element access
   `[]`, invocations, named arguments, initializers
 - **Comments**: single-line `//`, multi-line `(* ... *)` and `/* ... */`
-- ** pragmas**: `{pragma ...}`, `{region ...}`, `{endregion}`
+- **Pragmas**: `{pragma ...}`, `{region ...}`, `{endregion}`
+- **Direct variables**: `%I`, `%Q`, `%M` with size digits and addresses,
+  plus `%I*`/`%Q*`/`%M*` wildcard syntax
 
 ## Using STBud for TwinCAT
 
@@ -314,15 +430,15 @@ deploy.bat
 Start-Process "C:\Program Files (x86)\STBud\STFormatter.Host.exe"
 ```
 
-Once running, the Host injects **Format ST Document** and **Format ST Selection** buttons
-into the PLC editor's right-click context menu. Click either to format the active
-declaration or implementation section.
-
-The Host also provides a system tray icon with:
-- **Settings** — change formatting options at runtime
-- **Instances** — view connected TcXaeShell processes
-- **History** — review past format operations
-- **Log** — live log viewer (`%TEMP%\STBud_Host.log`)
+Once running, the Host injects a **STBud for TwinCAT** context menu
+into the PLC editor's right-click menu. The menu provides:
+- **Format** → Format Document (Ctrl+Shift+F) / Format Selection (Ctrl+Shift+D)
+- **Add Attribute** → organized submenus for visibility, binding, monitoring,
+  OPC UA, and code generation pragmas
+- **Add Task Attribute** → task scheduling pragmas
+- **Add Region** → `{region}` / `{endregion}` blocks
+- **Add Warning...** → `{warning '...'}`
+- **Settings...** → runtime configuration UI
 
 ### 3. Configuration via .editorconfig
 
@@ -375,6 +491,18 @@ dotnet format ./samples/RealTcFiles/Execute.TcPOU --dry-run
 
 ------------------------------------------------------------------------
 
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|---|---|
+| **Ctrl+Shift+F** | Format the active document (declaration or implementation tab) |
+| **Ctrl+Shift+D** | Format the selected text |
+
+Shortcuts are active when TcXaeShell has foreground focus. They do not interfere
+with other applications.
+
+------------------------------------------------------------------------
+
 ## Documentation
 
 | Document | Description |
@@ -407,11 +535,16 @@ CodeFormatter/
     STFormatter.Host/          TcXaeShell external host (net48 / x86, production)
       Program.cs               Main host executable — DTE connection, context menu injection,
                                formatting engine integration, auto-reconnect
+      HostManager.cs            COM DTE discovery, menu injection, instance tracking
+      KeyboardHook.cs          Low-level keyboard hook for Ctrl+Shift+F/D shortcuts
+      LiveEditor.cs            DTE ExecuteCommand + clipboard live edit pipeline
       STFormatter.Host.csproj  Project file — references Microsoft.VisualStudio.Interop
     STFormatter.UI/            Tray UI, settings, instances, history, diff viewer
   tests/
-    STFormatter.Core.Tests/    Unit tests
+    STFormatter.Core.Tests/    Unit tests (132 passing)
   docs/                        Documentation
+  screens/                      Screenshots and demos
+  assets/                       Logos, icons, demo GIF
 ```
 
 ------------------------------------------------------------------------
