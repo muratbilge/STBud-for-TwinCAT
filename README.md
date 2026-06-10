@@ -515,6 +515,7 @@ with other applications.
 | [docs/HOW-TO-INSTALL.md](docs/HOW-TO-INSTALL.md) | Installation instructions for all targets |
 | [docs/HOW-TO-USE.md](docs/HOW-TO-USE.md) | Practical usage guide |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Planned toolbox direction and future tools |
+| [docs/COMPATIBILITY-4026-PLAN.md](docs/COMPATIBILITY-4026-PLAN.md) | Phased plan for TwinCAT 3 Build 4026 compatibility |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | Release history |
 | [docs/API-REFERENCE.md](docs/API-REFERENCE.md) | Public API reference for STFormatter.Core |
 

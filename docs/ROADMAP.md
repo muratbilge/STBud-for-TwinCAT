@@ -91,6 +91,7 @@ Implementation notes:
 ### TwinCAT 4026 Compatibility Test
 
 Add explicit validation for TwinCAT 3 Build 4026 environments.
+Detailed, phased plan: [COMPATIBILITY-4026-PLAN.md](COMPATIBILITY-4026-PLAN.md).
 
 Planned phases:
 
