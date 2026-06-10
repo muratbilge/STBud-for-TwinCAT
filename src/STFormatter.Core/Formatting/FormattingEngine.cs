@@ -98,12 +98,22 @@ public sealed class FormattingEngine
         if (string.IsNullOrWhiteSpace(declaration))
             return declaration;
 
+        // TYPE...END_TYPE declarations (DUTs: enums, structs, unions) are complete
+        // compilation units; the synthetic VAR wrapper below would garble them.
+        if (ContainsTypeDeclaration(declaration))
+            return Format(declaration);
+
         string pouHeader;
         string varContent;
         SplitPouHeaderAndVars(declaration, out pouHeader, out varContent);
 
         if (string.IsNullOrWhiteSpace(varContent))
             return declaration;
+
+        // A trailing END_PROGRAM/END_FUNCTION_BLOCK/... would duplicate the
+        // synthetic wrapper's own terminator and break the parse; split it off
+        // and re-append after formatting.
+        string pouFooter = StripPouFooter(ref varContent);
 
         bool hasVarSection = HasVarSectionKeyword(varContent);
         if (!hasVarSection)
@@ -115,6 +125,11 @@ public sealed class FormattingEngine
         var text = Text.SourceText.From(wrapper);
         var parser = new Parsing.Parser(text);
         var tree = parser.Parse();
+
+        // A wrapper that fails to parse would format to garbage (dropped
+        // declarations); leave the original text untouched instead.
+        if (tree.Diagnostics.Any(d => d.Severity == Syntax.DiagnosticSeverity.Error))
+            return declaration;
 
         var writer = new FormattingWriter(_config);
         var visitor = new FormattingVisitor(writer, _config);
@@ -146,7 +161,9 @@ public sealed class FormattingEngine
                 }
 
                 if (!string.IsNullOrEmpty(pouHeader))
-                    extracted = pouHeader + _config.GetNewLine() + extracted;
+                    extracted = NormalizeNewLines(pouHeader, _config.GetNewLine()) + _config.GetNewLine() + extracted;
+                if (!string.IsNullOrEmpty(pouFooter))
+                    extracted = extracted.TrimEnd('\r', '\n') + _config.GetNewLine() + pouFooter;
 
                 var inputUsesCrLf = declaration.Contains("\r\n");
                 if (inputUsesCrLf && !extracted.Contains("\r\n"))
@@ -178,7 +195,9 @@ public sealed class FormattingEngine
         }
 
         if (!string.IsNullOrEmpty(pouHeader))
-            extractedFallback = pouHeader + _config.GetNewLine() + extractedFallback;
+            extractedFallback = NormalizeNewLines(pouHeader, _config.GetNewLine()) + _config.GetNewLine() + extractedFallback;
+        if (!string.IsNullOrEmpty(pouFooter))
+            extractedFallback = extractedFallback.TrimEnd('\r', '\n') + _config.GetNewLine() + pouFooter;
 
         var usesCrLf = declaration.Contains("\r\n");
         if (usesCrLf && !extractedFallback.Contains("\r\n"))
@@ -187,11 +206,55 @@ public sealed class FormattingEngine
         return extractedFallback;
     }
 
+    private static string NormalizeNewLines(string text, string newLine)
+    {
+        return text.Replace("\r\n", "\n").Replace("\n", newLine);
+    }
+
+    private static readonly string[] PouFooterKeywords = new[]
+    {
+        "END_PROGRAM", "END_FUNCTION_BLOCK", "END_FUNCTION", "END_METHOD",
+        "END_PROPERTY", "END_ACTION", "END_INTERFACE"
+    };
+
+    private static string StripPouFooter(ref string varContent)
+    {
+        var lines = varContent.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        int lastIdx = lines.Length - 1;
+        while (lastIdx >= 0 && string.IsNullOrWhiteSpace(lines[lastIdx]))
+            lastIdx--;
+        if (lastIdx < 0)
+            return "";
+
+        var last = lines[lastIdx].Trim();
+        foreach (var kw in PouFooterKeywords)
+        {
+            if (string.Equals(last, kw, StringComparison.OrdinalIgnoreCase))
+            {
+                var nl = varContent.Contains("\r\n") ? "\r\n" : "\n";
+                varContent = string.Join(nl, lines.Take(lastIdx));
+                return last;
+            }
+        }
+
+        return "";
+    }
+
     private static readonly string[] VarSectionKeywords = new[]
     {
         "VAR_INPUT", "VAR_OUTPUT", "VAR_IN_OUT", "VAR_TEMP", "VAR_STAT",
         "VAR_GLOBAL", "VAR_ACCESS", "VAR_EXTERNAL", "VAR_CONFIG", "VAR_INST", "VAR"
     };
+
+    private static readonly System.Text.RegularExpressions.Regex TypeDeclarationRegex =
+        new(@"(^|\n)\s*TYPE\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private static bool ContainsTypeDeclaration(string text)
+    {
+        // Matches TYPE at the start of a line; END_TYPE does not match because
+        // '_' is a word character.
+        return TypeDeclarationRegex.IsMatch(text);
+    }
 
     private static bool HasVarSectionKeyword(string text)
     {

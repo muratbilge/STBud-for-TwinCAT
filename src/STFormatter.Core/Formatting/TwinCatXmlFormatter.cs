@@ -48,8 +48,22 @@ public sealed class TwinCatXmlFormatter
             if (isDeclaration)
             {
                 formatted = _engine.FormatDeclaration(stCode);
-                if (string.IsNullOrEmpty(formatted) || formatted == stCode)
-                    formatted = _engine.Format(stCode) ?? stCode;
+                if (string.IsNullOrEmpty(formatted))
+                    formatted = stCode;
+
+                // FormatDeclaration returns header-only declarations (no VAR
+                // section, no TYPE) unchanged; give those a full-format pass.
+                // An unchanged result for content it does handle just means the
+                // text is already formatted - never re-run Format() on it, and
+                // never accept empty output (that would wipe the section).
+                if (formatted == stCode &&
+                    stCode.IndexOf("VAR", StringComparison.OrdinalIgnoreCase) < 0 &&
+                    stCode.IndexOf("TYPE", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    var full = _engine.Format(stCode);
+                    if (!string.IsNullOrWhiteSpace(full))
+                        formatted = full;
+                }
                 formattedDecl = formatted;
             }
             else
