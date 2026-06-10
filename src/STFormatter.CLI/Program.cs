@@ -41,6 +41,7 @@ class Program
             "preset" => PresetCommand(args[1..]),
             "export" => ExportCommand(args[1..]),
             "import" => ImportCommand(args[1..]),
+            "ping" => PingCommand(args[1..]),
             _ => UnknownCommand(command)
         };
     }
@@ -518,6 +519,29 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
         }
     }
 
+    static int PingCommand(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.Error.WriteLine("Error: No target specified for ping command.");
+            Console.Error.WriteLine("Usage: stfmt ping <host|ip> [--timeout <ms>]");
+            return 1;
+        }
+
+        var target = args[0];
+        int timeoutMs = 2000;
+        for (int i = 1; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--timeout" && int.TryParse(args[i + 1], out var t) && t > 0)
+                timeoutMs = t;
+        }
+
+        Console.WriteLine($"Checking {target} (timeout {timeoutMs} ms)...");
+        var report = STFormatter.Core.Toolbox.TwinCatPinger.RunDiagnostics(target, timeoutMs);
+        Console.Write(report.BuildSummary());
+        return report.Reachable ? 0 : 1;
+    }
+
     static int UnknownCommand(string command)
     {
         Console.Error.WriteLine($"Unknown command: {command}");
@@ -537,6 +561,7 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
         Console.WriteLine("  stfmt preset [name]");
         Console.WriteLine("  stfmt export [file] [--preset <name>]");
         Console.WriteLine("  stfmt import <json-file>");
+        Console.WriteLine("  stfmt ping <host|ip> [--timeout <ms>]");
         Console.WriteLine();
         Console.WriteLine("Commands:");
         Console.WriteLine("  format    Format a single ST file");
@@ -546,6 +571,7 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
         Console.WriteLine("  preset    Show preset details or list presets");
         Console.WriteLine("  export    Export configuration to JSON");
         Console.WriteLine("  import    Import configuration from JSON to .editorconfig");
+        Console.WriteLine("  ping      Check TwinCAT machine reachability (ICMP + ADS ports)");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  -o              Output file path (default: overwrite input)");
