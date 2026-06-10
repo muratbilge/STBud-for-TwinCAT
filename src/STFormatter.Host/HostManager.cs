@@ -529,8 +529,8 @@ internal sealed class HostManager
         monitoringPopup.Tag = "STBud.Add.Attribute.Monitoring";
         instance.InjectedControls.Add(monitoringPopup);
 
-        AddPragmaButton(instance, monitoringPopup, "monitoring := 'call'", "monitoring");
-        AddPragmaButton(instance, monitoringPopup, "TcRpcEnable := '1'", "TcRpcEnable");
+        AddPragmaButton(instance, monitoringPopup, "monitoring := 'call'", "{attribute 'monitoring' := 'call'}", "monitoring");
+        AddPragmaButton(instance, monitoringPopup, "TcRpcEnable := '1'", "{attribute 'TcRpcEnable' := '1'}", "TcRpcEnable");
 
         // -- OPC UA --
         var opcUaPopup = (CommandBarPopup)attrPopup.Controls.Add(
@@ -563,12 +563,12 @@ internal sealed class HostManager
         AddPragmaButton(instance, codeGenPopup, "no_check", "no_check");
     }
 
-    private void AddPragmaButton(TcXaeInstance instance, CommandBarPopup parent, string caption, string pragmaText)
+    private void AddPragmaButton(TcXaeInstance instance, CommandBarPopup parent, string caption, string pragmaText, string? tagSuffix = null)
     {
         var btn = (CommandBarButton)parent.Controls.Add(
             MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
         btn.Caption = caption;
-        btn.Tag = "STBud.Add.Attr." + pragmaText;
+        btn.Tag = "STBud.Add.Attr." + (tagSuffix ?? pragmaText);
         TrySetIcon(btn, 1722);
         var capturedText = pragmaText;
         btn.Click += (CommandBarButton ctrl, ref bool cancel) =>
@@ -733,7 +733,7 @@ internal sealed class HostManager
         endRegionBtn.Tag = "STBud.Add.Region.End";
         TrySetIcon(endRegionBtn, 309);
         endRegionBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
-            Program.HandleAddPragma(instance.Pid, "{endregion}");
+            Program.HandleAddPragma(instance.Pid, STFormatter.Core.Toolbox.PragmaTemplates.EndRegion);
         instance.InjectedControls.Add(endRegionBtn);
 
         var startEndRegionBtn = (CommandBarButton)regionPopup.Controls.Add(

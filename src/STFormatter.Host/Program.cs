@@ -11,6 +11,7 @@ using System.Windows.Forms;
 using EnvDTE;
 using STFormatter.Core.Formatting;
 using STFormatter.Core.Configuration;
+using STFormatter.Core.Toolbox;
 using STFormatter.UI;
 
 namespace STFormatter.Host;
@@ -428,9 +429,7 @@ internal class Program
                 return;
             }
 
-            string fullPragma = pragmaText.Contains("{")
-                ? pragmaText
-                : $"{{attribute '{pragmaText}'}}";
+            string fullPragma = PragmaTemplates.WrapMenuPragma(pragmaText);
 
             bool success = LiveEditor.InsertLineAbove(instance.Dte, fullPragma);
             Log($"HandleAddPragma: PID {pid} result={(success ? "OK" : "FAILED")}");
@@ -480,7 +479,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{warning '{warningText}'}}";
+            string pragmaText = PragmaTemplates.Warning(warningText);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddWarning: PID {pid} warning=[{warningText}] result={(success ? "OK" : "FAILED")}");
         }
@@ -529,7 +528,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{region '{regionName}'}}";
+            string pragmaText = PragmaTemplates.RegionStart(regionName);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddRegion: PID {pid} region=[{regionName}] result={(success ? "OK" : "FAILED")}");
         }
@@ -578,7 +577,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{region '{regionName}'}}\r\n\r\n\r\n{{endregion}}";
+            string pragmaText = PragmaTemplates.RegionBlock(regionName);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddStartEndRegion: PID {pid} region=[{regionName}] result={(success ? "OK" : "FAILED")}");
         }
@@ -627,7 +626,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{attribute 'no_explicit_call' := '{message}'}}";
+            string pragmaText = PragmaTemplates.Attribute("no_explicit_call", message);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddNoExplicitCall: PID {pid} message=[{message}] result={(success ? "OK" : "FAILED")}");
         }
@@ -676,7 +675,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{attribute 'OPC.UA.DA' := '{param}'}}";
+            string pragmaText = PragmaTemplates.Attribute("OPC.UA.DA", param);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddOpcUaDa: PID {pid} param=[{param}] result={(success ? "OK" : "FAILED")}");
         }
@@ -725,7 +724,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{attribute 'always_average' := '{varName}'}}";
+            string pragmaText = PragmaTemplates.Attribute("always_average", varName);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddAlwaysAverage: PID {pid} varName=[{varName}] result={(success ? "OK" : "FAILED")}");
         }
@@ -810,7 +809,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{attribute 'TcLinkTo' := '{ioPath}'}}";
+            string pragmaText = PragmaTemplates.Attribute("TcLinkTo", ioPath);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddIOLinking: PID {pid} ioPath=[{ioPath}] result={(success ? "OK" : "FAILED")}");
         }
@@ -859,7 +858,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{attribute 'obsolete' := '{message}'}}";
+            string pragmaText = PragmaTemplates.Attribute("obsolete", message);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddObsolete: PID {pid} message=[{message}] result={(success ? "OK" : "FAILED")}");
         }
@@ -908,7 +907,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{attribute 'task_name' := '{taskName}'}}";
+            string pragmaText = PragmaTemplates.Attribute("task_name", taskName);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddTaskName: PID {pid} taskName=[{taskName}] result={(success ? "OK" : "FAILED")}");
         }
@@ -957,7 +956,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{attribute 'call_after' := '{pouName}'}}";
+            string pragmaText = PragmaTemplates.Attribute("call_after", pouName);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddCallAfter: PID {pid} pouName=[{pouName}] result={(success ? "OK" : "FAILED")}");
         }
@@ -1006,7 +1005,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{attribute 'call_before' := '{pouName}'}}";
+            string pragmaText = PragmaTemplates.Attribute("call_before", pouName);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddCallBefore: PID {pid} pouName=[{pouName}] result={(success ? "OK" : "FAILED")}");
         }
@@ -1055,7 +1054,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{attribute 'call_after_init' := '{pouName}'}}";
+            string pragmaText = PragmaTemplates.Attribute("call_after_init", pouName);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddCallAfterInit: PID {pid} pouName=[{pouName}] result={(success ? "OK" : "FAILED")}");
         }
@@ -1104,7 +1103,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{attribute 'call_before_init' := '{pouName}'}}";
+            string pragmaText = PragmaTemplates.Attribute("call_before_init", pouName);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddCallBeforeInit: PID {pid} pouName=[{pouName}] result={(success ? "OK" : "FAILED")}");
         }
@@ -1153,7 +1152,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{attribute 'call_after_exit' := '{pouName}'}}";
+            string pragmaText = PragmaTemplates.Attribute("call_after_exit", pouName);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddCallAfterExit: PID {pid} pouName=[{pouName}] result={(success ? "OK" : "FAILED")}");
         }
@@ -1202,7 +1201,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{attribute 'call_before_exit' := '{pouName}'}}";
+            string pragmaText = PragmaTemplates.Attribute("call_before_exit", pouName);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddCallBeforeExit: PID {pid} pouName=[{pouName}] result={(success ? "OK" : "FAILED")}");
         }
@@ -1251,7 +1250,7 @@ internal class Program
                 return;
             }
 
-            string pragmaText = $"{{attribute 'priority' := '{priority}'}}";
+            string pragmaText = PragmaTemplates.Attribute("priority", priority);
             bool success = LiveEditor.InsertLineAbove(instance.Dte, pragmaText);
             Log($"HandleAddPriority: PID {pid} priority=[{priority}] result={(success ? "OK" : "FAILED")}");
         }
