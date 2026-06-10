@@ -135,10 +135,10 @@ public sealed class TwinCatXmlFormatter
         return modified;
     }
 
-    public static bool LooksLikeDeclaration(string text)
+    public static bool LooksLikeDeclaration(string? text)
     {
         if (string.IsNullOrEmpty(text)) return true;
-        string upper = text.ToUpperInvariant();
+        string upper = text!.ToUpperInvariant();
         bool hasVar = upper.Contains("VAR") && upper.Contains("END_VAR");
         bool hasProgram = upper.Contains("PROGRAM") || upper.Contains("FUNCTION_BLOCK") || upper.Contains("FUNCTION");
 

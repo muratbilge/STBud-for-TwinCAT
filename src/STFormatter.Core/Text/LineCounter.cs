@@ -7,6 +7,6 @@ public static class LineCounter
     public static int Count(string? text)
     {
         if (string.IsNullOrEmpty(text)) return 0;
-        return text.Split(_separators, System.StringSplitOptions.None).Length;
+        return text!.Split(_separators, System.StringSplitOptions.None).Length;
     }
 }

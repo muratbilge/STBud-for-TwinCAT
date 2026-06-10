@@ -396,25 +396,25 @@ dotnet build src/STFormatter.CLI -c Release
 dotnet run --project src/STFormatter.CLI format MyProgram.st
 
 # Dry-run (print result without changing the file)
-dotnet format MyProgram.st --dry-run
+dotnet run --project src/STFormatter.CLI format MyProgram.st --dry-run
 
 # Format to a different output file
-dotnet format MyProgram.st -o MyProgram_formatted.st
+dotnet run --project src/STFormatter.CLI format MyProgram.st -o MyProgram_formatted.st
 
 # Batch-format all .st files in a directory
-dotnet format batch ./POUs --recursive
+dotnet run --project src/STFormatter.CLI batch ./POUs --recursive
 
 # Batch-format TwinCAT XML files (.TcPOU, .TcDUT, .TcGVL)
-dotnet format batch ./MyProject --recursive --twincat
+dotnet run --project src/STFormatter.CLI batch ./MyProject --recursive --twincat
 
 # Check if files are formatted (CI mode — exit code 1 on mismatch)
-dotnet format check ./src --recursive
+dotnet run --project src/STFormatter.CLI check ./src --recursive
 
 # Generate .editorconfig from a preset
-dotnet format init . --preset default
+dotnet run --project src/STFormatter.CLI init . --preset default
 
 # View preset details
-dotnet format preset default
+dotnet run --project src/STFormatter.CLI preset default
 ```
 
 ### 2. TcXaeShell — Format Inside the PLC Editor
@@ -483,10 +483,10 @@ The `samples/` directory contains test files:
 
 ```shell
 # Format all real samples as a dry-run
-dotnet format batch ./samples/RealTcFiles --twincat --dry-run
+dotnet run --project src/STFormatter.CLI batch ./samples/RealTcFiles --twincat --dry-run
 
 # Format a single real file
-dotnet format ./samples/RealTcFiles/Execute.TcPOU --dry-run
+dotnet run --project src/STFormatter.CLI format ./samples/RealTcFiles/Execute.TcPOU --dry-run
 ```
 
 ------------------------------------------------------------------------
@@ -521,7 +521,7 @@ with other applications.
 ## Project Structure
 
 ```
-CodeFormatter/
+STBud/
   TwinCAT.STFormatter.sln
   src/
     STFormatter.Core/          Formatting engine (net8.0 / net48 / net462)
