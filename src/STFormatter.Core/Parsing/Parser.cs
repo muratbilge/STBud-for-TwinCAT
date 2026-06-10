@@ -204,6 +204,7 @@ public sealed class Parser
         var start = Current.Span.Start;
         var access = TryMatchAccessModifier();
         var methodKeyword = MatchToken(SyntaxKind.MethodKeyword);
+        var modifiers = MatchPostKeywordModifiers(); // METHOD PROTECTED ABSTRACT Foo
         var name = MatchToken(SyntaxKind.Identifier);
 
         SyntaxToken? colon = null;
@@ -225,7 +226,9 @@ public sealed class Parser
         if (returnType != null) children.Add(returnType);
         children.Add(body);
 
-        var tokens = new List<SyntaxToken> { methodKeyword, name };
+        var tokens = new List<SyntaxToken> { methodKeyword };
+        tokens.AddRange(modifiers);
+        tokens.Add(name);
         if (colon != null) tokens.Add(colon);
         tokens.Add(endKeyword);
         if (access != null) tokens.Insert(0, access);
@@ -239,6 +242,7 @@ public sealed class Parser
         var start = Current.Span.Start;
         var access = TryMatchAccessModifier();
         var propKeyword = MatchToken(SyntaxKind.PropertyKeyword);
+        var modifiers = MatchPostKeywordModifiers(); // PROPERTY PUBLIC P_Info
         var name = MatchToken(SyntaxKind.Identifier);
         var colon = MatchToken(SyntaxKind.Colon);
         var type = ParseType();
@@ -252,7 +256,11 @@ public sealed class Parser
         children.AddRange(varSections);
         children.AddRange(getters);
 
-        var tokens = new List<SyntaxToken> { propKeyword, name, colon, endKeyword };
+        var tokens = new List<SyntaxToken> { propKeyword };
+        tokens.AddRange(modifiers);
+        tokens.Add(name);
+        tokens.Add(colon);
+        tokens.Add(endKeyword);
         if (access != null) tokens.Insert(0, access);
         if (endName != null) tokens.Add(endName);
 
@@ -468,6 +476,21 @@ public sealed class Parser
         };
     }
 
+    // TwinCAT places modifiers after the POU keyword: METHOD PROTECTED ABSTRACT Foo,
+    // PROPERTY PUBLIC Bar. Collect any run of access/inheritance modifiers.
+    private List<SyntaxToken> MatchPostKeywordModifiers()
+    {
+        var modifiers = new List<SyntaxToken>();
+        while (Current.Kind is SyntaxKind.PublicKeyword or SyntaxKind.PrivateKeyword
+               or SyntaxKind.ProtectedKeyword or SyntaxKind.InternalKeyword
+               or SyntaxKind.FinalKeyword or SyntaxKind.AbstractKeyword
+               or SyntaxKind.OverrideKeyword)
+        {
+            modifiers.Add(NextToken());
+        }
+        return modifiers;
+    }
+
     private SyntaxToken? TryMatchIdentifier()
     {
         if (Current.Kind == SyntaxKind.Identifier)
@@ -604,6 +627,13 @@ public sealed class Parser
             return ParseEnumType();
         }
 
+        // Standard IEC enum form without the ENUM keyword:
+        // TYPE E : (A, B := 1, C) [baseType]; END_TYPE  (also inline in VAR sections)
+        if (Current.Kind == SyntaxKind.OpenParen)
+        {
+            return ParseParenEnumType();
+        }
+
         if (Current.Kind == SyntaxKind.StringKeyword || Current.Kind == SyntaxKind.WStringKeyword)
         {
             return ParseStringType();
@@ -726,6 +756,46 @@ public sealed class Parser
             new[] { enumKeyword, endKeyword });
     }
 
+    private SyntaxNode ParseParenEnumType()
+    {
+        var start = Current.Span.Start;
+        var tokens = new List<SyntaxToken> { MatchToken(SyntaxKind.OpenParen) };
+
+        var values = new List<SyntaxNode>();
+        if (Current.Kind == SyntaxKind.Identifier)
+        {
+            values.Add(ParseEnumValue());
+            while (Current.Kind == SyntaxKind.Comma)
+            {
+                tokens.Add(NextToken()); // comma
+                values.Add(ParseEnumValue());
+            }
+        }
+
+        var closeParen = MatchToken(SyntaxKind.CloseParen);
+        tokens.Add(closeParen);
+
+        // Optional base type after the closing paren: TYPE E : (A, B) USINT; END_TYPE
+        SyntaxNode? baseType = null;
+        if (Current.Kind == SyntaxKind.Identifier || IsElementaryTypeKeyword(Current.Kind))
+        {
+            var typeName = NextToken();
+            baseType = SyntaxFactory.Node(SyntaxKind.NamedType, typeName.Span, new[] { typeName });
+        }
+
+        var end = baseType?.Span.End ?? closeParen.Span.End;
+        var children = new List<SyntaxNode>(values);
+        if (baseType != null) children.Add(baseType);
+
+        return SyntaxFactory.Node(SyntaxKind.EnumerationType,
+            TextSpan.FromBounds(start, end), children, tokens);
+    }
+
+    private static bool IsElementaryTypeKeyword(SyntaxKind kind)
+    {
+        return kind >= SyntaxKind.BoolKeyword && kind <= SyntaxKind.DateAndTimeTypeKeyword;
+    }
+
     private SyntaxNode? TryParseEnumBaseType()
     {
         if (Current.Kind == SyntaxKind.OpenParen)
@@ -774,11 +844,16 @@ public sealed class Parser
 
     private SyntaxNode? TryParseStringLength()
     {
-        if (Current.Kind == SyntaxKind.OpenBracket)
+        // STRING[80] (IEC bracket form) and STRING(255) (TwinCAT paren form);
+        // the length may be a literal or a constant identifier.
+        if (Current.Kind == SyntaxKind.OpenBracket || Current.Kind == SyntaxKind.OpenParen)
         {
+            var closeKind = Current.Kind == SyntaxKind.OpenBracket
+                ? SyntaxKind.CloseBracket : SyntaxKind.CloseParen;
             var open = NextToken();
-            var length = MatchToken(SyntaxKind.NumericLiteral);
-            var close = MatchToken(SyntaxKind.CloseBracket);
+            var length = Current.Kind == SyntaxKind.Identifier
+                ? NextToken() : MatchToken(SyntaxKind.NumericLiteral);
+            var close = MatchToken(closeKind);
             return SyntaxFactory.Node(SyntaxKind.StringLength,
                 TextSpan.FromBounds(open.Span.Start, close.Span.End),
                 new[] { open, length, close });
@@ -1423,6 +1498,14 @@ public sealed class Parser
                 var span = TextSpan.FromBounds(start, memberName.Span.End);
                 result = SyntaxFactory.Node(SyntaxKind.MemberAccessExpression, span,
                     new[] { result }, new[] { dot, memberName });
+            }
+            else if (Current.Kind == SyntaxKind.Caret)
+            {
+                // Pointer dereference: ptr^ / THIS^.Method()
+                var caret = NextToken();
+                result = SyntaxFactory.Node(SyntaxKind.DereferenceExpression,
+                    TextSpan.FromBounds(start, caret.Span.End),
+                    new[] { result }, new[] { caret });
             }
             else if (Current.Kind == SyntaxKind.OpenBracket)
             {

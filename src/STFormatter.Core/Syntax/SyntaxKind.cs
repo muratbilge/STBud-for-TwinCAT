@@ -196,6 +196,7 @@ public enum SyntaxKind
     GreaterThanOrEqual,          // >=
     Hash,                        // #
     Ampersand,                   // &
+    Caret,                       // ^ (pointer dereference)
     ModKeyword,                  // MOD
     AndKeyword,                  // AND
     OrKeyword,                   // OR
@@ -295,6 +296,7 @@ public enum SyntaxKind
     StructuredInitializer,
     ArrayInitializer,
     DirectVariableExpression,
+    DereferenceExpression,       // expr^
 
     // Nodes - Other
     Attribute,

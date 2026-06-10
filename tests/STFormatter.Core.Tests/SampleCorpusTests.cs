@@ -68,4 +68,48 @@ public class SampleCorpusTests
         Assert.False(changedAgain, "second format pass still changed the file");
         Assert.Equal(once, twice);
     }
+
+    // Formatting only rearranges whitespace and changes keyword casing, so the
+    // sequence of code tokens inside every CDATA section must survive unchanged
+    // (case-insensitively). This is the data-loss guard: a formatter bug that
+    // drops or invents code fails here with the exact position of the difference.
+    [Theory]
+    [MemberData(nameof(TwinCatXmlFiles))]
+    public void TwinCatXmlFile_FormattingPreservesAllCodeTokens(string relativePath)
+    {
+        var xml = File.ReadAllText(Path.Combine(SamplesDir, relativePath));
+        var formatter = new TwinCatXmlFormatter();
+        formatter.FormatXmlContent(xml, out var formatted, out _, out _);
+
+        var before = ExtractCdataTokens(xml);
+        var after = ExtractCdataTokens(formatted);
+
+        Assert.Equal(before.Count, after.Count);
+        for (int i = 0; i < before.Count; i++)
+        {
+            Assert.True(string.Equals(before[i], after[i], StringComparison.OrdinalIgnoreCase),
+                $"token {i} changed: '{before[i]}' -> '{after[i]}'");
+        }
+    }
+
+    private static List<string> ExtractCdataTokens(string xml)
+    {
+        var tokens = new List<string>();
+        int pos = 0;
+        while ((pos = xml.IndexOf("<![CDATA[", pos, StringComparison.Ordinal)) >= 0)
+        {
+            int start = pos + 9;
+            int end = xml.IndexOf("]]>", start, StringComparison.Ordinal);
+            if (end < 0) break;
+
+            var code = xml.Substring(start, end - start);
+            foreach (System.Text.RegularExpressions.Match m in
+                     System.Text.RegularExpressions.Regex.Matches(code, @"[A-Za-z0-9_]+"))
+            {
+                tokens.Add(m.Value);
+            }
+            pos = end + 3;
+        }
+        return tokens;
+    }
 }

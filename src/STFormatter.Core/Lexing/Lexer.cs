@@ -197,6 +197,10 @@ public sealed class Lexer
                 _kind = SyntaxKind.Ampersand;
                 _position++;
                 break;
+            case '^':
+                _kind = SyntaxKind.Caret;
+                _position++;
+                break;
             case '%':
                 ReadDirectVariable();
                 break;

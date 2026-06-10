@@ -40,6 +40,11 @@ public sealed class FormattingEngine
         var parser = new Parsing.Parser(text);
         var tree = parser.Parse();
 
+        // Emitting from a tree with parse errors silently drops the statements
+        // the parser skipped during recovery; leave the body untouched instead.
+        if (tree.Diagnostics.Any(d => d.Severity == Syntax.DiagnosticSeverity.Error))
+            return body;
+
         var writer = new FormattingWriter(_config);
         var visitor = new FormattingVisitor(writer, _config);
 
@@ -100,8 +105,14 @@ public sealed class FormattingEngine
 
         // TYPE...END_TYPE declarations (DUTs: enums, structs, unions) are complete
         // compilation units; the synthetic VAR wrapper below would garble them.
+        // Only emit when the parse is clean - error recovery drops content.
         if (ContainsTypeDeclaration(declaration))
-            return Format(declaration);
+        {
+            var typeTree = new Parsing.Parser(Text.SourceText.From(declaration)).Parse();
+            if (typeTree.Diagnostics.Any(d => d.Severity == Syntax.DiagnosticSeverity.Error))
+                return declaration;
+            return Format(typeTree);
+        }
 
         string pouHeader;
         string varContent;
@@ -654,6 +665,10 @@ internal sealed class FormattingVisitor
             case SyntaxKind.MemberAccessExpression:
                 VisitMemberAccessExpression(node);
                 break;
+            case SyntaxKind.DereferenceExpression:
+                Visit(node.ChildNodes[0]);
+                WriteToken(node.ChildTokens[0]); // ^
+                break;
             case SyntaxKind.ElementAccessExpression:
                 VisitElementAccessExpression(node);
                 break;
@@ -758,6 +773,15 @@ internal sealed class FormattingVisitor
         if (tokenIndex < tokens.Count)
         {
             WriteTokenWithCasing(tokens[tokenIndex++]); // PROGRAM/FUNCTION_BLOCK/etc
+            _writer.WriteSpace();
+        }
+        // TwinCAT modifiers after the keyword: METHOD PROTECTED Foo, PROPERTY PUBLIC Bar
+        while (tokenIndex < tokens.Count &&
+               (IsAccessModifier(tokens[tokenIndex].Kind) ||
+                tokens[tokenIndex].Kind is SyntaxKind.FinalKeyword
+                    or SyntaxKind.AbstractKeyword or SyntaxKind.OverrideKeyword))
+        {
+            WriteTokenWithCasing(tokens[tokenIndex++]);
             _writer.WriteSpace();
         }
         if (tokenIndex < tokens.Count && tokens[tokenIndex].Kind == SyntaxKind.Identifier)
@@ -1714,6 +1738,13 @@ internal sealed class FormattingVisitor
         var tokens = node.ChildTokens.ToList();
         var nodes = node.ChildNodes.ToList();
 
+        // Paren form: (A, B := 1, C) [baseType] - tokens are ( commas... )
+        if (tokens[0].Kind == SyntaxKind.OpenParen)
+        {
+            VisitParenEnumType(tokens, nodes);
+            return;
+        }
+
         WriteTokenWithCasing(tokens[0]); // ENUM
         _writer.EnsureNewLine();
 
@@ -1738,6 +1769,82 @@ internal sealed class FormattingVisitor
 
         _writer.EnsureNewLine();
         WriteTokenWithCasing(tokens[tokens.Count - 1]); // END_ENUM
+    }
+
+    private void VisitParenEnumType(List<SyntaxToken> tokens, List<SyntaxNode> nodes)
+    {
+        // Last node may be the optional base type: (A, B) USINT
+        var baseType = nodes.Count > 0 && nodes[nodes.Count - 1].Kind == SyntaxKind.NamedType
+            ? nodes[nodes.Count - 1] : null;
+        var valueCount = baseType != null ? nodes.Count - 1 : nodes.Count;
+
+        // Preserve the author's layout: members that were on separate lines (or
+        // carry comments/pragmas) stay one-per-line; compact enums stay compact.
+        // The decision is derivable from the formatted output too, keeping
+        // formatting idempotent.
+        bool multiline = false;
+        for (var i = 0; i < valueCount && !multiline; i++)
+        {
+            foreach (var trivia in nodes[i].ChildTokens[0].LeadingTrivia)
+            {
+                if (trivia.IsLineBreak || trivia.IsComment || trivia.IsPragma)
+                {
+                    multiline = true;
+                    break;
+                }
+            }
+        }
+
+        WriteToken(tokens[0]); // (
+        if (multiline)
+        {
+            _writer.EnsureNewLine();
+            _writer.IndentLevel++;
+            for (var i = 0; i < valueCount; i++)
+            {
+                VisitEnumValue(nodes[i]);
+                if (i < valueCount - 1)
+                    WriteToken(tokens[1 + i]); // comma
+                _writer.EnsureNewLine();
+            }
+            _writer.IndentLevel--;
+        }
+        else
+        {
+            for (var i = 0; i < valueCount; i++)
+            {
+                if (i > 0)
+                {
+                    WriteToken(tokens[i]); // comma
+                    if (_config.SpaceAfterComma)
+                        _writer.WriteSpace();
+                }
+                VisitEnumValue(nodes[i]);
+            }
+        }
+        WriteToken(tokens[tokens.Count - 1]); // )
+
+        if (baseType != null)
+        {
+            _writer.WriteSpace();
+            Visit(baseType);
+        }
+    }
+
+    private void VisitEnumValue(SyntaxNode node)
+    {
+        WriteToken(node.ChildTokens[0]); // name
+
+        var init = node.ChildNodes.FirstOrDefault(n => n.Kind == SyntaxKind.EnumValueInitializer);
+        if (init != null)
+        {
+            if (_config.SpaceAroundOperators)
+                _writer.WriteSpace();
+            WriteToken(init.ChildTokens[0]); // := or =
+            if (_config.SpaceAroundOperators)
+                _writer.WriteSpace();
+            Visit(init.ChildNodes[0]); // value
+        }
     }
 
     private void VisitStringType(SyntaxNode node)
@@ -1951,7 +2058,9 @@ internal sealed class FormattingVisitor
 
             if (trivia.IsWhitespace)
             {
-                prevWasLineBreak = false;
+                // Indentation between a line break and a comment doesn't make the
+                // comment "inline" - keep the line-break state so own-line
+                // comments stay on their own line.
                 lastTrivia = trivia;
                 continue;
             }
