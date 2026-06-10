@@ -12,6 +12,7 @@ namespace STFormatter.UI
         public string Language { get; set; } = "en";
         public DateTime? LastSavedUtc { get; set; }
         public FormattingConfiguration Formatting { get; set; } = new();
+        public System.Collections.Generic.List<string> RecentPingTargets { get; set; } = new();
     }
 
     public static class SettingsManager

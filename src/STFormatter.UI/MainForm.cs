@@ -20,6 +20,7 @@ namespace STFormatter.UI
         private readonly InstancesPanel _instancesPanel;
         private readonly HistoryPanel _historyPanel;
         private readonly LogPanel _logPanel;
+        private readonly ToolboxPanel _toolboxPanel;
         private readonly ConcurrentBag<FormatRecord> _formatHistory = new();
         private readonly System.Windows.Forms.Timer _maintainTimer;
         private readonly System.Windows.Forms.Timer _refreshTimer;
@@ -73,6 +74,7 @@ namespace STFormatter.UI
             _instancesPanel = new InstancesPanel(getInstances, cleanup, maintainAction, getStatus);
             _historyPanel = new HistoryPanel(_formatHistory);
             _logPanel = new LogPanel();
+            _toolboxPanel = new ToolboxPanel();
 
             _tabControl = new TabControl
             {
@@ -93,10 +95,14 @@ namespace STFormatter.UI
             var logTab = new TabPage(Strings.Get("Tab.Log")) { Padding = new Padding(4) };
             logTab.Controls.Add(_logPanel);
 
+            var toolboxTab = new TabPage(Strings.Get("Tab.Toolbox")) { Padding = new Padding(4) };
+            toolboxTab.Controls.Add(_toolboxPanel);
+
             _tabControl.TabPages.Add(settingsTab);
             _tabControl.TabPages.Add(instancesTab);
             _tabControl.TabPages.Add(historyTab);
             _tabControl.TabPages.Add(logTab);
+            _tabControl.TabPages.Add(toolboxTab);
 
             _tabControl.SelectedIndexChanged += OnTabChanged;
 
@@ -138,6 +144,7 @@ namespace STFormatter.UI
             _trayMenu.Items.Add(Strings.Get("Tray.Instances"), null, (s, e) => ShowWindow(1));
             _trayMenu.Items.Add(Strings.Get("Tray.History"), null, (s, e) => ShowWindow(2));
             _trayMenu.Items.Add(Strings.Get("Tray.Log"), null, (s, e) => ShowWindow(3));
+            _trayMenu.Items.Add(Strings.Get("Tray.Toolbox"), null, (s, e) => ShowWindow(4));
             _trayMenu.Items.Add(new ToolStripSeparator());
             _trayMenu.Items.Add(Strings.Get("Tray.Restart"), null, OnRestart);
             _trayMenu.Items.Add(Strings.Get("Tray.Exit"), null, OnExit);
@@ -151,12 +158,13 @@ namespace STFormatter.UI
             try
             {
                 Text = Strings.Get("App.Title");
-                if (_tabControl.TabPages.Count >= 4)
+                if (_tabControl.TabPages.Count >= 5)
                 {
                     _tabControl.TabPages[0].Text = Strings.Get("Tab.Settings");
                     _tabControl.TabPages[1].Text = Strings.Get("Tab.Instances");
                     _tabControl.TabPages[2].Text = Strings.Get("Tab.History");
                     _tabControl.TabPages[3].Text = Strings.Get("Tab.Log");
+                    _tabControl.TabPages[4].Text = Strings.Get("Tab.Toolbox");
                 }
                 _trayIcon.Text = Strings.Get("Tray.Text");
                 BuildTrayMenu();
@@ -165,6 +173,7 @@ namespace STFormatter.UI
                 _instancesPanel.RebuildUi();
                 _historyPanel.RebuildUi();
                 _logPanel.RebuildUi();
+                _toolboxPanel.RebuildUi();
             }
             finally
             {
