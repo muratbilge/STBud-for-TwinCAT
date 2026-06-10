@@ -53,8 +53,11 @@ namespace STFormatter.UI
                 _listView.Items.Add(item);
             }
             _listView.EndUpdate();
+            int connectedCount = 0;
+            foreach (var kvp in instances)
+                if (kvp.Value.Connected) connectedCount++;
             _statusLabel.Text = instances.Count > 0
-                ? $"{instances.Count} {Strings.Get("Instances.Status.Connected").ToLowerInvariant()}"
+                ? $"{connectedCount}/{instances.Count} {Strings.Get("Instances.Status.Connected").ToLowerInvariant()}"
                 : _getStatus?.Invoke() ?? Strings.Get("Instances.None");
         }
 

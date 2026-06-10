@@ -286,15 +286,13 @@ namespace STFormatter.UI
             string[] leftLines = SplitLines(original);
             string[] rightLines = SplitLines(formatted);
 
-            if (leftLines.Length > MaxDiffLines || rightLines.Length > MaxDiffLines)
-            {
-                int limit = Math.Min(leftLines.Length, MaxDiffLines);
-                if (leftLines.Length > MaxDiffLines)
-                    leftLines = leftLines.Take(MaxDiffLines).ToArray();
-                limit = Math.Min(rightLines.Length, MaxDiffLines);
-                if (rightLines.Length > MaxDiffLines)
-                    rightLines = rightLines.Take(MaxDiffLines).ToArray();
-            }
+            bool truncated = leftLines.Length > MaxDiffLines || rightLines.Length > MaxDiffLines;
+            if (leftLines.Length > MaxDiffLines)
+                leftLines = leftLines.Take(MaxDiffLines).ToArray();
+            if (rightLines.Length > MaxDiffLines)
+                rightLines = rightLines.Take(MaxDiffLines).ToArray();
+            if (truncated)
+                Text += $" — first {MaxDiffLines} lines only";
 
             _allDiffLines = ComputeDiff(leftLines, rightLines);
             RenderDiff();

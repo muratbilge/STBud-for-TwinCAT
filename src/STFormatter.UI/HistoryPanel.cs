@@ -235,11 +235,23 @@ namespace STFormatter.UI
                     else
                         result = string.Compare(sa, sb, StringComparison.CurrentCultureIgnoreCase);
                 }
+                else if (_column == 5)
+                {
+                    // Lines column is "<original> > <formatted>"; sort by original count
+                    result = LeadingNumber(sa).CompareTo(LeadingNumber(sb));
+                }
                 else
                 {
                     result = string.Compare(sa, sb, StringComparison.CurrentCultureIgnoreCase);
                 }
                 return _order == SortOrder.Descending ? -result : result;
+            }
+
+            private static int LeadingNumber(string s)
+            {
+                int end = 0;
+                while (end < s.Length && char.IsDigit(s[end])) end++;
+                return end > 0 && int.TryParse(s.Substring(0, end), out var n) ? n : -1;
             }
         }
     }

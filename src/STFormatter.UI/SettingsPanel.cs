@@ -9,7 +9,6 @@ namespace STFormatter.UI
     public class SettingsPanel : UserControl
     {
         private ComboBox _presetCombo;
-        private ComboBox _languageCombo;
         private ComboBox _indentStyleCombo;
         private NumericUpDown _indentSize;
         private NumericUpDown _continuationIndentSize;
@@ -30,7 +29,6 @@ namespace STFormatter.UI
         private CheckBox _startWithWindows;
         private RichTextBox _previewBox;
         private Label _savedAtLabel;
-        private Label _restartNoteLabel;
         private SplitContainer _split;
         private Panel _scroll;
         private TableLayoutPanel _grid;
@@ -71,7 +69,6 @@ END_IF";
         public void RebuildUi()
         {
             var config = BuildConfig();
-            var appLang = _languageCombo.SelectedIndex;
 
             _split.SuspendLayout();
             try
@@ -98,9 +95,6 @@ END_IF";
             {
                 _split.ResumeLayout(true);
             }
-
-            if (appLang >= 0)
-                _languageCombo.SelectedIndex = appLang;
 
             _savedAtLabel.Text = Strings.Get("Settings.NeverSaved");
             UpdateSavedAtLabel();
@@ -274,7 +268,7 @@ END_IF";
 
             _newLineStyleCombo = MakeCombo(new[] { "crlf", "lf", "cr" }, 0);
             _keywordCasingCombo = MakeCombo(new[] { "upper", "lower", "pascal", "original" }, 0);
-            _braceStyleCombo = MakeCombo(new[] { "allman", "kr" }, 0);
+            _braceStyleCombo = MakeCombo(new[] { "allman", "compact" }, 0);
 
             AddRow(p, Strings.Get("Settings.Newline"), _newLineStyleCombo);
             AddRow(p, Strings.Get("Settings.KeywordCasing"), _keywordCasingCombo);
@@ -324,35 +318,7 @@ END_IF";
                 else AutoStart.Disable();
             };
 
-            _languageCombo = new ComboBox
-            {
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Dock = DockStyle.Fill,
-                Margin = new Padding(0, 3, 0, 3),
-            };
-            _languageCombo.Items.Add("English");
-            _languageCombo.Items.Add("Deutsch");
-            _languageCombo.SelectedIndex = 0;
-            _languageCombo.SelectedIndexChanged += (s, e) =>
-            {
-                string lang = _languageCombo.SelectedIndex == 1 ? "de" : "en";
-                Strings.ApplyLanguage(lang);
-            };
-
             AddRow(p, _startWithWindows);
-            AddRow(p, Strings.Get("Settings.Language"), _languageCombo);
-
-            _restartNoteLabel = new Label
-            {
-                Text = Strings.Get("Settings.RestartNote"),
-                AutoSize = true,
-                ForeColor = SystemColors.ControlDarkDark,
-                Margin = new Padding(0, 4, 0, 0),
-            };
-            p.SetColumnSpan(_restartNoteLabel, 2);
-            int ri = p.RowCount++;
-            p.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            p.Controls.Add(_restartNoteLabel, 0, ri);
 
             return p;
         }
@@ -577,7 +543,8 @@ END_IF";
             _continuationIndentSize.Value = c.ContinuationIndentSize;
             _newLineStyleCombo.SelectedIndex = c.NewLineStyle switch { "lf" => 1, "cr" => 2, _ => 0 };
             _keywordCasingCombo.SelectedIndex = c.KeywordCasing switch { "lower" => 1, "pascal" => 2, "original" => 3, _ => 0 };
-            _braceStyleCombo.SelectedIndex = c.BraceStyle == "kr" ? 1 : 0;
+            // Anything non-allman formats compact ("kr"/"k&r"/"stroustrup" are aliases)
+            _braceStyleCombo.SelectedIndex = c.IsAllmanStyle() ? 0 : 1;
             _spaceAroundOperators.Checked = c.SpaceAroundOperators;
             _spaceAfterComma.Checked = c.SpaceAfterComma;
             _spaceBeforeSemicolon.Checked = c.SpaceBeforeSemicolon;
@@ -593,9 +560,7 @@ END_IF";
 
         private void LoadFromAppSettings()
         {
-            var app = SettingsManager.App;
             _startWithWindows.Checked = AutoStart.IsEnabled();
-            _languageCombo.SelectedIndex = app.Language?.ToLowerInvariant() == "de" ? 1 : 0;
         }
 
         private void UpdateSavedAtLabel()
