@@ -61,6 +61,47 @@ public sealed class Parser
         return SyntaxFactory.Token(kind, string.Empty, Current.Span.Start);
     }
 
+    // Users name variables/enum members after soft keywords (dt, tod, time,
+    // Reference, ...). A keyword token counts as a declaration name when the
+    // token after it confirms the name position - then it is consumed and
+    // re-typed as an identifier so downstream code treats it normally.
+    private bool IsDeclarationNameStart()
+    {
+        if (Current.Kind == SyntaxKind.Identifier)
+            return true;
+        if (!IsWordToken(Current))
+            return false;
+        var next = Peek(1).Kind;
+        return next == SyntaxKind.Colon || next == SyntaxKind.AtKeyword;
+    }
+
+    private SyntaxToken MatchDeclarationName()
+    {
+        if (Current.Kind == SyntaxKind.Identifier)
+            return NextToken();
+
+        if (IsWordToken(Current))
+        {
+            var token = NextToken();
+            return new SyntaxToken(SyntaxKind.Identifier, token.Text, token.Span,
+                token.LeadingTrivia, token.TrailingTrivia);
+        }
+
+        return MatchToken(SyntaxKind.Identifier);
+    }
+
+    private static bool IsWordToken(SyntaxToken token)
+    {
+        if (string.IsNullOrEmpty(token.Text))
+            return false;
+        foreach (var c in token.Text)
+        {
+            if (!char.IsLetterOrDigit(c) && c != '_')
+                return false;
+        }
+        return char.IsLetter(token.Text[0]) || token.Text[0] == '_';
+    }
+
     public SyntaxTree Parse()
     {
         var start = Current.Span.Start;
@@ -547,7 +588,7 @@ public sealed class Parser
         var modifiers = ParseVarModifiers();
         var declarations = new List<SyntaxNode>();
 
-        while (Current.Kind == SyntaxKind.Identifier)
+        while (IsDeclarationNameStart())
         {
             declarations.Add(ParseVarDeclaration());
         }
@@ -576,7 +617,7 @@ public sealed class Parser
     private SyntaxNode ParseVarDeclaration()
     {
         var start = Current.Span.Start;
-        var name = MatchToken(SyntaxKind.Identifier);
+        var name = MatchDeclarationName();
         var atClause = ParseOptionalAtClause();
         var colon = MatchToken(SyntaxKind.Colon);
         var type = ParseType();
@@ -723,7 +764,7 @@ public sealed class Parser
         var structKeyword = MatchToken(SyntaxKind.StructKeyword);
         var elements = new List<SyntaxNode>();
 
-        while (Current.Kind == SyntaxKind.Identifier)
+        while (IsDeclarationNameStart())
         {
             elements.Add(ParseVarDeclaration());
         }
@@ -740,7 +781,7 @@ public sealed class Parser
         var unionKeyword = MatchToken(SyntaxKind.UnionKeyword);
         var elements = new List<SyntaxNode>();
 
-        while (Current.Kind == SyntaxKind.Identifier)
+        while (IsDeclarationNameStart())
         {
             elements.Add(ParseVarDeclaration());
         }
@@ -783,7 +824,7 @@ public sealed class Parser
         var tokens = new List<SyntaxToken> { MatchToken(SyntaxKind.OpenParen) };
 
         var values = new List<SyntaxNode>();
-        if (Current.Kind == SyntaxKind.Identifier)
+        if (IsEnumValueStart())
         {
             values.Add(ParseEnumValue());
             while (Current.Kind == SyntaxKind.Comma)
@@ -829,10 +870,23 @@ public sealed class Parser
         return null;
     }
 
+    // Enum member names may collide with soft keywords (Reference, Error, ...);
+    // the following token disambiguates.
+    private bool IsEnumValueStart()
+    {
+        if (Current.Kind == SyntaxKind.Identifier)
+            return true;
+        if (!IsWordToken(Current))
+            return false;
+        var next = Peek(1).Kind;
+        return next == SyntaxKind.Comma || next == SyntaxKind.CloseParen ||
+               next == SyntaxKind.AssignmentOperator || next == SyntaxKind.Equal;
+    }
+
     private SyntaxNode ParseEnumValue()
     {
         var start = Current.Span.Start;
-        var name = MatchToken(SyntaxKind.Identifier);
+        var name = MatchDeclarationName();
         SyntaxNode? init = null;
         if (Current.Kind == SyntaxKind.AssignmentOperator || Current.Kind == SyntaxKind.Equal)
         {
@@ -1494,6 +1548,10 @@ public sealed class Parser
                 return SyntaxFactory.Node(SyntaxKind.DirectVariableExpression, directVar.Span,
                     new[] { directVar });
 
+            case SyntaxKind.OpenBracket:
+                // Array initializer: [expr, expr, ...] (used in VAR initializers)
+                return ParseArrayInitializer();
+
             default:
                 _diagnostics.Add(new Diagnostic(
                     DiagnosticSeverity.Error,
@@ -1502,6 +1560,29 @@ public sealed class Parser
                 var badToken = NextToken();
                 return SyntaxFactory.Node(SyntaxKind.LiteralExpression, badToken.Span, new[] { badToken });
         }
+    }
+
+    private SyntaxNode ParseArrayInitializer()
+    {
+        var start = Current.Span.Start;
+        var tokens = new List<SyntaxToken> { MatchToken(SyntaxKind.OpenBracket) };
+        var elements = new List<SyntaxNode>();
+
+        if (Current.Kind != SyntaxKind.CloseBracket)
+        {
+            elements.Add(ParseExpression());
+            while (Current.Kind == SyntaxKind.Comma)
+            {
+                tokens.Add(NextToken()); // comma
+                elements.Add(ParseExpression());
+            }
+        }
+
+        var closeBracket = MatchToken(SyntaxKind.CloseBracket);
+        tokens.Add(closeBracket);
+
+        return SyntaxFactory.Node(SyntaxKind.ArrayInitializer,
+            TextSpan.FromBounds(start, closeBracket.Span.End), elements, tokens);
     }
 
     private SyntaxNode ParseIdentifierOrMemberExpression()

@@ -20,32 +20,33 @@ public sealed class EditorConfigParser
 
     public static FormattingConfiguration? LoadFromDirectory(string startDirectory, string? filePath = null)
     {
-        var configs = new List<EditorConfigSection>();
+        // Walk up the directory tree collecting .editorconfig files, innermost
+        // first; stop at the first file declaring "root = true" (a top-level
+        // preamble property, parsed into the synthetic "" section).
+        var files = new List<List<EditorConfigSection>>();
         var currentDir = startDirectory;
 
-        // Walk up directory tree collecting .editorconfig files
         while (!string.IsNullOrEmpty(currentDir))
         {
             var editorConfigPath = Path.Combine(currentDir, ".editorconfig");
             if (File.Exists(editorConfigPath))
             {
                 var sections = Parse(editorConfigPath);
-                configs.AddRange(sections);
+                files.Add(sections);
 
-                // Check if this is root
-                var rootSection = sections.FirstOrDefault(s => s.Pattern == "*");
-                if (rootSection?.Properties.ContainsKey("root") == true &&
-                    rootSection.Properties["root"].Equals("true", StringComparison.OrdinalIgnoreCase))
-                {
+                bool isRoot = sections.Any(s =>
+                    (s.Pattern == "" || s.Pattern == "*") &&
+                    s.Properties.TryGetValue("root", out var rootValue) &&
+                    rootValue.Equals("true", StringComparison.OrdinalIgnoreCase));
+                if (isRoot)
                     break;
-                }
             }
 
             var parentDir = Directory.GetParent(currentDir);
             currentDir = parentDir?.FullName;
         }
 
-        if (configs.Count == 0)
+        if (files.Count == 0)
             return null;
 
         var config = new FormattingConfiguration();
@@ -53,16 +54,20 @@ public sealed class EditorConfigParser
 
         var fileName = filePath != null ? Path.GetFileName(filePath) : null;
 
-        // Apply from outermost to innermost; later overrides earlier
-        for (var i = configs.Count - 1; i >= 0; i--)
+        // EditorConfig precedence: outermost file first, then inner files
+        // override; within a file, later sections override earlier ones.
+        for (var f = files.Count - 1; f >= 0; f--)
         {
-            var section = configs[i];
-            if (fileName != null && !MatchesPattern(section.Pattern, fileName))
-                continue;
-
-            foreach (var prop in section.Properties)
+            foreach (var section in files[f])
             {
-                allProperties[prop.Key] = prop.Value;
+                if (section.Pattern == "") continue; // preamble (only "root" lives there)
+                if (fileName != null && !MatchesPattern(section.Pattern, fileName))
+                    continue;
+
+                foreach (var prop in section.Properties)
+                {
+                    allProperties[prop.Key] = prop.Value;
+                }
             }
         }
 
@@ -205,7 +210,10 @@ public sealed class EditorConfigParser
     private static List<EditorConfigSection> Parse(string filePath)
     {
         var sections = new List<EditorConfigSection>();
-        EditorConfigSection? currentSection = null;
+        // Properties before the first [section] header form the preamble -
+        // that is where "root = true" lives per the EditorConfig spec.
+        var currentSection = new EditorConfigSection("");
+        sections.Add(currentSection);
 
         foreach (var rawLine in File.ReadAllLines(filePath))
         {
@@ -223,7 +231,7 @@ public sealed class EditorConfigParser
             }
 
             var equalsIndex = line.IndexOf('=');
-            if (equalsIndex > 0 && currentSection != null)
+            if (equalsIndex > 0)
             {
                 var key = line.Substring(0, equalsIndex).Trim();
                 var value = line.Substring(equalsIndex + 1).Trim();

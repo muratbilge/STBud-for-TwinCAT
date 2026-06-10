@@ -95,55 +95,45 @@ internal sealed class KeyboardHook : IDisposable
             if (vkCode == _lastHotkeyVkCode && time == _lastHotkeyTime)
                 return CallNextHookEx(_hookId, nCode, wParam, lParam);
 
-            if (IsCtrlShiftPressed())
+            if ((vkCode == VK_F || vkCode == VK_D) && IsCtrlShiftPressed())
             {
-                if (vkCode == VK_F)
+                // Low-level hook callbacks must return fast (Windows silently
+                // unhooks slow hooks) - keep this path to cheap Win32 calls plus
+                // a cached process-name lookup; logging happens in the posted
+                // continuation on the UI thread.
+                int? pid = FindTcXaeShellPid();
+                if (pid.HasValue)
                 {
-                    int? pid = FindTcXaeShellPid();
-                    if (pid.HasValue)
+                    _lastHotkeyVkCode = vkCode;
+                    _lastHotkeyTime = time;
+                    var capturedPid = pid.Value;
+                    var handler = vkCode == VK_F ? FormatDocumentHotkey : FormatSelectionHotkey;
+                    var keyName = vkCode == VK_F ? "Ctrl+Shift+F" : "Ctrl+Shift+D";
+                    _syncContext?.Post(_ =>
                     {
-                        _lastHotkeyVkCode = vkCode;
-                        _lastHotkeyTime = time;
-                        HostLog.Append("KeyboardHook", $"Ctrl+Shift+F detected, TcXaeShell PID {pid.Value}");
-                        var capturedPid = pid.Value;
-                        _syncContext?.Post(_ =>
+                        if (!_processing)
                         {
-                            if (!_processing)
+                            _processing = true;
+                            try
                             {
-                                _processing = true;
-                                try { FormatDocumentHotkey?.Invoke(capturedPid); }
-                                finally { _processing = false; }
+                                HostLog.Append("KeyboardHook", $"{keyName} detected, TcXaeShell PID {capturedPid}");
+                                handler?.Invoke(capturedPid);
                             }
-                        }, null);
-                        return (IntPtr)1;
-                    }
-                }
-                else if (vkCode == VK_D)
-                {
-                    int? pid = FindTcXaeShellPid();
-                    if (pid.HasValue)
-                    {
-                        _lastHotkeyVkCode = vkCode;
-                        _lastHotkeyTime = time;
-                        HostLog.Append("KeyboardHook", $"Ctrl+Shift+D detected, TcXaeShell PID {pid.Value}");
-                        var capturedPid = pid.Value;
-                        _syncContext?.Post(_ =>
-                        {
-                            if (!_processing)
-                            {
-                                _processing = true;
-                                try { FormatSelectionHotkey?.Invoke(capturedPid); }
-                                finally { _processing = false; }
-                            }
-                        }, null);
-                        return (IntPtr)1;
-                    }
+                            finally { _processing = false; }
+                        }
+                    }, null);
+                    return (IntPtr)1;
                 }
             }
         }
 
         return CallNextHookEx(_hookId, nCode, wParam, lParam);
     }
+
+    // PID -> is-TcXaeShell, cached briefly so the hook callback avoids the
+    // comparatively slow Process.GetProcessById on every keystroke.
+    private static readonly System.Collections.Generic.Dictionary<uint, (bool IsTcXae, DateTime CheckedAt)> _pidCache = new();
+    private static readonly TimeSpan PidCacheValidity = TimeSpan.FromSeconds(5);
 
     private static int? FindTcXaeShellPid()
     {
@@ -153,17 +143,25 @@ internal sealed class KeyboardHook : IDisposable
         GetWindowThreadProcessId(foreground, out uint pid);
         if (pid == 0) return null;
 
+        if (_pidCache.TryGetValue(pid, out var cached) &&
+            DateTime.UtcNow - cached.CheckedAt < PidCacheValidity)
+        {
+            return cached.IsTcXae ? (int)pid : (int?)null;
+        }
+
+        bool isTcXae = false;
         try
         {
             using var process = Process.GetProcessById((int)pid);
-            if (process.ProcessName.Equals("TcXaeShell", StringComparison.OrdinalIgnoreCase))
-                return (int)pid;
+            isTcXae = process.ProcessName.Equals("TcXaeShell", StringComparison.OrdinalIgnoreCase);
         }
         catch
         {
         }
 
-        return null;
+        if (_pidCache.Count > 64) _pidCache.Clear();
+        _pidCache[pid] = (isTcXae, DateTime.UtcNow);
+        return isTcXae ? (int)pid : (int?)null;
     }
 
     private static bool IsCtrlShiftPressed()

@@ -153,7 +153,7 @@ public sealed class TwinCatXmlFormatter
 
     // Formatting a tree that has parse errors loses the content the parser
     // skipped during recovery - only full-format when the parse is clean.
-    private static bool ParsesWithoutErrors(string source)
+    public static bool ParsesWithoutErrors(string source)
     {
         var tree = new Parsing.Parser(Text.SourceText.From(source)).Parse();
         return !tree.Diagnostics.Any(d => d.Severity == Syntax.DiagnosticSeverity.Error);

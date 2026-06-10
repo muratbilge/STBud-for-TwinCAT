@@ -215,7 +215,6 @@ internal class Program
 
     private static void HandleFormatDocumentCore(int pid)
     {
-        Log($"HandleFormatDocument: PID {pid}");
         try
         {
             var instance = _hostManager?.GetInstance(pid);
@@ -269,18 +268,27 @@ internal class Program
             var config = SettingsManager.Current;
             var engine = new FormattingEngine(config);
 
-            if (!FormatTwinCatXml(xmlContent, engine, out string formattedXml, out string? formattedDecl, out string? formattedImpl))
+            // The on-disk file may be stale when the editor buffer has unsaved
+            // changes - only short-circuit on "disk already formatted" when the
+            // document is saved; otherwise fall through to the live-edit tier,
+            // which reads the editor content itself.
+            bool docDirty = false;
+            try { docDirty = !dte.ActiveDocument.Saved; } catch { }
+
+            bool diskChanged = FormatTwinCatXml(xmlContent, engine,
+                out string formattedXml, out string? formattedDecl, out string? formattedImpl);
+
+            if (!diskChanged && !docDirty)
             {
                 Log("HandleFormatDocument: No changes needed");
                 return;
             }
 
-            string backupPath = filePath + ".bak";
-            File.Copy(filePath, backupPath, true);
-
-            // Tier 1: Automation API
-            if (TryFormatViaAutomation(dte, filePath, formattedDecl, formattedImpl))
+            // Tier 1: Automation API (no disk backup needed - the editor buffer
+            // is updated; the file write below snapshots first)
+            if (diskChanged && TryFormatViaAutomation(dte, filePath, formattedDecl, formattedImpl))
             {
+                CreateBackup(filePath);
                 File.WriteAllText(filePath, formattedXml, System.Text.Encoding.UTF8);
                 Log("HandleFormatDocument: Tier 1 (Automation API) succeeded");
                 RecordFormat(pid, filePath, "Declaration+Implementation",
@@ -308,7 +316,17 @@ internal class Program
                 return;
             }
 
+            // Disk-writing tiers below only make sense when the disk content
+            // actually changed (they would otherwise clobber unsaved edits with
+            // stale disk-derived content)
+            if (!diskChanged)
+            {
+                Log("HandleFormatDocument: live-edit tiers failed and disk is already formatted - giving up");
+                return;
+            }
+
             // Tier 4: IVsFileChangeEx + RDT
+            CreateBackup(filePath);
             if (LiveEditor.TryFormatViaRdtFileWrite(dte, filePath, formattedXml, engine))
             {
                 Log("HandleFormatDocument: Tier 4 (RDT File Write) succeeded");
@@ -345,7 +363,6 @@ internal class Program
 
     private static void HandleFormatSelectionCore(int pid)
     {
-        Log($"HandleFormatSelection: PID {pid}");
         try
         {
             var instance = _hostManager?.GetInstance(pid);
@@ -1260,6 +1277,20 @@ internal class Program
         }
     }
 
+    // Backup only before tiers that write to disk (AGENTS.md: backups are for
+    // the file-write fallback, not for live edits)
+    private static void CreateBackup(string filePath)
+    {
+        try
+        {
+            File.Copy(filePath, filePath + ".bak", true);
+        }
+        catch (Exception ex)
+        {
+            Log($"CreateBackup: failed for {filePath}: {ex.Message}");
+        }
+    }
+
     private static void RecordFormat(int pid, string filePath, string section,
         string original, string formatted, string method, bool success)
     {
@@ -1367,14 +1398,19 @@ internal class Program
 
             Type adapterType = sysManItem.GetType();
 
-            if (!string.IsNullOrEmpty(formattedDecl))
+            // Only report success when every required setter actually worked -
+            // a false positive here makes the caller overwrite the file on disk
+            // while the editor still holds the unformatted buffer.
+            bool declOk = string.IsNullOrEmpty(formattedDecl);
+            if (!declOk)
             {
                 try
                 {
                     adapterType.InvokeMember("DeclarationText",
                         BindingFlags.SetProperty | BindingFlags.Instance | BindingFlags.Public,
-                        null, sysManItem, new object[] { formattedDecl });
+                        null, sysManItem, new object[] { formattedDecl! });
                     Log("TryFormatViaAutomation: DeclarationText set");
+                    declOk = true;
                 }
                 catch (Exception ex)
                 {
@@ -1382,14 +1418,16 @@ internal class Program
                 }
             }
 
-            if (!string.IsNullOrEmpty(formattedImpl))
+            bool implOk = string.IsNullOrEmpty(formattedImpl);
+            if (!implOk)
             {
                 try
                 {
                     adapterType.InvokeMember("ImplementationText",
                         BindingFlags.SetProperty | BindingFlags.Instance | BindingFlags.Public,
-                        null, sysManItem, new object[] { formattedImpl });
+                        null, sysManItem, new object[] { formattedImpl! });
                     Log("TryFormatViaAutomation: ImplementationText set");
+                    implOk = true;
                 }
                 catch (Exception ex)
                 {
@@ -1397,8 +1435,15 @@ internal class Program
                 }
             }
 
-            Log("TryFormatViaAutomation: SUCCESS");
-            return true;
+            bool attemptedAny = !string.IsNullOrEmpty(formattedDecl) || !string.IsNullOrEmpty(formattedImpl);
+            if (attemptedAny && declOk && implOk)
+            {
+                Log("TryFormatViaAutomation: SUCCESS");
+                return true;
+            }
+
+            Log("TryFormatViaAutomation: setters incomplete - reporting failure");
+            return false;
         }
         catch (Exception ex)
         {

@@ -54,6 +54,35 @@ public class SampleCorpusTests
         Assert.Equal(once, twice);
     }
 
+    // Same data-loss guard as for XML files: formatting plain ST may only
+    // change whitespace and keyword casing, never the token sequence.
+    [Theory]
+    [MemberData(nameof(PlainStFiles))]
+    public void PlainStFile_FormattingPreservesAllCodeTokens(string relativePath)
+    {
+        var source = File.ReadAllText(Path.Combine(SamplesDir, relativePath));
+        var formatted = new FormattingEngine().Format(source);
+
+        var before = WordTokens(source);
+        var after = WordTokens(formatted);
+
+        Assert.Equal(before.Count, after.Count);
+        for (int i = 0; i < before.Count; i++)
+        {
+            Assert.True(string.Equals(before[i], after[i], StringComparison.OrdinalIgnoreCase),
+                $"token {i} changed: '{before[i]}' -> '{after[i]}'");
+        }
+    }
+
+    private static List<string> WordTokens(string code)
+    {
+        var tokens = new List<string>();
+        foreach (System.Text.RegularExpressions.Match m in
+                 System.Text.RegularExpressions.Regex.Matches(code, @"[A-Za-z0-9_]+"))
+            tokens.Add(m.Value);
+        return tokens;
+    }
+
     [Theory]
     [MemberData(nameof(TwinCatXmlFiles))]
     public void TwinCatXmlFile_FormatsAndIsIdempotent(string relativePath)

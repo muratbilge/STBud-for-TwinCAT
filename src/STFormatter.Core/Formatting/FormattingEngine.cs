@@ -697,6 +697,9 @@ internal sealed class FormattingVisitor
                 Visit(node.ChildNodes[0]);
                 WriteToken(node.ChildTokens[0]); // ^
                 break;
+            case SyntaxKind.ArrayInitializer:
+                VisitArrayInitializer(node);
+                break;
             case SyntaxKind.ElementAccessExpression:
                 VisitElementAccessExpression(node);
                 break;
@@ -1646,6 +1649,26 @@ internal sealed class FormattingVisitor
         WriteToken(tokens[tokens.Count - 1]); // )
     }
 
+    private void VisitArrayInitializer(SyntaxNode node)
+    {
+        // [a, b, c] - tokens are [ commas... ]
+        var tokens = node.ChildTokens.ToList();
+        var elements = node.ChildNodes.ToList();
+
+        WriteToken(tokens[0]); // [
+        for (var i = 0; i < elements.Count; i++)
+        {
+            if (i > 0)
+            {
+                WriteToken(tokens[i]); // comma
+                if (_config.SpaceAfterComma)
+                    _writer.WriteSpace();
+            }
+            Visit(elements[i]);
+        }
+        WriteToken(tokens[tokens.Count - 1]); // ]
+    }
+
     private void VisitParenthesizedExpression(SyntaxNode node)
     {
         var tokens = node.ChildTokens.ToList();
@@ -1926,13 +1949,13 @@ internal sealed class FormattingVisitor
     private void VisitPointerOrReferenceType(SyntaxNode node)
     {
         var tokens = node.ChildTokens.ToList();
-        WriteTokenWithCasing(tokens[0]); // POINTER/REF/REFERENCE
+        WriteTokenWithCasing(tokens[0]); // POINTER/REF_TO/REFERENCE
         if (tokens.Count > 1)
         {
             _writer.WriteSpace();
             WriteTokenWithCasing(tokens[1]); // TO
-            _writer.WriteSpace();
         }
+        _writer.WriteSpace(); // REF_TO has no TO token but still needs the separator
         Visit(node.ChildNodes[0]);
     }
 

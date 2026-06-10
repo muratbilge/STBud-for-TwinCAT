@@ -469,9 +469,9 @@ internal static class LiveEditor
                 {
                     formatted = engine.FormatDeclaration(currentText);
                     Log($"TryFormatViaExecuteCommand: FormatDeclaration result: [{(formatted ?? "<null>")}]");
-                    if (string.IsNullOrEmpty(formatted) || formatted == currentText)
+                    if (NeedsFullFormatFallback(formatted, currentText))
                     {
-                        Log("TryFormatViaExecuteCommand: FormatDeclaration failed or unchanged, trying Format as fallback");
+                        Log("TryFormatViaExecuteCommand: header-only declaration, trying full Format");
                         formatted = engine.Format(currentText);
                     }
                 }
@@ -592,9 +592,9 @@ internal static class LiveEditor
                     Log("TryFormatSelectionViaExecuteCommand: Detected as Declaration");
                     formatted = engine.FormatDeclaration(selectedText);
                     Log($"TryFormatSelectionViaExecuteCommand: FormatDeclaration result: [{(formatted ?? "<null>").Replace("\r", "\\r").Replace("\n", "\\n")}]");
-                    if (string.IsNullOrEmpty(formatted) || formatted == selectedText)
+                    if (NeedsFullFormatFallback(formatted, selectedText))
                     {
-                        Log("TryFormatSelectionViaExecuteCommand: FormatDeclaration failed or unchanged, trying Format as fallback");
+                        Log("TryFormatSelectionViaExecuteCommand: header-only declaration, trying full Format");
                         formatted = engine.Format(selectedText);
                     }
                 }
@@ -603,11 +603,6 @@ internal static class LiveEditor
                     Log("TryFormatSelectionViaExecuteCommand: Detected as Implementation (body)");
                     formatted = engine.FormatBody(selectedText);
                     Log($"TryFormatSelectionViaExecuteCommand: FormatBody result: [{(formatted ?? "<null>").Replace("\r", "\\r").Replace("\n", "\\n")}]");
-                    if (string.IsNullOrEmpty(formatted) || formatted == selectedText)
-                    {
-                        Log("TryFormatSelectionViaExecuteCommand: FormatBody failed or unchanged, trying Format as fallback");
-                        formatted = engine.Format(selectedText);
-                    }
                 }
 
                 Log($"TryFormatSelectionViaExecuteCommand: Final formatted: [{(formatted ?? "<null>").Replace("\r", "\\r").Replace("\n", "\\n")}]");
@@ -770,56 +765,18 @@ internal static class LiveEditor
         }
     }
 
-    private static string ReadActiveSectionText(EnvDTE.DTE dte)
+    // "Unchanged" from FormatDeclaration means either "already formatted" (a
+    // success - do NOT reformat) or "construct it does not handle" (header-only
+    // declarations without VAR/TYPE). Only the latter warrants a full Format()
+    // pass, and only when the text parses cleanly - emitting from a tree with
+    // parse errors drops content.
+    private static bool NeedsFullFormatFallback(string? formatted, string original)
     {
-        try
-        {
-            // Try TextSelection first
-            var selection = dte.ActiveDocument?.Selection as EnvDTE.TextSelection;
-            if (selection != null && !string.IsNullOrEmpty(selection.Text))
-            {
-                return selection.Text;
-            }
-
-            // TextSelection is empty for PLC editor — use clipboard trick:
-            // 1. Save current clipboard
-            string? savedClip = null;
-            try { savedClip = GetClipboardText(); } catch { }
-
-            // 2. SelectAll + Copy to get the text onto clipboard
-            dte.ExecuteCommand("Edit.SelectAll", "");
-            System.Threading.Thread.Sleep(50);
-            dte.ExecuteCommand("Edit.Copy", "");
-            System.Threading.Thread.Sleep(50);
-
-            // 3. Read the clipboard
-            string text = GetClipboardText() ?? "";
-
-            // 4. Deselect by moving cursor
-            try
-            {
-                var sel = dte.ActiveDocument?.Selection as EnvDTE.TextSelection;
-                if (sel != null)
-                {
-                    sel.StartOfDocument(false);
-                }
-            }
-            catch { }
-
-            // 5. Restore original clipboard
-            if (savedClip != null)
-            {
-                try { SetClipboardText(savedClip); } catch { }
-            }
-
-            Log($"ReadActiveSectionText: clipboard read returned {text.Length} chars");
-            return text;
-        }
-        catch (Exception ex)
-        {
-            Log($"ReadActiveSectionText: FAILED: {ex.Message}");
-            return "";
-        }
+        if (!string.IsNullOrEmpty(formatted) && formatted != original)
+            return false;
+        return original.IndexOf("VAR", StringComparison.OrdinalIgnoreCase) < 0 &&
+               original.IndexOf("TYPE", StringComparison.OrdinalIgnoreCase) < 0 &&
+               TwinCatXmlFormatter.ParsesWithoutErrors(original);
     }
 
     // Tier 4: SendKeys fallback
@@ -938,6 +895,9 @@ internal static class LiveEditor
     [DllImport("kernel32.dll")]
     private static extern bool GlobalUnlock(IntPtr hMem);
 
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GlobalFree(IntPtr hMem);
+
     private const uint CF_UNICODETEXT = 13;
     private const uint GMEM_MOVEABLE = 0x0002;
 
@@ -955,7 +915,11 @@ internal static class LiveEditor
                 if (hMem == IntPtr.Zero) return false;
 
                 IntPtr ptr = GlobalLock(hMem);
-                if (ptr == IntPtr.Zero) return false;
+                if (ptr == IntPtr.Zero)
+                {
+                    GlobalFree(hMem);
+                    return false;
+                }
                 try
                 {
                     Marshal.Copy(bytes, 0, ptr, bytes.Length);
@@ -965,7 +929,14 @@ internal static class LiveEditor
                     GlobalUnlock(hMem);
                 }
 
-                SetClipboardData(CF_UNICODETEXT, hMem);
+                // If SetClipboardData fails the system did NOT take ownership -
+                // free the memory and report failure so the caller never pastes
+                // stale clipboard content over the document.
+                if (SetClipboardData(CF_UNICODETEXT, hMem) == IntPtr.Zero)
+                {
+                    GlobalFree(hMem);
+                    return false;
+                }
                 return true;
             }
             finally

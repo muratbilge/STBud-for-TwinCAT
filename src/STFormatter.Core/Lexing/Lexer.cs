@@ -401,6 +401,7 @@ public sealed class Lexer
         var start = _position;
         _position++; // skip {
 
+        bool inString = false;
         while (true)
         {
             if (Current == '\0')
@@ -412,7 +413,12 @@ public sealed class Lexer
                 break;
             }
 
-            if (Current == '}')
+            // A '}' inside a quoted value does not end the pragma:
+            // {warning 'do not use } here'}
+            if (Current == '\'')
+                inString = !inString;
+
+            if (Current == '}' && !inString)
             {
                 _position++;
                 break;
@@ -457,7 +463,12 @@ public sealed class Lexer
         var isTime = prefix.ToUpperInvariant() is "T" or "TIME" or "TOD" or "TIME_OF_DAY";
         var isDate = prefix.ToUpperInvariant() is "D" or "DATE" or "DT" or "DATE_AND_TIME";
 
-        while (Current != '\0' && Current != ';' && Current != '\r' && Current != '\n' && Current != ' ' && Current != '\t')
+        // Stop at any delimiter that can legally follow a literal - notably
+        // ')' ',' ']' '}' for literals inside argument/index lists. ':' must
+        // NOT stop the scan (TOD#12:30:15) and neither may '.' (T#1.5S).
+        while (Current != '\0' && Current != ';' && Current != '\r' && Current != '\n' &&
+               Current != ' ' && Current != '\t' &&
+               Current != ')' && Current != ',' && Current != ']' && Current != '}' && Current != '(')
         {
             _position++;
         }
@@ -812,6 +823,7 @@ public sealed class Lexer
             "WSTRING" => SyntaxKind.WStringKeyword,
             "POINTER" => SyntaxKind.PointerKeyword,
             "REF" => SyntaxKind.RefToKeyword,
+            "REF_TO" => SyntaxKind.RefToKeyword,
             "REFERENCE" => SyntaxKind.ReferenceKeyword,
             "AT" => SyntaxKind.AtKeyword,
             "EDGE" => SyntaxKind.EdgeKeyword,

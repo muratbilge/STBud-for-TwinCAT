@@ -211,9 +211,9 @@ internal sealed class HostManager
                                 Log($"FindNewTcXaeShell: Found PID {pid} profile={detectedProfile}");
                                 break;
                             }
-                            else
+                            else if (obj != null)
                             {
-                                Marshal.ReleaseComObject(obj as DTE);
+                                Marshal.ReleaseComObject(obj);
                             }
                         }
                         catch { }
@@ -347,6 +347,15 @@ internal sealed class HostManager
         }
     }
 
+    // Matches both current ("STBud.*") and legacy ("STFormatter.*") tags so a
+    // crashed Host's leftover controls are removed before re-injection.
+    private static bool IsOurTag(string? tag)
+    {
+        return !string.IsNullOrEmpty(tag) &&
+               (tag!.StartsWith("STBud.", StringComparison.OrdinalIgnoreCase) ||
+                tag.StartsWith("STFormatter.", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static int RemoveStaleButtons(CommandBar menu)
     {
         int removed = 0;
@@ -358,8 +367,7 @@ internal sealed class HostManager
                 if (ctrl is CommandBarButton btn)
                 {
                     string? tag = btn.Tag as string;
-                    if (!string.IsNullOrEmpty(tag) &&
-                        (tag.StartsWith("STFormatter.", StringComparison.OrdinalIgnoreCase)))
+                    if (IsOurTag(tag))
                     {
                         btn.Delete(false);
                         removed++;
@@ -368,8 +376,7 @@ internal sealed class HostManager
                 else if (ctrl is CommandBarPopup popup)
                 {
                     string? tag = popup.Tag as string;
-                    if (!string.IsNullOrEmpty(tag) &&
-                        tag.StartsWith("STFormatter.", StringComparison.OrdinalIgnoreCase))
+                    if (IsOurTag(tag))
                     {
                         popup.Delete(false);
                         removed++;
