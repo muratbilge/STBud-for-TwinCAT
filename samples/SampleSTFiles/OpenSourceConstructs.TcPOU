@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="FB_OpenSourceConstructs" Id="{0d2f4a66-1b3c-4e5d-8f7a-9b0c1d2e3f40}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_OpenSourceConstructs EXTENDS TcUnit.FB_TestSuite IMPLEMENTS Vendor.I_First, I_Second
+VAR
+    counter : INT; (* trailing block comment stays on this line *)
+    task    : TcoCore.ITcoTask;
+    name    : STRING(255);
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[FOR counter := 1 TO 10 BY 2 DO
+    task.Invoke();
+END_FOR
+{flow}
+]]></ST>
+    </Implementation>
+    <Method Name="GetTask" Id="{1e3f5b77-2c4d-5f6e-9a8b-0c1d2e3f4a51}">
+      <Declaration><![CDATA[METHOD PROTECTED GetTask : TcoCore.ITcoTaskStatus
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[GetTask := THIS^.task.Status;
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

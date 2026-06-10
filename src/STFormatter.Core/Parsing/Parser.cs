@@ -351,12 +351,19 @@ public sealed class Parser
         if (Current.Kind != SyntaxKind.ExtendsKeyword)
             return null;
 
-        var extendsKeyword = NextToken();
-        var baseName = MatchToken(SyntaxKind.Identifier);
+        // Base names may be namespace-qualified (EXTENDS TcUnit.FB_TestSuite)
+        // and interfaces may extend several bases (EXTENDS I_A, I_B).
+        var tokens = new List<SyntaxToken> { NextToken() }; // EXTENDS
+        AddDottedName(tokens);
+        while (Current.Kind == SyntaxKind.Comma)
+        {
+            tokens.Add(NextToken()); // comma
+            AddDottedName(tokens);
+        }
 
         return SyntaxFactory.Node(SyntaxKind.ExtendsClause,
-            TextSpan.FromBounds(extendsKeyword.Span.Start, baseName.Span.End),
-            new[] { extendsKeyword, baseName });
+            TextSpan.FromBounds(tokens[0].Span.Start, tokens[tokens.Count - 1].Span.End),
+            tokens.ToArray());
     }
 
     private SyntaxNode? ParseOptionalImplements()
@@ -364,21 +371,29 @@ public sealed class Parser
         if (Current.Kind != SyntaxKind.ImplementsKeyword)
             return null;
 
-        var implementsKeyword = NextToken();
-        var names = new List<SyntaxToken>();
-        names.Add(MatchToken(SyntaxKind.Identifier));
-
+        var tokens = new List<SyntaxToken> { NextToken() }; // IMPLEMENTS
+        AddDottedName(tokens);
         while (Current.Kind == SyntaxKind.Comma)
         {
-            names.Add(NextToken()); // comma
-            names.Add(MatchToken(SyntaxKind.Identifier));
+            tokens.Add(NextToken()); // comma
+            AddDottedName(tokens);
         }
 
-        var end = names[names.Count - 1].Span.End;
         return SyntaxFactory.Node(SyntaxKind.ImplementsClause,
-            TextSpan.FromBounds(implementsKeyword.Span.Start, end),
+            TextSpan.FromBounds(tokens[0].Span.Start, tokens[tokens.Count - 1].Span.End),
             ImmutableArray<SyntaxNode>.Empty,
-            names);
+            tokens);
+    }
+
+    // Appends Identifier (. Identifier)* to the token list.
+    private void AddDottedName(List<SyntaxToken> tokens)
+    {
+        tokens.Add(MatchToken(SyntaxKind.Identifier));
+        while (Current.Kind == SyntaxKind.Dot)
+        {
+            tokens.Add(NextToken()); // dot
+            tokens.Add(MatchToken(SyntaxKind.Identifier));
+        }
     }
 
     private SyntaxNode? ParseOptionalReturnType()
@@ -649,10 +664,16 @@ public sealed class Parser
             return ParseReferenceType();
         }
 
-        // Simple type or user-defined type
-        var typeName = NextToken();
-        var span = TextSpan.FromBounds(start, typeName.Span.End);
-        return SyntaxFactory.Node(SyntaxKind.NamedType, span, new[] { typeName });
+        // Simple or user-defined type, possibly namespace-qualified
+        // (TcoCore.ITcoTask) - keep all name parts as tokens.
+        var nameTokens = new List<SyntaxToken> { NextToken() };
+        while (Current.Kind == SyntaxKind.Dot)
+        {
+            nameTokens.Add(NextToken()); // dot
+            nameTokens.Add(MatchToken(SyntaxKind.Identifier));
+        }
+        var span = TextSpan.FromBounds(start, nameTokens[nameTokens.Count - 1].Span.End);
+        return SyntaxFactory.Node(SyntaxKind.NamedType, span, nameTokens.ToArray());
     }
 
     private SyntaxNode ParseArrayType()

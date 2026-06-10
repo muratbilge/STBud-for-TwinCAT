@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
@@ -58,7 +59,8 @@ public sealed class TwinCatXmlFormatter
                 // never accept empty output (that would wipe the section).
                 if (formatted == stCode &&
                     stCode.IndexOf("VAR", StringComparison.OrdinalIgnoreCase) < 0 &&
-                    stCode.IndexOf("TYPE", StringComparison.OrdinalIgnoreCase) < 0)
+                    stCode.IndexOf("TYPE", StringComparison.OrdinalIgnoreCase) < 0 &&
+                    ParsesWithoutErrors(stCode))
                 {
                     var full = _engine.Format(stCode);
                     if (!string.IsNullOrWhiteSpace(full))
@@ -147,6 +149,14 @@ public sealed class TwinCatXmlFormatter
         }
 
         return modified;
+    }
+
+    // Formatting a tree that has parse errors loses the content the parser
+    // skipped during recovery - only full-format when the parse is clean.
+    private static bool ParsesWithoutErrors(string source)
+    {
+        var tree = new Parsing.Parser(Text.SourceText.From(source)).Parse();
+        return !tree.Diagnostics.Any(d => d.Severity == Syntax.DiagnosticSeverity.Error);
     }
 
     public static bool LooksLikeDeclaration(string? text)

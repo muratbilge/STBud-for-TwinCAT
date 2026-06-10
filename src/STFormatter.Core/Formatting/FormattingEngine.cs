@@ -58,6 +58,7 @@ public sealed class FormattingEngine
             if (stmtList != null && stmtList.ChildNodes.Any())
             {
                 visitor.Visit(stmtList);
+                EmitWrapperEndTrivia(pouDecl, visitor);
                 var extracted = writer.ToString();
                 extracted = StripCommonIndent(extracted);
 
@@ -163,6 +164,7 @@ public sealed class FormattingEngine
                     }
                 }
 
+                EmitWrapperEndTrivia(pouDecl, visitor);
                 var extracted = writer.ToString();
                 extracted = StripCommonIndent(extracted);
 
@@ -215,6 +217,17 @@ public sealed class FormattingEngine
             extractedFallback = extractedFallback.Replace("\n", "\r\n");
 
         return extractedFallback;
+    }
+
+    // Trailing comments/pragmas in body/declaration fragments end up as leading
+    // trivia of the synthetic wrapper's END_PROGRAM token; emit them so they
+    // survive formatting.
+    private static void EmitWrapperEndTrivia(SyntaxNode pouDecl, FormattingVisitor visitor)
+    {
+        var endToken = pouDecl.ChildTokens
+            .FirstOrDefault(t => t.Kind == SyntaxKind.EndProgramKeyword);
+        if (endToken != null)
+            visitor.EmitDanglingTrivia(endToken);
     }
 
     private static string NormalizeNewLines(string text, string newLine)
@@ -593,6 +606,21 @@ internal sealed class FormattingVisitor
         _config = config;
     }
 
+    // Emits comments/pragmas that belong to a token the caller is not going to
+    // visit (e.g. trivia attached to a synthetic wrapper's END_PROGRAM).
+    public void EmitDanglingTrivia(SyntaxToken token)
+    {
+        foreach (var trivia in token.LeadingTrivia)
+        {
+            if (trivia.IsComment || trivia.IsPragma)
+            {
+                _writer.EnsureNewLine();
+                _writer.WriteTrivia(trivia);
+                _writer.EnsureNewLine();
+            }
+        }
+    }
+
     public void Visit(SyntaxNode node)
     {
         switch (node.Kind)
@@ -732,6 +760,13 @@ internal sealed class FormattingVisitor
                 break;
             case SyntaxKind.EmptyStatement:
                 VisitEmptyStatement(node);
+                break;
+            case SyntaxKind.ExtendsClause:
+            case SyntaxKind.ImplementsClause:
+                VisitExtendsOrImplementsClause(node);
+                break;
+            case SyntaxKind.ForByClause:
+                VisitForByClause(node);
                 break;
             default:
                 VisitDefault(node);
@@ -1621,12 +1656,43 @@ internal sealed class FormattingVisitor
         WriteToken(tokens[1]); // )
     }
 
+    private void VisitExtendsOrImplementsClause(SyntaxNode node)
+    {
+        // EXTENDS/IMPLEMENTS Name(.Part)* (, Name(.Part)*)*
+        var tokens = node.ChildTokens.ToList();
+        WriteTokenWithCasing(tokens[0]); // EXTENDS / IMPLEMENTS
+        _writer.WriteSpace();
+        for (var i = 1; i < tokens.Count; i++)
+        {
+            if (tokens[i].Kind == SyntaxKind.Comma)
+            {
+                WriteToken(tokens[i]);
+                if (_config.SpaceAfterComma)
+                    _writer.WriteSpace();
+            }
+            else
+            {
+                WriteToken(tokens[i]); // identifier or dot, written tight
+            }
+        }
+    }
+
+    private void VisitForByClause(SyntaxNode node)
+    {
+        WriteTokenWithCasing(node.ChildTokens[0]); // BY
+        _writer.WriteSpace();
+        Visit(node.ChildNodes[0]); // step expression
+    }
+
     private void VisitType(SyntaxNode node)
     {
         switch (node.Kind)
         {
             case SyntaxKind.NamedType:
-                WriteTokenWithCasing(node.ChildTokens[0]);
+                // All name-part tokens (identifiers and dots) written tight:
+                // INT, TcoCore.ITcoTask
+                foreach (var token in node.ChildTokens)
+                    WriteTokenWithCasing(token);
                 break;
             case SyntaxKind.ArrayType:
                 VisitArrayType(node);
@@ -2070,10 +2136,17 @@ internal sealed class FormattingVisitor
                 _writer.EnsureNewLine();
             }
 
-            if (!prevWasLineBreak && trivia.Kind == SyntaxKind.SingleLineCommentTrivia && _writer.AtLineStart)
+            // A comment with no line break before it in the source was at the end
+            // of the previous line - pull it back up instead of gluing it to the
+            // next token.
+            bool pulledInline = false;
+            if (!prevWasLineBreak && _writer.AtLineStart &&
+                (trivia.Kind == SyntaxKind.SingleLineCommentTrivia ||
+                 trivia.Kind == SyntaxKind.MultiLineCommentTrivia))
             {
                 _writer.UndoLastNewLineAndIndent();
                 _writer.WriteSpace();
+                pulledInline = trivia.Kind == SyntaxKind.MultiLineCommentTrivia;
             }
 
             var wasLineBreak = prevWasLineBreak;
@@ -2081,7 +2154,7 @@ internal sealed class FormattingVisitor
             _writer.WriteTrivia(trivia);
             lastTrivia = trivia;
 
-            if (trivia.Kind == SyntaxKind.MultiLineCommentTrivia && wasLineBreak)
+            if (trivia.Kind == SyntaxKind.MultiLineCommentTrivia && (wasLineBreak || pulledInline))
             {
                 _writer.EnsureNewLine();
             }
