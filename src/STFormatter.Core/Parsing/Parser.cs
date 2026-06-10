@@ -1526,6 +1526,12 @@ public sealed class Parser
             case SyntaxKind.NumericLiteral:
             case SyntaxKind.RealLiteral:
             case SyntaxKind.StringLiteral:
+            case SyntaxKind.BoolLiteral:
+            case SyntaxKind.TimeLiteral:
+            case SyntaxKind.DateLiteral:
+            case SyntaxKind.TimeOfDayLiteral:
+            case SyntaxKind.DateAndTimeLiteral:
+            case SyntaxKind.BitStringLiteral:
             case SyntaxKind.TrueKeyword:
             case SyntaxKind.FalseKeyword:
                 var literalToken = NextToken();

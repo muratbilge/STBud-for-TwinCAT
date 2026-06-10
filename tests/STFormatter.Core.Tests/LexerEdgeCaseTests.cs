@@ -47,6 +47,21 @@ public class LexerEdgeCaseTests
     }
 
     [Fact]
+    public void TimeLiteral_AsArgumentExpression_ParsesWithoutErrors()
+    {
+        // Time literals in expressions previously produced parser errors that
+        // recovery papered over; the FormatBody error guard then refused to
+        // format such bodies at all (field report: CASE body with TON calls).
+        var body = "TON_Fill(IN := TRUE, PT := T#10s);\nIF tonX.ET > T#1S THEN\n  x := TRUE;\nEND_IF";
+        var engine = new FormattingEngine();
+        var result = engine.FormatBody(body);
+
+        Assert.NotEqual(body, result); // guard must not block formatting
+        Assert.Contains("T#10s", result);
+        Assert.Contains("T#1S", result);
+    }
+
+    [Fact]
     public void Pragma_WithBraceInsideQuotedString_IsNotTruncated()
     {
         var src = "{warning 'do not use } here'}\nPROGRAM P\nVAR\nEND_VAR\nEND_PROGRAM";
