@@ -691,6 +691,27 @@ internal static class LiveEditor
         }
     }
 
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    // Synthetic SendKeys merge with physically held modifiers: a user still
+    // holding Ctrl/Shift turns our {HOME} into Ctrl+Shift+Home (select to
+    // document start) with destructive follow-up. Wait briefly for release.
+    private static void WaitForModifierRelease(int timeoutMs = 1000)
+    {
+        const int VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_MENU = 0x12;
+        var deadline = Environment.TickCount + timeoutMs;
+        while (Environment.TickCount < deadline)
+        {
+            bool held = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0 ||
+                        (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0 ||
+                        (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+            if (!held) return;
+            System.Threading.Thread.Sleep(25);
+        }
+        Log("WaitForModifierRelease: modifiers still held after timeout - proceeding");
+    }
+
     public static bool InsertLineAbove(EnvDTE.DTE dte, string text)
     {
         Log($"InsertLineAbove: Inserting text ({text.Length} chars)");
@@ -701,6 +722,8 @@ internal static class LiveEditor
                 Log("InsertLineAbove: No active document");
                 return false;
             }
+
+            WaitForModifierRelease();
 
             bool undoContextOpened = false;
             try
@@ -861,6 +884,7 @@ internal static class LiveEditor
                 // Fallback to SendKeys only if DTE commands fail
                 try
                 {
+                    WaitForModifierRelease();
                     System.Windows.Forms.SendKeys.SendWait("^a");
                     System.Threading.Thread.Sleep(100);
                     System.Windows.Forms.SendKeys.SendWait("{DELETE}");
