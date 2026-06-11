@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="ST_PragmaTypes" Id="{cc33dd44-ee55-4f66-b077-112233445566}">
+    <Declaration><![CDATA[{attribute 'pack_mode' := '1'}
+{attribute 'no_assign'}
+{attribute 'no_assign_warning'}
+{attribute 'to_string'}
+{attribute 'analysis' := '-33'}
+{attribute 'init_namespace'}
+{attribute 'subsequent'}
+{attribute addProperty Name "<#Showcase#>"}
+{attribute addProperty SyncUnit "default"}
+{attribute clr [ReadOnly()]}
+{attribute wpf [Group(Layout.GroupBox)]}
+TYPE ST_PragmaTypes :
+STRUCT
+    {attribute 'hide'}
+    nInternal : INT;
+    {attribute 'displaymode' := 'dec'}
+    rValue : REAL; (* trailing block comment *)
+    {attribute 'TcEncoding' := 'UTF-8'}
+    sText : STRING(80);
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

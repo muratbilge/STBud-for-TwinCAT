@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="FB_PragmaShowcase" Id="{aa11bb22-cc33-4d44-9e55-ff6677889900}" SpecialFunc="None">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+{attribute 'reflection'}
+{attribute 'conditionalshow'}
+{attribute 'hide_all_locals'}
+{attribute 'no_instance_in_retain'}
+{attribute 'enable_dynamic_creation'}
+{attribute 'obsolete' := 'use FB_NewShowcase instead'}
+{attribute 'call_after_init'}
+{attribute 'call_after_online_change_slot' := '100'}
+{attribute 'global_init_slot' := '500'}
+{attribute 'estimated-stack-usage' := '64'}
+FUNCTION_BLOCK FB_PragmaShowcase
+VAR_INPUT
+    {attribute 'hide'}
+    bHidden : BOOL;
+    {attribute 'monitoring' := 'call'}
+    nMonitored : INT;
+    {attribute 'displaymode' := 'hex'}
+    wFlags : WORD;
+    {attribute 'TcLinkTo' := 'TIID^Device 1 (EtherCAT)^Term 1^Channel 1^Input'}
+    bLinked AT %I* : BOOL;
+END_VAR
+VAR_OUTPUT
+    {attribute 'OPC.UA.DA' := '1'}
+    {attribute 'OPC.UA.DA.Property' := '1'}
+    nOpcVisible : DINT;
+    {attribute 'TcRpcEnable'}
+    bRpcReady : BOOL;
+END_VAR
+VAR
+    {attribute 'noinit'}
+    nNoInit : INT;
+    {attribute 'noload'}
+    nNoLoad : INT;
+    {attribute 'no_copy'}
+    nNoCopy : INT;
+    {attribute 'instance-path'}
+    {attribute 'noinit'}
+    sPath : STRING;
+    {attribute 'conditionalshow_all_locals'}
+    fbInner : TON;
+    {attribute 'init_on_onlchange'}
+    bOnlChange : BOOL;
+    {attribute 'TcIgnorePersistent'}
+    nNotRestored : INT;
+    {attribute 'tc_no_symbol'}
+    nNoSymbol : INT;
+    {attribute 'TcInitSymbol'}
+    nInitFromList : INT;
+END_VAR
+{IF defined (constant: GVL.bSimulation)}
+VAR
+    nSimOnly : INT;
+END_VAR
+{END_IF}
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[{region 'init phase'}
+nNoInit := nNoInit + 1;
+{endregion}
+{warning disable C0195}
+nMonitored := DINT_TO_INT(nOpcVisible);
+{warning restore C0195}
+{warning enable C0357}
+{IF defined (constant: GVL.bSimulation)}
+nSimOnly := 1;
+{ELSE}
+nNoLoad := 2;
+{END_IF}
+{text 'plain build message'}
+{info 'informational build message'}
+IF bHidden THEN
+    {warning 'manual warning emitted at build'}
+    wFlags := 16#FFFF;
+END_IF
+{region 'cleanup'}
+bRpcReady := TRUE;
+{endregion}
+]]></ST>
+    </Implementation>
+    <Method Name="DoWork" Id="{bb22cc33-dd44-4e55-af66-001122334455}">
+      <Declaration><![CDATA[{attribute 'no-analysis'}
+{attribute 'no_check'}
+{attribute 'no-exit'}
+METHOD DoWork : BOOL
+VAR_INPUT
+    {attribute 'parameterstringof' := 'nMonitored'}
+    sParam : STRING;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[DoWork := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

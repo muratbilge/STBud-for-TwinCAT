@@ -401,7 +401,8 @@ public sealed class Lexer
         var start = _position;
         _position++; // skip {
 
-        bool inString = false;
+        bool inSingleQuote = false;
+        bool inDoubleQuote = false;
         while (true)
         {
             if (Current == '\0')
@@ -414,11 +415,13 @@ public sealed class Lexer
             }
 
             // A '}' inside a quoted value does not end the pragma:
-            // {warning 'do not use } here'}
-            if (Current == '\'')
-                inString = !inString;
+            // {warning 'do not use } here'} / {attribute addProperty Name "x}y"}
+            if (Current == '\'' && !inDoubleQuote)
+                inSingleQuote = !inSingleQuote;
+            else if (Current == '"' && !inSingleQuote)
+                inDoubleQuote = !inDoubleQuote;
 
-            if (Current == '}' && !inString)
+            if (Current == '}' && !inSingleQuote && !inDoubleQuote)
             {
                 _position++;
                 break;
