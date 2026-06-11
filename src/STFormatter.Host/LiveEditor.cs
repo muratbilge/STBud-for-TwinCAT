@@ -499,17 +499,17 @@ internal static class LiveEditor
                 }
                 Log($"TryFormatViaExecuteCommand: Clipboard set ({formatted.Length} chars)");
 
+                System.Threading.Thread.Sleep(50);
                 dte.ExecuteCommand("Edit.Delete", "");
                 Log("TryFormatViaExecuteCommand: Edit.Delete executed");
 
+                System.Threading.Thread.Sleep(50);
                 dte.ExecuteCommand("Edit.Paste", "");
                 Log("TryFormatViaExecuteCommand: Edit.Paste executed");
 
-                // Restore clipboard
-                if (savedClipboard != null)
-                {
-                    try { SetClipboardText(savedClipboard); } catch { }
-                }
+                VerifyPasteAndRetryOnce(dte, formatted, "TryFormatViaExecuteCommand");
+
+                RestoreClipboardAfterPaste(savedClipboard);
 
                 Log("TryFormatViaExecuteCommand: SUCCESS - live edit applied");
                 outOriginal = currentText;
@@ -631,16 +631,15 @@ internal static class LiveEditor
                 }
                 Log($"TryFormatSelectionViaExecuteCommand: Clipboard set ({formatted.Length} chars)");
 
+                System.Threading.Thread.Sleep(50);
                 dte.ExecuteCommand("Edit.Delete", "");
                 Log("TryFormatSelectionViaExecuteCommand: Edit.Delete executed");
 
+                System.Threading.Thread.Sleep(50);
                 dte.ExecuteCommand("Edit.Paste", "");
                 Log("TryFormatSelectionViaExecuteCommand: Edit.Paste executed");
 
-                if (savedClipboard != null)
-                {
-                    try { SetClipboardText(savedClipboard); } catch { }
-                }
+                RestoreClipboardAfterPaste(savedClipboard);
 
                 Log("TryFormatSelectionViaExecuteCommand: SUCCESS - selection formatted");
                 outOriginal = selectedText;
@@ -739,12 +738,8 @@ internal static class LiveEditor
                 System.Threading.Thread.Sleep(30);
 
                 dte.ExecuteCommand("Edit.Paste", "");
-                System.Threading.Thread.Sleep(50);
 
-                if (savedClipboard != null)
-                {
-                    try { SetClipboardText(savedClipboard); } catch { }
-                }
+                RestoreClipboardAfterPaste(savedClipboard);
 
                 Log("InsertLineAbove: SUCCESS");
                 return true;
@@ -864,6 +859,63 @@ internal static class LiveEditor
         {
             Log($"TryFormatViaSendKeys: FAILED: {ex.GetType().Name} - {ex.Message}");
             return false;
+        }
+    }
+
+    // Whole-section formatting can verify its own result: re-read the section
+    // and compare against what we pasted. If the editor dropped the paste
+    // (asynchronous command handling), the section is empty after the Delete -
+    // re-paste once. SelectAll after the check leaves the section selected, so
+    // a retry paste replaces cleanly.
+    private static void VerifyPasteAndRetryOnce(EnvDTE.DTE dte, string expected, string logPrefix)
+    {
+        try
+        {
+            System.Threading.Thread.Sleep(150);
+
+            // Pre-clear so a no-op Copy (empty section) cannot leave our own
+            // pasted text on the clipboard and fake a successful verification.
+            SetClipboardText("");
+            dte.ExecuteCommand("Edit.SelectAll", "");
+            System.Threading.Thread.Sleep(50);
+            dte.ExecuteCommand("Edit.Copy", "");
+            System.Threading.Thread.Sleep(100);
+
+            string actual = GetClipboardText() ?? "";
+            if (string.Equals(actual.TrimEnd('\r', '\n'), expected.TrimEnd('\r', '\n'), StringComparison.Ordinal))
+            {
+                Log($"{logPrefix}: paste verified ({actual.Length} chars)");
+                try { dte.ExecuteCommand("Edit.SelectionCancel", ""); } catch { }
+                return;
+            }
+
+            Log($"{logPrefix}: PASTE VERIFY MISMATCH (section has {actual.Length} chars, expected {expected.Length}) - retrying paste");
+            if (SetClipboardText(expected))
+            {
+                System.Threading.Thread.Sleep(50);
+                dte.ExecuteCommand("Edit.Paste", "");
+                System.Threading.Thread.Sleep(200);
+                Log($"{logPrefix}: retry paste executed");
+            }
+            try { dte.ExecuteCommand("Edit.SelectionCancel", ""); } catch { }
+        }
+        catch (Exception ex)
+        {
+            Log($"{logPrefix}: paste verification failed: {ex.Message}");
+        }
+    }
+
+    // The PLC editor may process Edit.Paste asynchronously: restoring the
+    // user's clipboard immediately after issuing the command can race the
+    // editor's actual paste, which then inserts the restored (old) content -
+    // or nothing - after the Delete already removed the selection. Give the
+    // editor time to consume the formatted text before touching the clipboard.
+    private static void RestoreClipboardAfterPaste(string? savedClipboard)
+    {
+        System.Threading.Thread.Sleep(300);
+        if (savedClipboard != null)
+        {
+            try { SetClipboardText(savedClipboard); } catch { }
         }
     }
 
