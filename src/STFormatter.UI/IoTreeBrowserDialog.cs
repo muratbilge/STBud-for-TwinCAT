@@ -3,163 +3,399 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using STFormatter.Core.IoTree;
+using STFormatter.Core.Toolbox;
 
 namespace STFormatter.UI
 {
+    /// <summary>
+    /// I/O tree browser for picking a TcLinkTo path. Built for real machines
+    /// with hundreds of terminals: live filter with ancestor-preserving
+    /// matches, direction-aware coloring, attribute preview, and a fully
+    /// responsive docked layout.
+    /// </summary>
     public class IoTreeBrowserDialog : Form
     {
-        private TreeView _treeView;
-        private TextBox _pathBox;
-        private Button _okButton;
-        private Button _cancelButton;
-        private Label _pathLabel;
+        private readonly IoTreeNode _root;
+        private readonly TextBox _searchBox;
+        private readonly TreeView _treeView;
+        private readonly TextBox _pathBox;
+        private readonly TextBox _previewBox;
+        private readonly Button _okButton;
+        private readonly Button _cancelButton;
+        private readonly Button _copyButton;
+        private readonly Label _statsLabel;
+        private readonly System.Windows.Forms.Timer _filterDebounce;
+
+        private static Size _rememberedSize = new Size(680, 620);
+
+        private static readonly Color DeviceColor = Color.FromArgb(40, 40, 40);
+        private static readonly Color BoxColor = Color.FromArgb(60, 60, 120);
+        private static readonly Color InputColor = Color.FromArgb(0, 110, 0);
+        private static readonly Color OutputColor = Color.FromArgb(170, 90, 0);
+        private static readonly Color EntryColor = Color.FromArgb(30, 30, 30);
 
         public string SelectedPath { get; private set; } = "";
 
         public IoTreeBrowserDialog(IoTreeNode ioTree)
         {
+            _root = ioTree;
+
             Text = Strings.Get("IOTree.Title");
-            Size = new Size(560, 500);
-            MinimumSize = new Size(400, 350);
+            Size = _rememberedSize;
+            MinimumSize = new Size(460, 420);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.Sizable;
-            MaximizeBox = false;
+            MaximizeBox = true;
             MinimizeBox = false;
             TopMost = true;
             ShowInTaskbar = true;
+            KeyPreview = true;
             Font = new Font("Segoe UI", 9f);
+            Icon = MainForm.AppIcon;
 
-            _pathLabel = new Label
+            // --- Top: search + expand/collapse ---
+            var topPanel = new TableLayoutPanel
             {
-                Text = Strings.Get("IOTree.Path"),
-                Location = new Point(12, 12),
-                AutoSize = true
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                ColumnCount = 4,
+                Padding = new Padding(10, 10, 10, 4),
+            };
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+            var searchLabel = new Label
+            {
+                Text = Strings.Get("IOTree.Filter"),
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                Margin = new Padding(0, 6, 6, 0),
             };
 
-            _pathBox = new TextBox
+            _searchBox = new TextBox
             {
-                Location = new Point(12, 32),
-                Size = new Size(520, 22),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-                ReadOnly = true,
-                BackColor = SystemColors.Window
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 3, 8, 3),
+            };
+            _searchBox.TextChanged += (s, e) => _filterDebounce!.Stop();
+            _searchBox.TextChanged += (s, e) => _filterDebounce!.Start();
+            _searchBox.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    // Enter in the filter jumps into the tree instead of OK-ing
+                    e.SuppressKeyPress = true;
+                    ApplyFilter();
+                    if (_treeView!.Nodes.Count > 0)
+                    {
+                        _treeView.SelectedNode = _treeView.Nodes[0];
+                        _treeView.Focus();
+                    }
+                }
+                else if (e.KeyCode == Keys.Escape && _searchBox!.TextLength > 0)
+                {
+                    e.SuppressKeyPress = true;
+                    _searchBox.Clear();
+                }
             };
 
+            var expandBtn = new Button
+            {
+                Text = Strings.Get("IOTree.ExpandAll"),
+                AutoSize = true,
+                Margin = new Padding(0, 2, 4, 2),
+            };
+            expandBtn.Click += (s, e) => { _treeView!.BeginUpdate(); _treeView.ExpandAll(); _treeView.EndUpdate(); };
+
+            var collapseBtn = new Button
+            {
+                Text = Strings.Get("IOTree.CollapseAll"),
+                AutoSize = true,
+                Margin = new Padding(0, 2, 0, 2),
+            };
+            collapseBtn.Click += (s, e) => { _treeView!.BeginUpdate(); _treeView.CollapseAll(); _treeView.EndUpdate(); };
+
+            topPanel.Controls.Add(searchLabel, 0, 0);
+            topPanel.Controls.Add(_searchBox, 1, 0);
+            topPanel.Controls.Add(expandBtn, 2, 0);
+            topPanel.Controls.Add(collapseBtn, 3, 0);
+
+            // --- Middle: tree ---
             _treeView = new TreeView
             {
-                Location = new Point(12, 62),
-                Size = new Size(520, 330),
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+                Dock = DockStyle.Fill,
                 ShowPlusMinus = true,
                 ShowLines = true,
                 ShowRootLines = true,
                 HideSelection = false,
-                FullRowSelect = true
+                FullRowSelect = true,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Segoe UI", 9.5f),
+                ItemHeight = 22,
             };
+            _treeView.AfterSelect += TreeView_AfterSelect;
+            _treeView.NodeMouseDoubleClick += TreeView_NodeMouseDoubleClick;
 
-            _okButton = new Button
+            var treeHost = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10, 4, 10, 4) };
+            treeHost.Controls.Add(_treeView);
+
+            // --- Bottom: path, preview, stats, buttons ---
+            var bottomPanel = new TableLayoutPanel
             {
-                Text = Strings.Get("Common.OK"),
-                DialogResult = DialogResult.OK,
-                Size = new Size(85, 26),
-                Enabled = false,
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Right
+                Dock = DockStyle.Bottom,
+                AutoSize = true,
+                ColumnCount = 2,
+                Padding = new Padding(10, 0, 10, 10),
+            };
+            bottomPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            bottomPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+            var pathLabel = new Label
+            {
+                Text = Strings.Get("IOTree.Path"),
+                AutoSize = true,
+                Margin = new Padding(0, 6, 0, 0),
+            };
+            _pathBox = new TextBox
+            {
+                Dock = DockStyle.Fill,
+                ReadOnly = true,
+                BackColor = SystemColors.Window,
+                Margin = new Padding(0, 3, 8, 3),
             };
 
+            _copyButton = new Button
+            {
+                Text = Strings.Get("IOTree.CopyPath"),
+                AutoSize = true,
+                Enabled = false,
+                Margin = new Padding(0, 2, 0, 2),
+            };
+            _copyButton.Click += (s, e) =>
+            {
+                if (!string.IsNullOrEmpty(SelectedPath))
+                {
+                    try { Clipboard.SetText(SelectedPath); } catch { }
+                }
+            };
+
+            var previewLabel = new Label
+            {
+                Text = Strings.Get("IOTree.Preview"),
+                AutoSize = true,
+                Margin = new Padding(0, 6, 0, 0),
+            };
+            _previewBox = new TextBox
+            {
+                Dock = DockStyle.Fill,
+                ReadOnly = true,
+                BackColor = Color.FromArgb(245, 245, 245),
+                ForeColor = Color.FromArgb(60, 60, 60),
+                Font = new Font("Consolas", 9f),
+                Margin = new Padding(0, 3, 8, 3),
+            };
+
+            _statsLabel = new Label
+            {
+                AutoSize = true,
+                ForeColor = SystemColors.ControlDarkDark,
+                Margin = new Padding(0, 6, 0, 0),
+            };
+
+            var buttonRow = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                FlowDirection = FlowDirection.RightToLeft,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0),
+            };
             _cancelButton = new Button
             {
                 Text = Strings.Get("Common.Cancel"),
                 DialogResult = DialogResult.Cancel,
-                Size = new Size(85, 26),
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Right
+                Size = new Size(90, 28),
+                Margin = new Padding(6, 2, 0, 2),
             };
+            _okButton = new Button
+            {
+                Text = Strings.Get("Common.OK"),
+                DialogResult = DialogResult.OK,
+                Size = new Size(90, 28),
+                Enabled = false,
+                Margin = new Padding(6, 2, 0, 2),
+            };
+            buttonRow.Controls.Add(_cancelButton);
+            buttonRow.Controls.Add(_okButton);
 
-            var buttonPanel = new Panel
-            {
-                Dock = DockStyle.Bottom,
-                Height = 40
-            };
-            _cancelButton.Location = new Point(buttonPanel.Width - _cancelButton.Width - 12, 7);
-            _okButton.Location = new Point(_cancelButton.Left - _okButton.Width - 6, 7);
-            buttonPanel.Controls.Add(_okButton);
-            buttonPanel.Controls.Add(_cancelButton);
-            buttonPanel.Resize += (s, e) =>
-            {
-                _cancelButton.Left = buttonPanel.Width - _cancelButton.Width - 12;
-                _okButton.Left = _cancelButton.Left - _okButton.Width - 6;
-            };
+            bottomPanel.Controls.Add(pathLabel, 0, 0);
+            bottomPanel.Controls.Add(_pathBox, 0, 1);
+            bottomPanel.Controls.Add(_copyButton, 1, 1);
+            bottomPanel.Controls.Add(previewLabel, 0, 2);
+            bottomPanel.Controls.Add(_previewBox, 0, 3);
+            bottomPanel.Controls.Add(_statsLabel, 0, 4);
+            bottomPanel.Controls.Add(buttonRow, 1, 4);
+
+            Controls.Add(treeHost);
+            Controls.Add(bottomPanel);
+            Controls.Add(topPanel);
 
             AcceptButton = _okButton;
             CancelButton = _cancelButton;
 
-            Controls.Add(_pathLabel);
-            Controls.Add(_pathBox);
-            Controls.Add(_treeView);
-            Controls.Add(buttonPanel);
+            _filterDebounce = new System.Windows.Forms.Timer { Interval = 250 };
+            _filterDebounce.Tick += (s, e) => { _filterDebounce.Stop(); ApplyFilter(); };
 
-            _treeView.AfterSelect += TreeView_AfterSelect;
-            _treeView.NodeMouseDoubleClick += TreeView_NodeMouseDoubleClick;
+            KeyDown += (s, e) =>
+            {
+                if (e.Control && e.KeyCode == Keys.F)
+                {
+                    e.SuppressKeyPress = true;
+                    _searchBox.Focus();
+                    _searchBox.SelectAll();
+                }
+            };
 
-            PopulateTree(ioTree);
+            ResizeEnd += (s, e) => _rememberedSize = Size;
+
+            PopulateTree(filter: "");
+            UpdateStats();
 
             Shown += (s, e) =>
             {
                 Activate();
                 BringToFront();
+                _searchBox.Focus();
                 if (_treeView.Nodes.Count > 0)
                     _treeView.Nodes[0].Expand();
             };
         }
 
-        private void PopulateTree(IoTreeNode ioTree)
+        private void ApplyFilter()
+        {
+            PopulateTree(_searchBox.Text.Trim());
+            UpdateStats();
+        }
+
+        private void PopulateTree(string filter)
         {
             _treeView.BeginUpdate();
             _treeView.Nodes.Clear();
 
-            foreach (var device in ioTree.Children)
+            foreach (var device in _root.Children)
             {
-                var deviceNode = new TreeNode(device.DisplayText) { Tag = device };
-                AddChildNodes(deviceNode, device);
-                _treeView.Nodes.Add(deviceNode);
+                var node = BuildNode(device, filter);
+                if (node != null)
+                    _treeView.Nodes.Add(node);
             }
+
+            if (!string.IsNullOrEmpty(filter))
+                _treeView.ExpandAll();
 
             _treeView.EndUpdate();
         }
 
-        private void AddChildNodes(TreeNode parentNode, IoTreeNode ioNode)
+        // Builds the visual node; when filtering, a node survives if it or any
+        // descendant matches, so the hierarchy above a match stays visible.
+        private TreeNode? BuildNode(IoTreeNode ioNode, string filter)
         {
+            var children = new List<TreeNode>();
             foreach (var child in ioNode.Children)
             {
-                var childNode = new TreeNode(child.DisplayText) { Tag = child };
-                AddChildNodes(childNode, child);
-                parentNode.Nodes.Add(childNode);
+                var built = BuildNode(child, filter);
+                if (built != null)
+                    children.Add(built);
             }
+
+            bool selfMatch = string.IsNullOrEmpty(filter) || Matches(ioNode, filter);
+            if (!selfMatch && children.Count == 0)
+                return null;
+
+            var node = new TreeNode(ioNode.DisplayText)
+            {
+                Tag = ioNode,
+                ForeColor = ColorFor(ioNode),
+            };
+            if (ioNode.NodeType == "Entry")
+                node.NodeFont = new Font(_treeView.Font, FontStyle.Bold);
+
+            node.Nodes.AddRange(children.ToArray());
+            return node;
         }
 
-        private void TreeView_AfterSelect(object sender, TreeViewEventArgs e)
+        private static bool Matches(IoTreeNode node, string filter)
+        {
+            return node.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   node.Description.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   node.Path.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static Color ColorFor(IoTreeNode node)
+        {
+            if (node.Direction == "Input") return InputColor;
+            if (node.Direction == "Output") return OutputColor;
+            return node.NodeType switch
+            {
+                "Device" => DeviceColor,
+                "Box" => BoxColor,
+                "Entry" => EntryColor,
+                _ => SystemColors.WindowText,
+            };
+        }
+
+        private void UpdateStats()
+        {
+            int devices = 0, boxes = 0, channels = 0;
+            void Count(IoTreeNode n)
+            {
+                switch (n.NodeType)
+                {
+                    case "Device": devices++; break;
+                    case "Box": boxes++; break;
+                    case "Pdo":
+                    case "Entry": channels++; break;
+                }
+                foreach (var c in n.Children) Count(c);
+            }
+            Count(_root);
+            _statsLabel.Text = Strings.Get("IOTree.Stats", devices, boxes, channels);
+        }
+
+        private void TreeView_AfterSelect(object? sender, TreeViewEventArgs e)
         {
             if (e.Node?.Tag is IoTreeNode node && !string.IsNullOrEmpty(node.Path))
             {
-                _pathBox.Text = node.Path;
                 SelectedPath = node.Path;
+                _pathBox.Text = node.Path;
+                _previewBox.Text = PragmaTemplates.Attribute("TcLinkTo", node.Path);
                 _okButton.Enabled = true;
+                _copyButton.Enabled = true;
             }
             else
             {
-                _pathBox.Text = "";
                 SelectedPath = "";
+                _pathBox.Text = "";
+                _previewBox.Text = "";
                 _okButton.Enabled = false;
+                _copyButton.Enabled = false;
             }
         }
 
-        private void TreeView_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
+        private void TreeView_NodeMouseDoubleClick(object? sender, TreeNodeMouseClickEventArgs e)
         {
-            if (e.Node?.Tag is IoTreeNode node && !string.IsNullOrEmpty(node.Path))
+            if (e.Node?.Tag is IoTreeNode node && !string.IsNullOrEmpty(node.Path) && !node.HasChildren)
             {
                 SelectedPath = node.Path;
                 DialogResult = DialogResult.OK;
                 Close();
             }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _filterDebounce?.Dispose();
+            base.Dispose(disposing);
         }
     }
 }
