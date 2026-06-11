@@ -24,9 +24,14 @@ namespace STFormatter.UI
         private readonly Button _cancelButton;
         private readonly Button _copyButton;
         private readonly Label _statsLabel;
+        private readonly RadioButton _tiidRadio;
+        private readonly RadioButton _tiibRadio;
         private readonly System.Windows.Forms.Timer _filterDebounce;
+        private readonly Dictionary<IoTreeNode, IoTreeNode?> _parents = new Dictionary<IoTreeNode, IoTreeNode?>();
+        private IoTreeNode? _selectedNode;
 
         private static Size _rememberedSize = new Size(680, 620);
+        private static bool _preferTiib;
 
         private static readonly Color DeviceColor = Color.FromArgb(40, 40, 40);
         private static readonly Color BoxColor = Color.FromArgb(60, 60, 120);
@@ -141,7 +146,7 @@ namespace STFormatter.UI
             var treeHost = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10, 4, 10, 4) };
             treeHost.Controls.Add(_treeView);
 
-            // --- Bottom: path, preview, stats, buttons ---
+            // --- Bottom: link style, path, preview, stats, buttons ---
             var bottomPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Bottom,
@@ -151,6 +156,39 @@ namespace STFormatter.UI
             };
             bottomPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
             bottomPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+            var styleRow = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                Dock = DockStyle.Fill,
+                WrapContents = false,
+                Margin = new Padding(0, 4, 0, 0),
+            };
+            var styleLabel = new Label
+            {
+                Text = Strings.Get("IOTree.LinkStyle"),
+                AutoSize = true,
+                Margin = new Padding(0, 4, 6, 0),
+            };
+            _tiidRadio = new RadioButton
+            {
+                Text = Strings.Get("IOTree.StyleTiid"),
+                AutoSize = true,
+                Checked = !_preferTiib,
+                Margin = new Padding(0, 1, 12, 1),
+            };
+            _tiibRadio = new RadioButton
+            {
+                Text = Strings.Get("IOTree.StyleTiib"),
+                AutoSize = true,
+                Checked = _preferTiib,
+                Margin = new Padding(0, 1, 0, 1),
+            };
+            _tiidRadio.CheckedChanged += (s, e) => { _preferTiib = _tiibRadio.Checked; UpdateSelection(); };
+            _tiibRadio.CheckedChanged += (s, e) => { _preferTiib = _tiibRadio.Checked; UpdateSelection(); };
+            styleRow.Controls.Add(styleLabel);
+            styleRow.Controls.Add(_tiidRadio);
+            styleRow.Controls.Add(_tiibRadio);
 
             var pathLabel = new Label
             {
@@ -229,13 +267,15 @@ namespace STFormatter.UI
             buttonRow.Controls.Add(_cancelButton);
             buttonRow.Controls.Add(_okButton);
 
-            bottomPanel.Controls.Add(pathLabel, 0, 0);
-            bottomPanel.Controls.Add(_pathBox, 0, 1);
-            bottomPanel.Controls.Add(_copyButton, 1, 1);
-            bottomPanel.Controls.Add(previewLabel, 0, 2);
-            bottomPanel.Controls.Add(_previewBox, 0, 3);
-            bottomPanel.Controls.Add(_statsLabel, 0, 4);
-            bottomPanel.Controls.Add(buttonRow, 1, 4);
+            bottomPanel.Controls.Add(styleRow, 0, 0);
+            bottomPanel.SetColumnSpan(styleRow, 2);
+            bottomPanel.Controls.Add(pathLabel, 0, 1);
+            bottomPanel.Controls.Add(_pathBox, 0, 2);
+            bottomPanel.Controls.Add(_copyButton, 1, 2);
+            bottomPanel.Controls.Add(previewLabel, 0, 3);
+            bottomPanel.Controls.Add(_previewBox, 0, 4);
+            bottomPanel.Controls.Add(_statsLabel, 0, 5);
+            bottomPanel.Controls.Add(buttonRow, 1, 5);
 
             Controls.Add(treeHost);
             Controls.Add(bottomPanel);
@@ -259,6 +299,7 @@ namespace STFormatter.UI
 
             ResizeEnd += (s, e) => _rememberedSize = Size;
 
+            BuildParentMap(_root, null);
             PopulateTree(filter: "");
             UpdateStats();
 
@@ -362,31 +403,70 @@ namespace STFormatter.UI
             _statsLabel.Text = Strings.Get("IOTree.Stats", devices, boxes, channels);
         }
 
+        private void BuildParentMap(IoTreeNode node, IoTreeNode? parent)
+        {
+            _parents[node] = parent;
+            foreach (var child in node.Children)
+                BuildParentMap(child, node);
+        }
+
+        /// <summary>
+        /// TIIB[Box Name]^Channel^Entry - addresses the innermost terminal by
+        /// name instead of the full device hierarchy, so the link survives
+        /// device renames. Returns null when the node has no Box ancestor
+        /// (devices, or the box itself), where only TIID applies.
+        /// </summary>
+        private string? BuildTiibPath(IoTreeNode node)
+        {
+            var below = new List<string>();
+            var current = node;
+            while (current != null && _parents.TryGetValue(current, out var parent))
+            {
+                if (current.NodeType == "Box" && below.Count > 0)
+                    return $"TIIB[{current.Name}]^{string.Join("^", below)}";
+                below.Insert(0, current.Name);
+                current = parent;
+            }
+            return null;
+        }
+
         private void TreeView_AfterSelect(object? sender, TreeViewEventArgs e)
         {
-            if (e.Node?.Tag is IoTreeNode node && !string.IsNullOrEmpty(node.Path))
-            {
-                SelectedPath = node.Path;
-                _pathBox.Text = node.Path;
-                _previewBox.Text = PragmaTemplates.Attribute("TcLinkTo", node.Path);
-                _okButton.Enabled = true;
-                _copyButton.Enabled = true;
-            }
-            else
+            _selectedNode = e.Node?.Tag as IoTreeNode;
+            UpdateSelection();
+        }
+
+        private void UpdateSelection()
+        {
+            var node = _selectedNode;
+            if (node == null || string.IsNullOrEmpty(node.Path))
             {
                 SelectedPath = "";
                 _pathBox.Text = "";
                 _previewBox.Text = "";
                 _okButton.Enabled = false;
                 _copyButton.Enabled = false;
+                return;
             }
+
+            string? tiib = BuildTiibPath(node);
+            _tiibRadio.Enabled = tiib != null;
+            if (tiib == null && _tiibRadio.Checked)
+                _tiidRadio.Checked = true; // device-level nodes only support TIID
+
+            SelectedPath = _tiibRadio.Checked && tiib != null ? tiib : node.Path;
+            _pathBox.Text = SelectedPath;
+            _previewBox.Text = PragmaTemplates.Attribute("TcLinkTo", SelectedPath);
+            _okButton.Enabled = true;
+            _copyButton.Enabled = true;
         }
 
         private void TreeView_NodeMouseDoubleClick(object? sender, TreeNodeMouseClickEventArgs e)
         {
-            if (e.Node?.Tag is IoTreeNode node && !string.IsNullOrEmpty(node.Path) && !node.HasChildren)
+            // AfterSelect has already computed SelectedPath in the chosen style
+            if (e.Node?.Tag is IoTreeNode node && !string.IsNullOrEmpty(node.Path) && !node.HasChildren &&
+                !string.IsNullOrEmpty(SelectedPath))
             {
-                SelectedPath = node.Path;
                 DialogResult = DialogResult.OK;
                 Close();
             }
