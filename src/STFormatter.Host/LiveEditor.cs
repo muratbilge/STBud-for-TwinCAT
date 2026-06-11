@@ -694,6 +694,36 @@ internal static class LiveEditor
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    // True when the editor's main window is the foreground window. Synthetic
+    // keystrokes (SendKeys) go to whatever is foreground - if a dialog just
+    // closed and focus drifted, sending keys would hit the wrong application
+    // (e.g. the desktop/Task Manager). Never SendKeys unless this returns true.
+    private static bool EnsureEditorForeground(EnvDTE.DTE dte)
+    {
+        try
+        {
+            var hwnd = (IntPtr)(long)dte.MainWindow.HWnd;
+            if (hwnd == IntPtr.Zero) return false;
+
+            if (GetForegroundWindow() == hwnd) return true;
+
+            SetForegroundWindow(hwnd);
+            System.Threading.Thread.Sleep(80);
+            return GetForegroundWindow() == hwnd;
+        }
+        catch (Exception ex)
+        {
+            Log($"EnsureEditorForeground: failed: {ex.Message}");
+            return false;
+        }
+    }
+
     // Synthetic SendKeys merge with physically held modifiers: a user still
     // holding Ctrl/Shift turns our {HOME} into Ctrl+Shift+Home (select to
     // document start) with destructive follow-up. Wait briefly for release.
@@ -736,6 +766,39 @@ internal static class LiveEditor
 
                 dte.ActiveDocument.Activate();
 
+                // Primary path: write directly into the buffer via TextSelection.
+                // No synthetic keystrokes and no clipboard - so it cannot leak
+                // keys to another window and never disturbs the user's clipboard.
+                var sel = dte.ActiveDocument.Selection as EnvDTE.TextSelection;
+                if (sel != null)
+                {
+                    try
+                    {
+                        sel.StartOfLine(EnvDTE.vsStartOfLineOptions.vsStartOfLineOptionsFirstColumn, false);
+                        sel.Insert(text + "\r\n",
+                            (int)EnvDTE.vsInsertFlags.vsInsertFlagsInsertAtStart);
+                        Log("InsertLineAbove: SUCCESS (TextSelection.Insert)");
+                        return true;
+                    }
+                    catch (Exception exSel)
+                    {
+                        Log($"InsertLineAbove: TextSelection.Insert failed ({exSel.Message}); trying clipboard paste");
+                    }
+                }
+
+                // Fallback: clipboard + Edit.Paste. This needs the caret at line
+                // start, which we can only do with synthetic keys when the DTE
+                // navigation commands are missing - so require the editor to be
+                // foreground first, or abort rather than spray keys elsewhere.
+                if (!EnsureEditorForeground(dte))
+                {
+                    Log("InsertLineAbove: editor not foreground - aborting to avoid stray keystrokes");
+                    Program.ShowInfoMessage(
+                        "Could not insert: the TwinCAT editor was not in focus.\n\n" +
+                        "Click into the editor, then try again.");
+                    return false;
+                }
+
                 string? savedClipboard = null;
                 try { savedClipboard = GetClipboardText(); } catch { }
 
@@ -746,54 +809,20 @@ internal static class LiveEditor
                     return false;
                 }
 
-                try
+                bool atLineStart = false;
+                try { dte.ExecuteCommand("Edit.LineStart", ""); atLineStart = true; System.Threading.Thread.Sleep(30); }
+                catch { }
+                if (!atLineStart)
                 {
-                    dte.ExecuteCommand("Edit.LineStart", "");
-                    System.Threading.Thread.Sleep(30);
-                }
-                catch
-                {
-                    Log("InsertLineAbove: Edit.LineStart not available, using Home key");
                     System.Windows.Forms.SendKeys.SendWait("{HOME}");
                     System.Threading.Thread.Sleep(30);
                 }
-
-                try
-                {
-                    dte.ExecuteCommand("Edit.BreakLine", "");
-                    System.Threading.Thread.Sleep(30);
-                }
-                catch
-                {
-                    Log("InsertLineAbove: Edit.BreakLine not available, using Enter key");
-                    System.Windows.Forms.SendKeys.SendWait("{ENTER}");
-                    System.Threading.Thread.Sleep(50);
-                }
-
-                try
-                {
-                    var sel = dte.ActiveDocument.Selection as EnvDTE.TextSelection;
-                    if (sel != null)
-                    {
-                        sel.LineUp(false, 1);
-                        System.Threading.Thread.Sleep(30);
-                    }
-                }
-                catch
-                {
-                    Log("InsertLineAbove: TextSelection.LineUp failed, using Up key");
-                    System.Windows.Forms.SendKeys.SendWait("{UP}");
-                    System.Threading.Thread.Sleep(30);
-                }
-
-                System.Windows.Forms.SendKeys.SendWait("{HOME}");
-                System.Threading.Thread.Sleep(30);
 
                 dte.ExecuteCommand("Edit.Paste", "");
 
                 RestoreClipboardAfterPaste(savedClipboard);
 
-                Log("InsertLineAbove: SUCCESS");
+                Log("InsertLineAbove: SUCCESS (clipboard paste)");
                 return true;
             }
             finally
