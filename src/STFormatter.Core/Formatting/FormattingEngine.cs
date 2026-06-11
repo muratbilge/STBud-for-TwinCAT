@@ -30,6 +30,46 @@ public sealed class FormattingEngine
         return Format(tree);
     }
 
+    /// <summary>
+    /// True when the implementation-body fragment parses without errors.
+    /// Lets callers distinguish "already formatted" from "refused to format
+    /// because the code has syntax errors" (FormatBody returns the input
+    /// unchanged in both cases).
+    /// </summary>
+    public bool BodyParsesCleanly(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return true;
+        var tree = new Parsing.Parser(Text.SourceText.From(
+            $"PROGRAM __BODY_WRAPPER__\n{body}\nEND_PROGRAM")).Parse();
+        return !tree.Diagnostics.Any(d => d.Severity == Syntax.DiagnosticSeverity.Error);
+    }
+
+    /// <summary>Declaration counterpart of <see cref="BodyParsesCleanly"/>.</summary>
+    public bool DeclarationParsesCleanly(string declaration)
+    {
+        if (string.IsNullOrWhiteSpace(declaration))
+            return true;
+
+        if (ContainsTypeDeclaration(declaration))
+        {
+            var typeTree = new Parsing.Parser(Text.SourceText.From(declaration)).Parse();
+            return !typeTree.Diagnostics.Any(d => d.Severity == Syntax.DiagnosticSeverity.Error);
+        }
+
+        SplitPouHeaderAndVars(declaration, out _, out var varContent);
+        if (string.IsNullOrWhiteSpace(varContent))
+            return true;
+
+        StripPouFooter(ref varContent);
+        if (!HasVarSectionKeyword(varContent))
+            varContent = $"VAR_INPUT\n{varContent}\nEND_VAR";
+
+        var tree = new Parsing.Parser(Text.SourceText.From(
+            $"PROGRAM __DECL_WRAPPER__\n{varContent}\nEND_PROGRAM")).Parse();
+        return !tree.Diagnostics.Any(d => d.Severity == Syntax.DiagnosticSeverity.Error);
+    }
+
     public string FormatBody(string body)
     {
         if (string.IsNullOrWhiteSpace(body))

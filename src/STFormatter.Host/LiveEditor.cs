@@ -464,6 +464,24 @@ internal static class LiveEditor
                 bool isDecl = TwinCatXmlFormatter.LooksLikeDeclaration(currentText);
                 Log($"TryFormatViaExecuteCommand: Detected as {(isDecl ? "Declaration" : "Implementation")}");
 
+                // Tell the user about syntax errors instead of silently doing
+                // nothing (the formatter refuses to reformat unparseable code).
+                bool parsesCleanly = isDecl
+                    ? engine.DeclarationParsesCleanly(currentText)
+                    : engine.BodyParsesCleanly(currentText);
+                if (!parsesCleanly)
+                {
+                    Log("TryFormatViaExecuteCommand: section has ST syntax errors - not formatting");
+                    try { dte.ExecuteCommand("Edit.SelectionCancel", ""); } catch { }
+                    if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { } }
+                    Program.ShowInfoMessage(
+                        "Could not format: the active section contains ST syntax errors.\n\n" +
+                        "Fix the errors (the TwinCAT compiler will point them out) and try again.");
+                    outOriginal = currentText;
+                    outFormatted = currentText;
+                    return true; // handled - prevent fallback tiers from clobbering the editor
+                }
+
                 string? formatted;
                 if (isDecl)
                 {
@@ -584,10 +602,21 @@ internal static class LiveEditor
                 Log($"TryFormatSelectionViaExecuteCommand: Original text: [{selectedText.Replace("\r", "\\r").Replace("\n", "\\n")}]");
 
                 var engine = new FormattingEngine(STFormatter.UI.SettingsManager.Current);
-                var formatter = new TwinCatXmlFormatter(engine);
+
+                bool isDeclSelection = TwinCatXmlFormatter.LooksLikeDeclaration(selectedText);
+                bool selectionParses = isDeclSelection
+                    ? engine.DeclarationParsesCleanly(selectedText)
+                    : engine.BodyParsesCleanly(selectedText);
+                if (!selectionParses)
+                {
+                    Log("TryFormatSelectionViaExecuteCommand: selection has ST syntax errors - not formatting");
+                    if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { } }
+                    outOriginal = selectedText; // signals "had text but could not format"
+                    return false;
+                }
 
                 string? formatted;
-                if (TwinCatXmlFormatter.LooksLikeDeclaration(selectedText))
+                if (isDeclSelection)
                 {
                     Log("TryFormatSelectionViaExecuteCommand: Detected as Declaration");
                     formatted = engine.FormatDeclaration(selectedText);

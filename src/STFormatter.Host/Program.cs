@@ -395,7 +395,7 @@ internal class Program
             else if (!success)
             {
                 Log($"HandleFormatSelection: PID {pid} Could not format selection — showing info");
-                ShowInfoMessage("Could not format the selected code.\n\nThe selection may be too small or contain incomplete ST syntax.\nTry selecting a larger code block or use Format Document instead.");
+                ShowInfoMessage("Could not format the selected code.\n\nThe selection contains ST syntax errors or is an incomplete fragment.\nFix compiler errors first, or select a complete statement block.");
             }
         }
         catch (Exception ex)
