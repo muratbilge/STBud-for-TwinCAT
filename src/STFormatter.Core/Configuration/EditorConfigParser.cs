@@ -182,6 +182,11 @@ public sealed class EditorConfigParser
             config.KeepSingleLineBlocks = IsTruthy(keepSingleLine);
         }
 
+        if (properties.TryGetValue("st_wrap_long_lines", out var wrapLongLines))
+        {
+            config.WrapLongLines = IsTruthy(wrapLongLines);
+        }
+
         if (properties.TryGetValue("st_space_after_comma", out var spaceAfterComma))
         {
             config.SpaceAfterComma = IsTruthy(spaceAfterComma);

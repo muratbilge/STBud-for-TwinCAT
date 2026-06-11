@@ -295,6 +295,7 @@ and declarations without a wrapping POU keyword.
 | `AlignAssignments` | `true` | Align `:=` in consecutive assignment blocks |
 | `AlignVariableDeclarations` | `true` | Pad names and types in VAR sections |
 | `MaxLineLength` | `120` | Line-length limit for wrapping (0 = unlimited) |
+| `WrapLongLines` | `true` | Wrap long lines (IF conditions, expressions) at operators when exceeding `MaxLineLength` |
 | `EmptyLinesBetweenPOUs` | `2` | Blank lines between top-level declarations |
 | `EmptyLinesBetweenVarSections` | `1` | Blank lines between VAR blocks |
 | `KeepSingleLineBlocks` | `false` | Keep single-statement blocks on one line |
@@ -354,6 +355,7 @@ All ST-specific `.editorconfig` properties:
 | `st_empty_lines_between_pous` | `EmptyLinesBetweenPOUs` | integer |
 | `st_empty_lines_between_var_sections` | `EmptyLinesBetweenVarSections` | integer |
 | `st_keep_single_line_blocks` | `KeepSingleLineBlocks` | `true`, `false` |
+| `st_wrap_long_lines` | `WrapLongLines` | `true`, `false` |
 | `st_continuation_indent_size` | `ContinuationIndentSize` | integer |
 | `st_format_on_save` | `FormatOnSave` | `true`, `false` |
 

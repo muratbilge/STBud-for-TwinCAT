@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Text;
 using STFormatter.Core.Syntax;
@@ -553,7 +553,7 @@ internal sealed class FormattingWriter
 
     public bool WouldExceedLineLength(int additionalChars)
     {
-        return _config.MaxLineLength > 0 && _currentLineLength + additionalChars > _config.MaxLineLength;
+        return _config.EffectiveMaxLineLength > 0 && _currentLineLength + additionalChars > _config.EffectiveMaxLineLength;
     }
 
     public void WriteSpaces(int count)
@@ -567,7 +567,7 @@ internal sealed class FormattingWriter
 
     public void WriteLineBreakIfNeeded(int estimatedLength)
     {
-        if (_config.MaxLineLength > 0 && !_atLineStart && _currentLineLength + estimatedLength > _config.MaxLineLength)
+        if (_config.EffectiveMaxLineLength > 0 && !_atLineStart && _currentLineLength + estimatedLength > _config.EffectiveMaxLineLength)
         {
             WriteNewLine();
             var continuationLevel = _indentLevel + Math.Max(1, _config.ContinuationIndentSize / Math.Max(1, _config.IndentSize));
@@ -580,7 +580,7 @@ internal sealed class FormattingWriter
 
     public void WriteTokenWithLineBreakCheck(string text)
     {
-        if (_config.MaxLineLength > 0 && !_atLineStart && _currentLineLength + text.Length > _config.MaxLineLength)
+        if (_config.EffectiveMaxLineLength > 0 && !_atLineStart && _currentLineLength + text.Length > _config.EffectiveMaxLineLength)
         {
             WriteNewLine();
             var continuationLevel = _indentLevel + Math.Max(1, _config.ContinuationIndentSize / Math.Max(1, _config.IndentSize));
@@ -1582,7 +1582,7 @@ internal sealed class FormattingVisitor
             _writer.WriteSpace();
 
         // Check if operator would exceed line length
-        if (_config.MaxLineLength > 0)
+        if (_config.EffectiveMaxLineLength > 0)
         {
             _writer.WriteLineBreakIfNeeded(tokens[0].Text.Length + (_config.SpaceAroundOperators ? 1 : 0) + EstimateNodeLength(nodes[1]));
         }

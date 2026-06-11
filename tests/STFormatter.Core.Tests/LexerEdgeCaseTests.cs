@@ -62,6 +62,24 @@ public class LexerEdgeCaseTests
     }
 
     [Fact]
+    public void LongIfCondition_WrapsWhenEnabled_StaysSingleLineWhenDisabled()
+    {
+        var src = "PROGRAM P\nVAR\na : BOOL; b : BOOL; c : BOOL; d : BOOL; e : BOOL; f : BOOL; g : BOOL;\nEND_VAR\n" +
+                  "IF aVeryLongCondition1 AND aVeryLongCondition2 AND aVeryLongCondition3 AND aVeryLongCondition4 AND aVeryLongCondition5 AND aVeryLongCondition6 THEN\n" +
+                  "    a := TRUE;\nEND_IF\nEND_PROGRAM";
+
+        var wrapped = new FormattingEngine(
+            new STFormatter.Core.Formatting.FormattingConfiguration { MaxLineLength = 80 }).Format(src);
+        var ifLine = wrapped.Split('\n').First(l => l.Contains("IF aVeryLongCondition1"));
+        Assert.True(ifLine.TrimEnd().Length <= 90, $"IF line not wrapped: {ifLine.Length} chars");
+
+        var unwrapped = new FormattingEngine(
+            new STFormatter.Core.Formatting.FormattingConfiguration { MaxLineLength = 80, WrapLongLines = false }).Format(src);
+        var ifLine2 = unwrapped.Split('\n').First(l => l.Contains("IF aVeryLongCondition1"));
+        Assert.Contains("aVeryLongCondition6 THEN", ifLine2); // single line, no wrap
+    }
+
+    [Fact]
     public void Pragma_WithBraceInsideQuotedString_IsNotTruncated()
     {
         var src = "{warning 'do not use } here'}\nPROGRAM P\nVAR\nEND_VAR\nEND_PROGRAM";

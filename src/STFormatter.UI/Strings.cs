@@ -54,6 +54,7 @@ namespace STFormatter.UI
             ["Settings.SpaceAfterColon"] = "Space after colon",
             ["Settings.AlignAssignments"] = "Align assignments",
             ["Settings.AlignDeclarations"] = "Align variable declarations",
+            ["Settings.WrapLongLines"] = "Wrap long lines (IF conditions, expressions)",
             ["Settings.MaxLineLength"] = "Max line length:",
             ["Settings.EmptyLinesBetweenPOUs"] = "Empty lines between POUs:",
             ["Settings.EmptyLinesBetweenVarSections"] = "Empty lines between VAR sections:",

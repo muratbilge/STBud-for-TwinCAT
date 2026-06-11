@@ -21,6 +21,7 @@ namespace STFormatter.UI
         private CheckBox _spaceAfterColon;
         private CheckBox _alignAssignments;
         private CheckBox _alignVariableDeclarations;
+        private CheckBox _wrapLongLines;
         private NumericUpDown _maxLineLength;
         private NumericUpDown _emptyLinesBetweenPOUs;
         private NumericUpDown _emptyLinesBetweenVarSections;
@@ -284,12 +285,15 @@ END_IF";
 
             _alignAssignments = MakeCheck(Strings.Get("Settings.AlignAssignments"), true);
             _alignVariableDeclarations = MakeCheck(Strings.Get("Settings.AlignDeclarations"), true);
+            _wrapLongLines = MakeCheck(Strings.Get("Settings.WrapLongLines"), true);
+            _wrapLongLines.CheckedChanged += (s, e) => _maxLineLength.Enabled = _wrapLongLines.Checked;
             _maxLineLength = MakeNum(40, 200, 120);
             _emptyLinesBetweenPOUs = MakeNum(0, 10, 2);
             _emptyLinesBetweenVarSections = MakeNum(0, 10, 1);
 
             AddRow(p, _alignAssignments);
             AddRow(p, _alignVariableDeclarations);
+            AddRow(p, _wrapLongLines);
             AddRow(p, Strings.Get("Settings.MaxLineLength"), _maxLineLength);
             AddRow(p, Strings.Get("Settings.EmptyLinesBetweenPOUs"), _emptyLinesBetweenPOUs);
             AddRow(p, Strings.Get("Settings.EmptyLinesBetweenVarSections"), _emptyLinesBetweenVarSections);
@@ -529,6 +533,7 @@ END_IF";
             SpaceAfterColon = _spaceAfterColon.Checked,
             AlignAssignments = _alignAssignments.Checked,
             AlignVariableDeclarations = _alignVariableDeclarations.Checked,
+            WrapLongLines = _wrapLongLines.Checked,
             MaxLineLength = (int)_maxLineLength.Value,
             EmptyLinesBetweenPOUs = (int)_emptyLinesBetweenPOUs.Value,
             EmptyLinesBetweenVarSections = (int)_emptyLinesBetweenVarSections.Value,
@@ -551,7 +556,9 @@ END_IF";
             _spaceAfterColon.Checked = c.SpaceAfterColon;
             _alignAssignments.Checked = c.AlignAssignments;
             _alignVariableDeclarations.Checked = c.AlignVariableDeclarations;
-            _maxLineLength.Value = c.MaxLineLength;
+            _wrapLongLines.Checked = c.WrapLongLines;
+            _maxLineLength.Value = Math.Max(_maxLineLength.Minimum, Math.Min(_maxLineLength.Maximum, c.MaxLineLength));
+            _maxLineLength.Enabled = c.WrapLongLines;
             _emptyLinesBetweenPOUs.Value = c.EmptyLinesBetweenPOUs;
             _emptyLinesBetweenVarSections.Value = c.EmptyLinesBetweenVarSections;
             _keepSingleLineBlocks.Checked = c.KeepSingleLineBlocks;

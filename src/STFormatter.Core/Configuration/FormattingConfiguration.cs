@@ -20,6 +20,16 @@ public sealed class FormattingConfiguration
     public bool AlignAssignments { get; set; } = true;
     public bool AlignVariableDeclarations { get; set; } = true;
     public int MaxLineLength { get; set; } = 120;
+
+    /// <summary>
+    /// When false, long lines (e.g. IF conditions with many operands) are never
+    /// wrapped, regardless of MaxLineLength. MaxLineLength keeps its value so
+    /// toggling wrapping back on restores the previous threshold.
+    /// </summary>
+    public bool WrapLongLines { get; set; } = true;
+
+    /// <summary>The wrap threshold the writer should use; 0 disables wrapping.</summary>
+    public int EffectiveMaxLineLength => WrapLongLines ? MaxLineLength : 0;
     public int EmptyLinesBetweenPOUs { get; set; } = 2;
     public int EmptyLinesBetweenVarSections { get; set; } = 1;
     public bool KeepSingleLineBlocks { get; set; } = false;

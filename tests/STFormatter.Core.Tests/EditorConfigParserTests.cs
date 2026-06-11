@@ -78,6 +78,19 @@ public class EditorConfigParserTests : IDisposable
     }
 
     [Fact]
+    public void WrapLongLines_ParsesAndDisablesWrapping()
+    {
+        var dir = Write("proj", "root = true\n[*.st]\nst_wrap_long_lines = false\n");
+
+        var config = EditorConfigParser.LoadFromDirectory(dir, Path.Combine(dir, "a.st"));
+
+        Assert.NotNull(config);
+        Assert.False(config!.WrapLongLines);
+        Assert.Equal(0, config.EffectiveMaxLineLength);
+        Assert.Equal(120, config.MaxLineLength); // threshold preserved for re-enabling
+    }
+
+    [Fact]
     public void StPropertiesParse()
     {
         var dir = Write("proj",
