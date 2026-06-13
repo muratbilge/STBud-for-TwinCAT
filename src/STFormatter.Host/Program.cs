@@ -404,6 +404,57 @@ internal class Program
         }
     }
 
+    // Dialogs must be OWNED by the TcXaeShell main window: an ownerless
+    // TopMost dialog hands focus to the next topmost-band window when it
+    // closes - e.g. an always-on-top Task Manager - instead of the editor.
+    private static System.Windows.Forms.DialogResult ShowDialogOwned(
+        System.Windows.Forms.Form dlg, int pid)
+    {
+        try
+        {
+            var instance = _hostManager?.GetInstance(pid);
+            if (instance != null)
+            {
+                var hwnd = (IntPtr)(long)instance.Dte.MainWindow.HWnd;
+                if (hwnd != IntPtr.Zero)
+                {
+                    dlg.TopMost = false; // owned dialogs stay above their owner
+                    return dlg.ShowDialog(new Win32Owner(hwnd));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"ShowDialogOwned: owner lookup failed, showing unowned: {ex.Message}");
+        }
+        return dlg.ShowDialog();
+    }
+
+    private sealed class Win32Owner : System.Windows.Forms.IWin32Window
+    {
+        public Win32Owner(IntPtr handle) { Handle = handle; }
+        public IntPtr Handle { get; }
+    }
+
+    // HWND of any alive TcXaeShell instance, so message boxes shown without a
+    // pid context (e.g. from LiveEditor) can still be owned by the editor and
+    // not hand focus to an always-on-top window like Task Manager when closed.
+    private static IntPtr GetAnyEditorWindow()
+    {
+        if (_hostManager == null) return IntPtr.Zero;
+        foreach (var kvp in _hostManager.GetAllInstances())
+        {
+            if (!_hostManager.IsInstanceAlive(kvp.Key)) continue;
+            try
+            {
+                var hwnd = (IntPtr)(long)kvp.Value.Dte.MainWindow.HWnd;
+                if (hwnd != IntPtr.Zero) return hwnd;
+            }
+            catch { }
+        }
+        return IntPtr.Zero;
+    }
+
     public static void ShowInfoMessage(string message)
     {
         _mainForm?.Invoke((Action)(() =>
@@ -411,9 +462,21 @@ internal class Program
             var consoleHandle = GetConsoleWindow();
             if (consoleHandle != IntPtr.Zero)
                 ShowWindow(consoleHandle, SW_HIDE);
-            System.Windows.Forms.MessageBox.Show(message, "STBud for TwinCAT",
-                System.Windows.Forms.MessageBoxButtons.OK,
-                System.Windows.Forms.MessageBoxIcon.Information);
+
+            var owner = GetAnyEditorWindow();
+            if (owner != IntPtr.Zero)
+            {
+                System.Windows.Forms.MessageBox.Show(new Win32Owner(owner), message,
+                    "STBud for TwinCAT",
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Information);
+            }
+            else
+            {
+                System.Windows.Forms.MessageBox.Show(message, "STBud for TwinCAT",
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Information);
+            }
         }));
     }
 
@@ -473,7 +536,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.WarningTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.WarningPrompt"),
                     "");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     warningText = dlg.InputText;
             }));
 
@@ -522,7 +585,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.StartRegionTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.StartRegionPrompt"),
                     "");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     regionName = dlg.InputText;
             }));
 
@@ -571,7 +634,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.StartEndRegionTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.StartEndRegionPrompt"),
                     "");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     regionName = dlg.InputText;
             }));
 
@@ -620,7 +683,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.NoExplicitCallTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.NoExplicitCallPrompt"),
                     "do not call this POU directly");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     message = dlg.InputText;
             }));
 
@@ -669,7 +732,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.OpcUaDaTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.OpcUaDaPrompt"),
                     "1");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     param = dlg.InputText;
             }));
 
@@ -718,7 +781,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.AlwaysAverageTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.AlwaysAveragePrompt"),
                     "");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     varName = dlg.InputText;
             }));
 
@@ -800,7 +863,7 @@ internal class Program
                 if (ioTree != null && ioTree.Children.Count > 0)
                 {
                     using var dlg = new STFormatter.UI.IoTreeBrowserDialog(ioTree);
-                    if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                         ioPath = dlg.SelectedPath;
                 }
                 else
@@ -809,7 +872,7 @@ internal class Program
                         STFormatter.UI.Strings.Get("AddMenu.IOLinkingTitle"),
                         STFormatter.UI.Strings.Get("AddMenu.IOLinkingPrompt"),
                         "");
-                    if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                         ioPath = dlg.InputText;
                 }
             }));
@@ -852,7 +915,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.ObsoleteTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.ObsoletePrompt"),
                     "use NewPou instead");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     message = dlg.InputText;
             }));
 
@@ -901,7 +964,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.TaskNameTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.TaskNamePrompt"),
                     "PlcTask");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     taskName = dlg.InputText;
             }));
 
@@ -950,7 +1013,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.CallAfterTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.CallAfterPrompt"),
                     "");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     pouName = dlg.InputText;
             }));
 
@@ -999,7 +1062,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.CallBeforeTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.CallBeforePrompt"),
                     "");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     pouName = dlg.InputText;
             }));
 
@@ -1048,7 +1111,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.CallAfterInitTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.CallAfterInitPrompt"),
                     "");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     pouName = dlg.InputText;
             }));
 
@@ -1097,7 +1160,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.CallBeforeInitTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.CallBeforeInitPrompt"),
                     "");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     pouName = dlg.InputText;
             }));
 
@@ -1146,7 +1209,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.CallAfterExitTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.CallAfterExitPrompt"),
                     "");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     pouName = dlg.InputText;
             }));
 
@@ -1195,7 +1258,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.CallBeforeExitTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.CallBeforeExitPrompt"),
                     "");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     pouName = dlg.InputText;
             }));
 
@@ -1244,7 +1307,7 @@ internal class Program
                     STFormatter.UI.Strings.Get("AddMenu.PriorityTitle"),
                     STFormatter.UI.Strings.Get("AddMenu.PriorityPrompt"),
                     "5");
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (ShowDialogOwned(dlg, pid) == System.Windows.Forms.DialogResult.OK)
                     priority = dlg.InputText;
             }));
 
