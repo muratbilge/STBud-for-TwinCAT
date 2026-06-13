@@ -35,6 +35,20 @@ public sealed class TcXaeShellVersionProfile
         InstallPathPattern = @"Beckhoff\TcXaeShell\Common7\IDE\";
     }
 
+    /// <summary>
+    /// Process names of every TwinCAT XAE shell variant to look for. Build 4026
+    /// adds a 64-bit shell (TcXaeShell64) alongside the classic 32-bit one;
+    /// both register a DTE automation object, so both must be scanned. Match by
+    /// prefix ("TcXaeShell"*) at call sites rather than exact-equals so a future
+    /// variant suffix is still recognized.
+    /// </summary>
+    public static readonly string[] ShellProcessNames = { "TcXaeShell", "TcXaeShell64" };
+
+    /// <summary>True if <paramref name="processName"/> is any TwinCAT XAE shell.</summary>
+    public static bool IsShellProcessName(string? processName) =>
+        !string.IsNullOrEmpty(processName) &&
+        processName!.StartsWith("TcXaeShell", StringComparison.OrdinalIgnoreCase);
+
     public static TcXaeShellVersionProfile VS2017 { get; } = new(
         "TC3-VS2017",
         "15.0",

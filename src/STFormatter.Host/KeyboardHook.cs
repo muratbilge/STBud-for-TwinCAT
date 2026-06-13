@@ -153,7 +153,8 @@ internal sealed class KeyboardHook : IDisposable
         try
         {
             using var process = Process.GetProcessById((int)pid);
-            isTcXae = process.ProcessName.Equals("TcXaeShell", StringComparison.OrdinalIgnoreCase);
+            // Prefix match so the 4026 64-bit shell (TcXaeShell64) is covered too.
+            isTcXae = TcXaeShellVersionProfile.IsShellProcessName(process.ProcessName);
         }
         catch
         {

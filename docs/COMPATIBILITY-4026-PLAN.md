@@ -23,6 +23,34 @@ Unknowns are flagged below as **[verify]** — resolve them on a real 4026 machi
 before writing any code. Do not hard-code guesses; everything version-specific goes
 through `TcXaeShellVersionProfile`.
 
+## Verified baseline (this dev machine)
+
+Checked 2026-06: this machine runs **TwinCAT 3.1 Build 4024-series** — classic
+`C:\TwinCAT\3.1` layout, single `TcXaeShell` on the VS 2017 isolated shell
+(registry root `Beckhoff\TcXaeShell\15.0`, DTE 15.0, moniker
+`!TcXaeShell.DTE.15.0:{PID}`). No TwinCAT Package Manager (`tcpkg`), no 64-bit
+shell, no VS 2022 integration. **A live 4026 runtime test is therefore not
+possible here** — Phases 0 and 2 still require access to a real 4026 install.
+
+## Already handled (no 4026 machine needed)
+
+Safe forward-compat that can only *add* detection, shipped ahead of Phase 0:
+
+- **Shell process detection covers the 64-bit shell.** `TcXaeShellVersionProfile.
+  ShellProcessNames` = `{TcXaeShell, TcXaeShell64}` and `IsShellProcessName()`
+  prefix-matches `TcXaeShell*`. The keyboard-hook PID check and the Host scan
+  diagnostics use it, so a 4026 `TcXaeShell64` is recognized for hotkeys and
+  diagnostics without code changes.
+- **Dynamic moniker fallback** already resolves any `!TcXaeShell.DTE.X.Y` /
+  `!VisualStudio.DTE.X.Y` to a working profile with the stable
+  `PlcCodeWinContextMenu` / `Code Window` menu names and `.TcPOU/.TcDUT/...`
+  extensions. `TcXaeShellVersionProfileTests` pins this for DTE 16.0/17.0 so a
+  version bump in 4026 still connects.
+
+The remaining unknown for connection is whether 4026 routes through VS 2022's
+`devenv` with a "Microsoft Visual Studio" DTE name (which `IsTcXaeShell` would
+reject) rather than the standalone TcXaeShell — that is a **[verify]** for Phase 0.
+
 ## Phase 0 — Reconnaissance (no code changes)
 
 On a Build 4026 installation, capture ground truth:
@@ -51,8 +79,9 @@ All changes land in `TcXaeShellVersionProfile` (Core) only:
    `!TcXaeShell.DTE.*`/`!VisualStudio.DTE.*` versions; add unit tests asserting the
    4026 monikers resolve to the right profile (these tests run everywhere, no
    TcXaeShell needed).
-3. If the 64-bit shell exists as a separate process name **[verify]**, the Host's
-   process scan must include it.
+3. ~~If the 64-bit shell exists as a separate process name, the Host's process scan
+   must include it.~~ **Done** — `ShellProcessNames` includes `TcXaeShell64`; the
+   keyboard hook and scan diagnostics prefix-match `TcXaeShell*`.
 
 ## Phase 2 — Host behavioral verification on 4026
 

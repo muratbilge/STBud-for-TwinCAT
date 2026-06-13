@@ -240,10 +240,18 @@ internal sealed class HostManager
         string processPids = "none";
         try
         {
-            var processes = System.Diagnostics.Process.GetProcessesByName(TcXaeShellVersionProfile.VS2017.ProcessName);
-            processCount = processes.Length;
-            if (processes.Length > 0)
-                processPids = string.Join(", ", Array.ConvertAll(processes, p => p.Id.ToString()));
+            // Scan every shell variant (32-bit TcXaeShell and 4026 TcXaeShell64).
+            var pids = new List<string>();
+            foreach (var name in TcXaeShellVersionProfile.ShellProcessNames)
+            {
+                foreach (var p in System.Diagnostics.Process.GetProcessesByName(name))
+                {
+                    using (p) pids.Add($"{p.Id}");
+                }
+            }
+            processCount = pids.Count;
+            if (pids.Count > 0)
+                processPids = string.Join(", ", pids);
         }
         catch { }
 
