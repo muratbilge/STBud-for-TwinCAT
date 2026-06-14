@@ -51,15 +51,31 @@ The remaining unknown for connection is whether 4026 routes through VS 2022's
 `devenv` with a "Microsoft Visual Studio" DTE name (which `IsTcXaeShell` would
 reject) rather than the standalone TcXaeShell — that is a **[verify]** for Phase 0.
 
+## Upgrade procedure (use this when installing 4026)
+
+`stfmt doctor` is the recon tool. The 4024 baseline is already captured in
+[baseline-4024.txt](baseline-4024.txt). When you install 4026:
+
+```
+stfmt doctor --save docs\after-4026.txt
+```
+
+then diff `after-4026.txt` against `baseline-4024.txt`. The report shows the exact
+ROT moniker each running shell registers, with a per-moniker verdict (SUPPORTED /
+forward-compat fallback / not recognized), the install model (TcPkg vs classic),
+detected shells with versions, and the deployed Host. That diff answers Phase 0's
+three unknowns in one shot: new moniker?, standalone-shell vs VS 2022 `devenv`?,
+and 64-bit shell present?.
+
 ## Phase 0 — Reconnaissance (no code changes)
 
 On a Build 4026 installation, capture ground truth:
 
-1. **Enumerate the ROT** while the 4026 shell runs. The Host log already prints every
-   DTE-like moniker it sees (`Scan:` lines in `%TEMP%\STBud_Host.log`) — run the
-   current Host unmodified and record what appears. **[verify]** moniker prefix and
-   DTE version for: the classic TcXaeShell, the 64-bit shell, and VS 2022 with the
-   TwinCAT integration.
+1. **Run `stfmt doctor --save docs\after-4026.txt`** — it enumerates the ROT and
+   classifies every DTE moniker against `TcXaeShellVersionProfile`. (The Host also
+   logs monikers in `%TEMP%\STBud_Host.log`, but doctor needs no Host deploy.)
+   **[verify]** moniker prefix and DTE version for: the classic TcXaeShell, the
+   64-bit shell, and VS 2022 with the TwinCAT integration.
 2. Record install paths, registry roots, process names, and shell bitness
    (`Get-Process <name> | Select Path, ProcessName`; check WOW64).
 3. Save a 4026-created PLC project (`.tsproj` + POUs) into `samples/` as fixtures —
@@ -106,20 +122,21 @@ Manual checklist against a live 4026 shell (no automated coverage possible — C
 2. Add `IoTreeParser` fixture tests for the 4026 `.tsproj` structure.
 3. `stfmt batch <4026 project> --twincat --dry-run` must report 0 errors.
 
-## Phase 4 — Compatibility report tool
+## Phase 4 — Compatibility report tool ✅ Done
 
-Roadmap asks for "a compatibility report that can be copied into issues/support
-notes". Cheapest useful version: a `stfmt doctor` CLI command (and a tray-UI button
-later) that prints:
+`stfmt doctor` (`TwinCatDoctor` in Core, used by the CLI) prints:
 
-- detected TwinCAT installs (paths + versions from registry),
-- running shells and their ROT monikers,
+- detected TwinCAT install + build (ProductVersion of the runtime service) and
+  whether TcPkg / classic install model is in use,
+- detected XAE shells with versions,
+- running shells and their **live ROT monikers**, each classified against the
+  version matrix (SUPPORTED / forward-compat fallback / not recognized),
 - Host deploy state (files + versions in `C:\Program Files (x86)\STBud`),
-- the Pinger's local ADS port check,
-- known-support status per the version matrix.
+- the Pinger's local ADS port check.
 
-This reuses `TcXaeShellVersionProfile`, `TwinCatPinger`, and the ROT scan the Host
-already has — mostly wiring, not new machinery.
+`--save <file>` writes the report for diffing. Pure filesystem + COM ROT +
+process inspection (no registry dependency). A tray-UI button can call the same
+`TwinCatDoctor.BuildReport()` later.
 
 ## Ordering and effort
 
@@ -129,10 +146,10 @@ already has — mostly wiring, not new machinery.
 | 1 Version profile | no (uses Phase 0 data) | small | Phase 0 |
 | 2 Host verification | yes | half a day | Phase 1 |
 | 3 Project fixtures | no (files from Phase 0) | small | Phase 0 |
-| 4 `stfmt doctor` | no | medium | none — can start anytime |
+| 4 `stfmt doctor` | no | medium | ✅ done |
 
-Phase 4 can start immediately and actually makes Phase 0 easier (the doctor command
-is the recon tool). Recommended order: **4 → 0 → 1 → 3 → 2**.
+Phase 4 is done and is the recon tool for Phase 0. Remaining order: **0 → 1 → 3 → 2**,
+all gated on access to a real 4026 install.
 
 ## Non-goals (unchanged from ROADMAP)
 

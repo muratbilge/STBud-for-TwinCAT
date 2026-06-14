@@ -42,6 +42,7 @@ class Program
             "export" => ExportCommand(args[1..]),
             "import" => ImportCommand(args[1..]),
             "ping" => PingCommand(args[1..]),
+            "doctor" => DoctorCommand(args[1..]),
             _ => UnknownCommand(command)
         };
     }
@@ -542,6 +543,35 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
         return report.Reachable ? 0 : 1;
     }
 
+    static int DoctorCommand(string[] args)
+    {
+        string? savePath = null;
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--save" || args[i] == "-o")
+                savePath = args[i + 1];
+        }
+
+        string report = STFormatter.Core.Toolbox.TwinCatDoctor.BuildReport();
+        Console.Write(report);
+
+        if (savePath != null)
+        {
+            try
+            {
+                File.WriteAllText(savePath, report);
+                Console.WriteLine();
+                Console.WriteLine($"Report saved to {savePath}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error: could not save report: {ex.Message}");
+                return 1;
+            }
+        }
+        return 0;
+    }
+
     static int UnknownCommand(string command)
     {
         Console.Error.WriteLine($"Unknown command: {command}");
@@ -562,6 +592,7 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
         Console.WriteLine("  stfmt export [file] [--preset <name>]");
         Console.WriteLine("  stfmt import <json-file>");
         Console.WriteLine("  stfmt ping <host|ip> [--timeout <ms>]");
+        Console.WriteLine("  stfmt doctor [--save <file>]");
         Console.WriteLine();
         Console.WriteLine("Commands:");
         Console.WriteLine("  format    Format a single ST file");
@@ -572,6 +603,7 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
         Console.WriteLine("  export    Export configuration to JSON");
         Console.WriteLine("  import    Import configuration from JSON to .editorconfig");
         Console.WriteLine("  ping      Check TwinCAT machine reachability (ICMP + ADS ports)");
+        Console.WriteLine("  doctor    Report TwinCAT/TcXaeShell environment (installs, shells, ROT monikers)");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  -o              Output file path (default: overwrite input)");

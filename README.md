@@ -181,6 +181,7 @@ Usage:
   stfmt export [file] [--preset <name>]
   stfmt import <json-file>
   stfmt ping <host|ip> [--timeout <ms>]
+  stfmt doctor [--save <file>]
 ```
 
 | Command | Description |
@@ -193,6 +194,7 @@ Usage:
 | `export` | Export a configuration preset to JSON |
 | `import` | Import a JSON configuration file and write an `.editorconfig` |
 | `ping` | Check TwinCAT machine reachability: ICMP ping + ADS/AMS (48898) and Secure ADS (8016) TCP ports |
+| `doctor` | Report the TwinCAT/TcXaeShell environment (install + build, shells, live ROT monikers, deployed Host, ADS check); `--save` writes it for diffing across upgrades |
 
 ### STFormatter.Host (external process — production)
 
