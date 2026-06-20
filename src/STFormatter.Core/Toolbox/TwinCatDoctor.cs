@@ -27,7 +27,7 @@ public static class TwinCatDoctor
         sb.AppendLine("=== STBud TwinCAT Doctor ===");
         sb.AppendLine($"Generated : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine($"STBud Core: {typeof(TwinCatDoctor).Assembly.GetName().Version}");
-        sb.AppendLine($"OS        : {RuntimeInformation.OSDescription} ({RuntimeInformation.OSArchitecture})");
+        sb.AppendLine($"OS        : {Environment.OSVersion} ({(Environment.Is64BitOperatingSystem ? "x64" : "x86")})");
         sb.AppendLine();
 
         AppendTwinCatInstall(sb);
@@ -43,7 +43,9 @@ public static class TwinCatDoctor
         return sb.ToString();
     }
 
-    private static bool IsWindows => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+    // net48/net462 only run on Windows; on net8.0 this still returns true on
+    // Windows. Avoids RuntimeInformation, which is not in the net462 BCL.
+    private static bool IsWindows => Environment.OSVersion.Platform == PlatformID.Win32NT;
 
     private static void AppendTwinCatInstall(StringBuilder sb)
     {
