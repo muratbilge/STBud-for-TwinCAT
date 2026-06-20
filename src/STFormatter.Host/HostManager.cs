@@ -430,8 +430,14 @@ internal sealed class HostManager
             mainPopup.TooltipText = "STBud for TwinCAT tools";
             instance.InjectedControls.Add(mainPopup);
 
-            AddFormatSubmenu(instance, mainPopup);
-            AddAttributeSubmenu(instance, mainPopup);
+            // Common actions surfaced to the top level (one click): the two
+            // format commands, then I/O Linking. Long-tail pragma helpers stay
+            // nested in the Add submenus below.
+            AddFormatButtons(instance, mainPopup);
+            AddIoLinkingButton(instance, mainPopup, beginGroup: true);
+
+            var attrPopupGroup = AddAttributeSubmenu(instance, mainPopup);
+            try { attrPopupGroup.BeginGroup = true; } catch { }
             AddTaskSubmenu(instance, mainPopup);
             AddRegionSubmenu(instance, mainPopup);
 
@@ -444,17 +450,11 @@ internal sealed class HostManager
                 Program.HandleAddWarning(instance.Pid);
             instance.InjectedControls.Add(warningBtn);
 
-            var sep2 = (CommandBarControl)mainPopup.Controls.Add(
-                MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
-            sep2.BeginGroup = true;
-            sep2.Caption = "-";
-            sep2.Visible = false;
-            instance.InjectedControls.Add(sep2);
-
             var settingsBtn = (CommandBarButton)mainPopup.Controls.Add(
                 MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
             settingsBtn.Caption = "Settings...";
             settingsBtn.Tag = "STBud.OpenSettings";
+            settingsBtn.BeginGroup = true;
             TrySetIcon(settingsBtn, 277);
             settingsBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
                 Program.ShowSettingsGui();
@@ -468,15 +468,11 @@ internal sealed class HostManager
         }
     }
 
-    private void AddFormatSubmenu(TcXaeInstance instance, CommandBarPopup parent)
+    // Format Document / Selection added directly to the main popup (top level)
+    // so the most-used commands are one click away.
+    private void AddFormatButtons(TcXaeInstance instance, CommandBarPopup parent)
     {
-        var formatPopup = (CommandBarPopup)parent.Controls.Add(
-            MsoControlType.msoControlPopup, Type.Missing, Type.Missing, Type.Missing, true);
-        formatPopup.Caption = "Format";
-        formatPopup.Tag = "STBud.Format";
-        instance.InjectedControls.Add(formatPopup);
-
-        var docBtn = (CommandBarButton)formatPopup.Controls.Add(
+        var docBtn = (CommandBarButton)parent.Controls.Add(
             MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
         docBtn.Caption = "Format Document";
         docBtn.TooltipText = "Format the entire ST document (Ctrl+Shift+F)";
@@ -487,7 +483,7 @@ internal sealed class HostManager
             Program.HandleFormatDocument(instance.Pid);
         instance.InjectedControls.Add(docBtn);
 
-        var selBtn = (CommandBarButton)formatPopup.Controls.Add(
+        var selBtn = (CommandBarButton)parent.Controls.Add(
             MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
         selBtn.Caption = "Format Selection";
         selBtn.TooltipText = "Format the selected ST code (Ctrl+Shift+D)";
@@ -499,7 +495,22 @@ internal sealed class HostManager
         instance.InjectedControls.Add(selBtn);
     }
 
-    private void AddAttributeSubmenu(TcXaeInstance instance, CommandBarPopup parent)
+    // I/O Linking opens the I/O tree browser. Surfaced to the top level (was
+    // buried under Add Attribute > Binding); also reusable from any parent.
+    private void AddIoLinkingButton(TcXaeInstance instance, CommandBarPopup parent, bool beginGroup = false)
+    {
+        var ioLinkBtn = (CommandBarButton)parent.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        ioLinkBtn.Caption = "I/O Linking...";
+        ioLinkBtn.Tag = "STBud.Add.IOLinking";
+        if (beginGroup) ioLinkBtn.BeginGroup = true;
+        TrySetIcon(ioLinkBtn, 303);
+        ioLinkBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
+            Program.HandleAddIOLinking(instance.Pid);
+        instance.InjectedControls.Add(ioLinkBtn);
+    }
+
+    private CommandBarPopup AddAttributeSubmenu(TcXaeInstance instance, CommandBarPopup parent)
     {
         var attrPopup = (CommandBarPopup)parent.Controls.Add(
             MsoControlType.msoControlPopup, Type.Missing, Type.Missing, Type.Missing, true);
@@ -527,15 +538,7 @@ internal sealed class HostManager
         instance.InjectedControls.Add(bindingPopup);
 
         AddPragmaButton(instance, bindingPopup, "linkalways", "linkalways");
-
-        var ioLinkBtn = (CommandBarButton)bindingPopup.Controls.Add(
-            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
-        ioLinkBtn.Caption = "I/O Linking...";
-        ioLinkBtn.Tag = "STBud.Add.IOLinking";
-        TrySetIcon(ioLinkBtn, 303);
-        ioLinkBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
-            Program.HandleAddIOLinking(instance.Pid);
-        instance.InjectedControls.Add(ioLinkBtn);
+        // I/O Linking... is now a top-level menu item (see AddIoLinkingButton).
 
         // -- Monitoring --
         var monitoringPopup = (CommandBarPopup)attrPopup.Controls.Add(
@@ -576,6 +579,8 @@ internal sealed class HostManager
         AddPragmaButtonWithPrompt(instance, codeGenPopup, "obsolete...", "obsolete",
             "Enter deprecation message:", "obsolete");
         AddPragmaButton(instance, codeGenPopup, "no_check", "no_check");
+
+        return attrPopup;
     }
 
     private void AddPragmaButton(TcXaeInstance instance, CommandBarPopup parent, string caption, string pragmaText, string? tagSuffix = null)

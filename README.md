@@ -35,7 +35,8 @@ major tool is the formatter. The product name is broader: **STBud for TwinCAT**.
 
 ### Format from TcXaeShell
 
-Right-click in the PLC editor and choose **STBud for TwinCAT → Format**:
+Right-click in the PLC editor; the **STBud for TwinCAT** menu lists the common
+actions at the top level:
 
 - **Format Document** — format the entire active declaration or implementation section
 - **Format Selection** — format only the selected text
@@ -49,7 +50,7 @@ Insert common TwinCAT pragmas and attributes directly from the context menu:
 
 **Visibility:** `qualified_only`, `hide`, `no_explicit_call...`
 
-**Binding:** `linkalways`, I/O Linking... (opens I/O Tree browser)
+**Binding:** `linkalways` (I/O Linking is a top-level menu item — see below)
 
 **Monitoring:** `monitoring := 'call'`, `TcRpcEnable := '1'`
 
@@ -90,17 +91,16 @@ Open the STBud settings tray UI to configure formatting options at runtime.
 
 ```
 STBud for TwinCAT
-├── Format
-│   ├── Format Document          Ctrl+Shift+F
-│   └── Format Selection         Ctrl+Shift+D
+├── Format Document              Ctrl+Shift+F
+├── Format Selection             Ctrl+Shift+D
+├── I/O Linking...
 ├── Add Attribute
 │   ├── Visibility
 │   │   ├── qualified_only
 │   │   ├── hide
 │   │   └── no_explicit_call...
 │   ├── Binding
-│   │   ├── linkalways
-│   │   └── I/O Linking...
+│   │   └── linkalways
 │   ├── Monitoring
 │   │   ├── monitoring := 'call'
 │   │   └── TcRpcEnable := '1'
