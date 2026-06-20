@@ -205,7 +205,7 @@ internal sealed class HostManager
                         try
                         {
                             int hrObj = rot.GetObject(monikers[0], out object obj);
-                            if (hrObj == 0 && obj is DTE dte && IsTcXaeShell(dte))
+                            if (hrObj == 0 && obj is DTE dte && IsTwinCatEngineering(dte))
                             {
                                 result = (pid, dte, detectedProfile);
                                 Log($"FindNewTcXaeShell: Found PID {pid} profile={detectedProfile}");
@@ -335,19 +335,34 @@ internal sealed class HostManager
 
     // --- Private helpers ---
 
-    private static bool IsTcXaeShell(DTE dte)
+    // A DTE is a TwinCAT engineering environment if it is the standalone shell
+    // (name contains "TcXae") OR any Visual Studio / devenv with TwinCAT loaded.
+    // The latter is detected by the Beckhoff PLC editor command bar, which plain
+    // Visual Studio does not have - so we connect to TwinCAT-in-VS2022 without
+    // injecting into a regular VS doing unrelated work.
+    private static bool IsTwinCatEngineering(DTE dte)
     {
         try
         {
             string name = dte.Name ?? "";
-            foreach (var profile in TcXaeShellVersionProfile.AllProfiles)
-            {
-                if (name.IndexOf(profile.DteNameMatch, StringComparison.OrdinalIgnoreCase) >= 0)
-                    return true;
-            }
             if (name.IndexOf("TcXae", StringComparison.OrdinalIgnoreCase) >= 0)
                 return true;
+            return HasPlcContextMenu(dte);
+        }
+        catch
+        {
             return false;
+        }
+    }
+
+    private static bool HasPlcContextMenu(DTE dte)
+    {
+        try
+        {
+            var bars = dte.CommandBars as CommandBars;
+            if (bars == null) return false;
+            // Indexer throws if the bar is absent (plain VS) -> caught below.
+            return bars["PlcCodeWinContextMenu"] != null;
         }
         catch
         {

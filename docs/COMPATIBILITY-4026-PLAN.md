@@ -23,14 +23,32 @@ Unknowns are flagged below as **[verify]** — resolve them on a real 4026 machi
 before writing any code. Do not hard-code guesses; everything version-specific goes
 through `TcXaeShellVersionProfile`.
 
-## Verified baseline (this dev machine)
+## Verified on Build 4026 (this machine, 2026-06)
 
-Checked 2026-06: this machine runs **TwinCAT 3.1 Build 4024-series** — classic
-`C:\TwinCAT\3.1` layout, single `TcXaeShell` on the VS 2017 isolated shell
-(registry root `Beckhoff\TcXaeShell\15.0`, DTE 15.0, moniker
-`!TcXaeShell.DTE.15.0:{PID}`). No TwinCAT Package Manager (`tcpkg`), no 64-bit
-shell, no VS 2022 integration. **A live 4026 runtime test is therefore not
-possible here** — Phases 0 and 2 still require access to a real 4026 install.
+Build 4026 was installed (TcPkg present). Confirmed live via `stfmt doctor`, the
+Host log, and a read-only DTE probe — three engineering environments can run at
+once, and **STBud connects to and injects its menu into all three**:
+
+| Environment | ROT moniker | `DTE.Name` | Detection | Status |
+|---|---|---|---|---|
+| TcXaeShell (4024) | `!TcXaeShell.DTE.15.0:{PID}` | TcXaeShell | known profile | ✅ injects |
+| TcXaeShell (4026) | `!TcXaeShell.DTE.17.0:{PID}` | TcXaeShell | dynamic fallback (DTE 17.0) | ✅ injects |
+| **VS 2022 + TwinCAT** | `!VisualStudio.DTE.17.0:{PID}` | **Microsoft Visual Studio** | **`PlcCodeWinContextMenu` command bar** | ✅ injects |
+
+Key findings:
+- The 4026 **standalone shell still uses the `!TcXaeShell.DTE.` moniker** (bumped to
+  17.0, not VS2022's `!VisualStudio.DTE.`); the dynamic fallback already resolves it
+  and menu injection works unchanged.
+- **VS 2022 + TwinCAT** reports `DTE.Name = "Microsoft Visual Studio"`, so the old
+  name-based gate rejected it. It is now detected by the presence of the
+  `PlcCodeWinContextMenu` command bar (the Beckhoff PLC editor menu, ~189 controls),
+  which a plain VS 2022 does not have — so we connect to TwinCAT-in-VS2022 without
+  touching unrelated VS instances. See `HostManager.IsTwinCatEngineering`.
+- `PlcCodeWinContextMenu` and `Code Window` exist with the same names across all three,
+  so `InjectButtons` is unchanged.
+
+Still worth a manual pass on 4026: live-edit format and the I/O-linking insert inside
+each environment (the connection + injection paths are confirmed).
 
 ## Already handled (no 4026 machine needed)
 

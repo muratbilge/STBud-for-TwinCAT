@@ -82,6 +82,15 @@ TcXaeShell registers in the Running Object Table with version-specific monikers:
 The `TcXaeShellVersionProfile.DetectFromRotMoniker()` method handles all versions.
 Searching for `!VisualStudio.DTE` alone will miss TcXaeShell — always also search `!TcXaeShell.DTE`.
 
+**Build 4026 / Visual Studio 2022 (verified):** 4026 adds two more environments.
+The 4026 standalone shell still uses `!TcXaeShell.DTE.17.0:{PID}` (handled by the
+dynamic fallback). TwinCAT can also load into **Visual Studio 2022** (`devenv`), which
+registers `!VisualStudio.DTE.17.0:{PID}` with `DTE.Name = "Microsoft Visual Studio"` —
+so a **name-based check does NOT recognize it**. Detect TwinCAT-in-VS2022 by the
+presence of the `PlcCodeWinContextMenu` command bar (the Beckhoff PLC editor menu);
+a plain VS 2022 does not have it. This is `HostManager.IsTwinCatEngineering()` /
+`HasPlcContextMenu()`. Injection is otherwise identical across all three environments.
+
 #### DTE Connection Code
 ```csharp
 [DllImport("ole32.dll")]
@@ -246,7 +255,9 @@ Get-Content "$env:TEMP\STBud_Host.log" -Tail 20
 
 | TcXaeShell Generation | VS Shell | DTE Version | ROT Moniker | .NET FW | Registry Root |
 |---|---|---|---|---|---|
-| TC3 Build 4024+ (current) | VS 2017 | 15.0 | `!TcXaeShell.DTE.15.0:{PID}` | 4.6+ | `Beckhoff\TcXaeShell\15.0` |
+| TC3 Build 4026 (VS 2022) | VS 2022 / devenv | 17.0 | `!VisualStudio.DTE.17.0:{PID}` (name "Microsoft Visual Studio" — detect via `PlcCodeWinContextMenu`) | 4.8 | n/a |
+| TC3 Build 4026 (shell) | VS 2022-based shell | 17.0 | `!TcXaeShell.DTE.17.0:{PID}` (dynamic fallback) | 4.8 | `Beckhoff\TcXaeShell\17.0` |
+| TC3 Build 4024+ | VS 2017 | 15.0 | `!TcXaeShell.DTE.15.0:{PID}` | 4.6+ | `Beckhoff\TcXaeShell\15.0` |
 | TC3 Build ~4020 | VS 2015 | 14.0 | `!TcXaeShell.DTE.14.0:{PID}` | 4.6+ | `Beckhoff\TcXaeShell\14.0` |
 | TC3 Build <4020 | VS 2013 | 12.0 | `!TcXaeShell.DTE.12.0:{PID}` | 4.5.1+ | `Beckhoff\TcXaeShell\12.0` |
 

@@ -64,6 +64,14 @@ internal class Program
         _keyboardHook = new KeyboardHook();
         _keyboardHook.FormatDocumentHotkey += pid => HandleFormatDocument(pid);
         _keyboardHook.FormatSelectionHotkey += pid => HandleFormatSelection(pid);
+        // Lets Ctrl+Shift+F/D fire inside TwinCAT-in-VS2022 (devenv) windows the
+        // Host has registered, without hijacking shortcuts in a plain VS. The
+        // try/catch tolerates a rare cross-thread read of the instance map.
+        _keyboardHook.IsRegisteredTarget = pid =>
+        {
+            try { return _hostManager?.GetInstance(pid) != null; }
+            catch { return false; }
+        };
 
         Maintain();
 

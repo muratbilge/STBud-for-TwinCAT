@@ -52,6 +52,12 @@ internal sealed class KeyboardHook : IDisposable
     public event Action<int>? FormatDocumentHotkey;
     public event Action<int>? FormatSelectionHotkey;
 
+    // Lets the hotkey fire inside a TwinCAT-in-VS2022 (devenv) window: the Host
+    // sets this to "is this PID a registered TwinCAT instance?". Gating on
+    // registration means we never suppress Ctrl+Shift+F in a plain VS (where it
+    // is Find in Files) - only in a window we actually format in.
+    public Func<int, bool>? IsRegisteredTarget;
+
     public KeyboardHook()
     {
         _hookCallback = HookCallback;
@@ -135,7 +141,7 @@ internal sealed class KeyboardHook : IDisposable
     private static readonly System.Collections.Generic.Dictionary<uint, (bool IsTcXae, DateTime CheckedAt)> _pidCache = new();
     private static readonly TimeSpan PidCacheValidity = TimeSpan.FromSeconds(5);
 
-    private static int? FindTcXaeShellPid()
+    private int? FindTcXaeShellPid()
     {
         IntPtr foreground = GetForegroundWindow();
         if (foreground == IntPtr.Zero) return null;
@@ -143,26 +149,39 @@ internal sealed class KeyboardHook : IDisposable
         GetWindowThreadProcessId(foreground, out uint pid);
         if (pid == 0) return null;
 
+        bool isShell;
         if (_pidCache.TryGetValue(pid, out var cached) &&
             DateTime.UtcNow - cached.CheckedAt < PidCacheValidity)
         {
-            return cached.IsTcXae ? (int)pid : (int?)null;
+            isShell = cached.IsTcXae;
+        }
+        else
+        {
+            isShell = false;
+            try
+            {
+                using var process = Process.GetProcessById((int)pid);
+                // Prefix match so the 4026 64-bit shell (TcXaeShell64) is covered too.
+                isShell = TcXaeShellVersionProfile.IsShellProcessName(process.ProcessName);
+            }
+            catch
+            {
+            }
+
+            if (_pidCache.Count > 64) _pidCache.Clear();
+            _pidCache[pid] = (isShell, DateTime.UtcNow);
         }
 
-        bool isTcXae = false;
-        try
-        {
-            using var process = Process.GetProcessById((int)pid);
-            // Prefix match so the 4026 64-bit shell (TcXaeShell64) is covered too.
-            isTcXae = TcXaeShellVersionProfile.IsShellProcessName(process.ProcessName);
-        }
-        catch
-        {
-        }
+        if (isShell) return (int)pid;
 
-        if (_pidCache.Count > 64) _pidCache.Clear();
-        _pidCache[pid] = (isTcXae, DateTime.UtcNow);
-        return isTcXae ? (int)pid : (int?)null;
+        // Not a standalone shell - allow if the Host has registered this window
+        // as a TwinCAT instance (TwinCAT-in-VS2022 / devenv). Not cached: the
+        // registration state changes as instances come and go.
+        var predicate = IsRegisteredTarget;
+        if (predicate != null && predicate((int)pid))
+            return (int)pid;
+
+        return null;
     }
 
     private static bool IsCtrlShiftPressed()
