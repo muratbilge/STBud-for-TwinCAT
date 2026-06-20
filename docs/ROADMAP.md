@@ -69,45 +69,31 @@ Implementation notes:
 - Make write operations opt-in and visible.
 - Keep connection history local to the user profile.
 
-### Pinger
+### Pinger — ✅ Shipped
 
-Add a lightweight network/runtime pinger for TwinCAT machines.
+A lightweight network/runtime pinger for TwinCAT machines, available as the CLI
+`stfmt ping <host>` command and the tray UI **Toolbox** tab. Pings the target,
+checks the ADS/AMS (48898) and Secure ADS (8016) ports, shows latency/status,
+persists recent targets, and prints a copyable diagnostic summary. Independent of
+TcXaeShell; no admin needed.
 
-Planned capabilities:
+### TwinCAT 4026 Compatibility — ✅ Verified on a live 4026 install
 
-- Ping target IP address or hostname.
-- Check common TwinCAT-related ports.
-- Detect whether ADS/router appears reachable.
-- Show latency and connection status.
-- Save recent targets.
-- Provide a simple diagnostic summary for support/debugging.
-
-Implementation notes:
-
-- Keep it independent from TcXaeShell.
-- Support quick checks from the tray UI and CLI.
-- Avoid requiring administrator privileges for normal checks.
-
-### TwinCAT 4026 Compatibility Test
-
-Add explicit validation for TwinCAT 3 Build 4026 environments.
 Detailed, phased plan: [COMPATIBILITY-4026-PLAN.md](COMPATIBILITY-4026-PLAN.md).
 
-Planned phases:
+Confirmed working on Build 4026: the Host connects to and injects its menu into all
+three engineering environments — the 4024 TcXaeShell (DTE 15.0), the 4026 TcXaeShell
+(DTE 17.0, dynamic moniker fallback), **and TwinCAT-in-Visual-Studio-2022** (`devenv`,
+detected by the `PlcCodeWinContextMenu` command bar since its DTE name is "Microsoft
+Visual Studio"). The 64-bit `TcXaeShell64` process name is recognized.
 
-- **Manual checklist**: document expected TcXaeShell behavior on Build 4026.
-- **Host compatibility checks**: verify ROT moniker detection, context-menu injection, live edit, undo, and reconnect.
-- **Project compatibility checks**: verify I/O tree parsing and TwinCAT XML formatting against Build 4026 project structures.
-- **Runtime compatibility checks**: detect installed TwinCAT version where possible and report known support status.
+The **`stfmt doctor`** command delivers the "compatibility report for issues/support
+notes" item: it reports the install + build, install model (TcPkg vs classic), running
+shells with their live ROT monikers (each classified SUPPORTED / fallback / unknown),
+the deployed Host, and a local ADS check. `--save` writes it for diffing across upgrades.
 
-Planned capabilities:
-
-- Verify TcXaeShell ROT moniker detection.
-- Verify `PlcCodeWinContextMenu` injection still works.
-- Verify live edit flow: copy, format, paste, undo.
-- Verify I/O tree parsing against Build 4026 `.tsproj` structures.
-- Document known 4026-specific behavior.
-- Add a compatibility report that can be copied into issues/support notes.
+Still worth a manual pass on 4026: live-edit format and the I/O-linking insert inside
+each environment (the connection + injection paths are confirmed).
 
 ---
 

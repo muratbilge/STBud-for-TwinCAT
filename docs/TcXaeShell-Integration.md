@@ -12,13 +12,19 @@ TcXaeShell is a **32-bit Visual Studio Isolated Shell** used for PLC programming
 
 | TcXaeShell Version | VS Shell | DTE Version | ROT Moniker | .NET FW |
 |---|---|---|---|---|
-| TC3 Build 4024+ (current) | VS 2017 | 15.0 | `!TcXaeShell.DTE.15.0:{PID}` | 4.6+ |
+| TC3 Build 4026 (VS 2022) | VS 2022 / devenv | 17.0 | `!VisualStudio.DTE.17.0:{PID}` | 4.8 |
+| TC3 Build 4026 (shell) | VS 2022-based shell | 17.0 | `!TcXaeShell.DTE.17.0:{PID}` | 4.8 |
+| TC3 Build 4024+ | VS 2017 | 15.0 | `!TcXaeShell.DTE.15.0:{PID}` | 4.6+ |
 | TC3 Build ~4020 | VS 2015 | 14.0 | `!TcXaeShell.DTE.14.0:{PID}` | 4.6+ |
 | TC3 Build <4020 | VS 2013 | 12.0 | `!TcXaeShell.DTE.12.0:{PID}` | 4.5.1+ |
 
-- **Process**: 32-bit (x86), even on 64-bit Windows (all versions)
+- **Process**: the standalone shell is 32-bit (x86); Build 4026 adds a 64-bit shell
+  (`TcXaeShell64`) and can also load TwinCAT into **Visual Studio 2022** (`devenv`).
+- **VS 2022 detection**: TwinCAT-in-VS2022 reports `DTE.Name = "Microsoft Visual Studio"`,
+  so it is identified by the presence of the `PlcCodeWinContextMenu` command bar — a plain
+  VS 2022 does not have it. See `HostManager.IsTwinCatEngineering`.
 - **TcXaeShell product path**: `C:\Program Files (x86)\Beckhoff\TcXaeShell\` (STBud is not installed here)
-- **Shell type**: VS Isolated Shell — not a standard VS installation
+- **Shell type**: VS Isolated Shell (≤4024) or VS 2022-based (4026) — not used for deployment
 
 The PLC editor is a CODESYS-based component embedded in the VS shell. It does not use standard VS editor infrastructure for its text content. The CODESYS engine is the source of truth, not the VS text buffer.
 

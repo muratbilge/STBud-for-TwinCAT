@@ -256,7 +256,7 @@ EndProgram
 |----------|-------|
 | Type     | `string` |
 | Default  | `"allman"` |
-| Values   | `"allman"`, `"kandr"` |
+| Values   | `"allman"`, `"compact"` (aliases `kr`, `k&r`, `stroustrup` map to `compact`) |
 
 Controls the placement of structural keywords in POU declarations and body blocks. In IEC 61131-3 ST, the equivalent of "braces" are the block delimiters such as `THEN`/`END_IF`, `DO`/`END_FOR`, `OF`/`END_CASE`, etc.
 
@@ -293,7 +293,7 @@ THEN
 END_IF
 ```
 
-**After** with `BraceStyle = "kandr"`:
+**After** with `BraceStyle = "compact"`:
 
 ```st
 IF bEnable THEN
@@ -572,6 +572,24 @@ IF bMotorRunning AND NOT bFaultDetected AND nCurrentSpeed < nMaxSpeed AND nTempe
 END_IF
 ```
 
+### WrapLongLines
+
+| Property | Value |
+|----------|-------|
+| Type     | `bool` |
+| Default  | `true` |
+
+Master switch for long-line wrapping (e.g. long `IF` conditions and expressions). When
+`false`, lines are never wrapped regardless of `MaxLineLength`, but `MaxLineLength` keeps
+its configured value — so toggling wrapping back on restores the previous threshold. This
+is what the Settings UI exposes as the **"Wrap long lines"** checkbox; unchecking it
+greys out the max-line-length field. Equivalent to setting `MaxLineLength = 0`, but
+non-destructive.
+
+```ini
+st_wrap_long_lines = false   # never wrap, but remember the threshold
+```
+
 ---
 
 ## 8. Empty Lines
@@ -839,7 +857,7 @@ Minimises vertical and horizontal space. 2-space indent, no alignment, single-li
 | `ContinuationIndentSize`      | `4`         |
 | `NewLineStyle`                | `"crlf"`    |
 | `KeywordCasing`               | `"lower"`   |
-| `BraceStyle`                  | `"allman"`  |
+| `BraceStyle`                  | `"compact"` |
 | `SpaceAroundOperators`        | `true`      |
 | `SpaceAfterComma`             | `true`      |
 | `SpaceBeforeSemicolon`        | `false`     |
@@ -985,6 +1003,7 @@ Custom properties use the `st_` prefix to avoid collisions with other language s
 | `st_align_assignments`             | `AlignAssignments`                    |
 | `st_empty_lines_between_pous`      | `EmptyLinesBetweenPOUs`               |
 | `st_empty_lines_between_var_sections` | `EmptyLinesBetweenVarSections`     |
+| `st_wrap_long_lines`               | `WrapLongLines`                       |
 | `st_format_on_save`                | `FormatOnSave`                        |
 
 Boolean values accept `true`, `yes`, `1`, `on` for truthy and any other value for falsy.
@@ -1174,6 +1193,7 @@ These commands are injected by `STFormatter.Host` into TcXaeShell context menus.
 | `AlignAssignments`              | bool    | `true`      | `st_align_assignments`                           |
 | `AlignVariableDeclarations`     | bool    | `true`      | `st_align_variable_declarations`                  |
 | `MaxLineLength`                 | int     | `120`       | `max_line_length`                                |
+| `WrapLongLines`                 | bool    | `true`      | `st_wrap_long_lines` (editorconfig only)          |
 | `EmptyLinesBetweenPOUs`         | int     | `2`         | `st_empty_lines_between_pous`                    |
 | `EmptyLinesBetweenVarSections`  | int     | `1`         | `st_empty_lines_between_var_sections`            |
 | `KeepSingleLineBlocks`          | bool    | `false`     | `st_keep_single_line_blocks` (editorconfig only)  |

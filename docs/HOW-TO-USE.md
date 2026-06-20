@@ -6,14 +6,16 @@ Practical usage guide for the CLI and TcXaeShell Host deployment targets.
 
 ## Quick Reference
 
-| Task | CLI | TcXaeShell |
+| Task | CLI | TcXaeShell / VS 2022 |
 |---|---|---|
-| Format current file | `stfmt format file.st` | Right-click > Format ST Document |
-| Format selection | `stfmt format file.st` (whole file only) | Right-click > Format ST Selection |
+| Format current file | `stfmt format file.st` | Right-click > Format Document |
+| Format selection | `stfmt format file.st` (whole file only) | Right-click > Format Selection |
 | Format entire project | `stfmt batch ./src --recursive` | — |
-| Insert TwinCAT pragmas/attributes | — | Right-click > Add submenu |
-| Add I/O linking attribute | — | Right-click > Add > I/O Linking... |
+| Add I/O linking attribute | — | Right-click > I/O Linking... |
+| Insert TwinCAT pragmas/attributes | — | Right-click > Add Attribute / Add Task Attribute / Add Region |
 | Check formatting | `stfmt check file.st` | — |
+| Check a TwinCAT machine | `stfmt ping <host>` | Tray icon > Toolbox |
+| Environment diagnostics | `stfmt doctor` | Tray icon > Toolbox |
 | Change settings | `.editorconfig` | Tray icon > Settings or `.editorconfig` |
 | View log | — | `%TEMP%\STBud_Host.log` |
 
@@ -98,6 +100,21 @@ stfmt export my-style.json --preset default
 stfmt import my-style.json
 ```
 
+### Connectivity & Diagnostics
+
+```bash
+# Check whether a TwinCAT machine is reachable (ICMP + ADS ports 48898/8016)
+stfmt ping 192.168.0.10
+stfmt ping plc-cell-3 --timeout 1000
+
+# Report the local TwinCAT/TcXaeShell environment: install + build, running
+# shells with their ROT monikers, deployed Host, and a local ADS check
+stfmt doctor
+
+# Save the report (e.g. to diff before/after a TwinCAT upgrade)
+stfmt doctor --save before-upgrade.txt
+```
+
 ### Configuration Priority (CLI)
 
 1. `.editorconfig` closest to the source file
@@ -146,33 +163,40 @@ The Host process must be running to provide STBud tools in TcXaeShell. You can:
 Start-Process "C:\Program Files (x86)\STBud\STFormatter.Host.exe"
 ```
 
-The Host auto-detects running TcXaeShell instances and auto-reconnects after TcXaeShell restarts.
+The Host auto-detects running engineering environments and auto-reconnects after a restart.
+It works with the standalone **TcXaeShell** (all generations, incl. Build 4026's DTE 17.0
+and the 64-bit `TcXaeShell64`) **and with TwinCAT loaded inside Visual Studio 2022** —
+detected by the presence of the TwinCAT PLC editor menu, so a plain (non-TwinCAT) VS is
+left untouched.
 
 ### Formatting Code
 
-1. Open a POU in TcXaeShell's PLC editor
+1. Open a POU in the PLC editor (TcXaeShell or VS 2022)
 2. Click in the **Declaration** section (VAR...END_VAR) or **Implementation** section (ST code)
 3. **Right-click** to open the context menu
-4. Click one of the formatting commands:
+4. Click one of the formatting commands (now at the top level of the **STBud for TwinCAT** menu):
 
 | Menu Item | What It Formats | Shortcut |
 |---|---|---|
-| **Format ST Document** | The active section (declaration or implementation) | — |
-| **Format ST Selection** | Only the selected text | — |
-| **Format ST File** | The entire .TcPOU/.TcDUT/.TcGVL file on disk | — |
+| **Format Document** | The active section (declaration or implementation) | Ctrl+Shift+F |
+| **Format Selection** | Only the selected text | Ctrl+Shift+D |
 
 The formatter automatically detects whether you're in the declaration or implementation
 section based on the content (VAR/END_VAR keywords → declaration, IF/FOR/:= → implementation).
+Keyboard shortcuts work when the editor has focus. If a section contains ST syntax errors,
+formatting is refused with a message rather than silently doing nothing.
 
 ### Editor Helpers
 
-The same context-menu integration exposes helper commands under the **Add** submenu.
-These commands insert common TwinCAT attributes/pragmas, regions, task attributes,
-warnings, and I/O-linking paths without requiring an in-process TcXaeShell extension.
+The **STBud for TwinCAT** context menu also surfaces **I/O Linking…** at the top level (it
+opens the I/O tree browser with TIID/TIIB link styles), plus **Add Attribute**, **Add Task
+Attribute**, **Add Region**, and **Warning…** submenus that insert common TwinCAT
+attributes/pragmas, regions, task attributes, and warnings — all without an in-process
+TcXaeShell extension.
 
 ### How the Live Edit Works
 
-When you click **Format ST Document**:
+When you click **Format Document**:
 
 1. The Host reads the active section from TcXaeShell using clipboard-based DTE commands
    (`Edit.SelectAll` → `Edit.Copy` → Win32 clipboard read)
@@ -184,13 +208,15 @@ When you click **Format ST Document**:
 > **Note**: During formatting, your clipboard content is saved and restored. Avoid copying
 > or pasting while formatting is in progress (typically under 100ms).
 
-### Format ST File (Disk-Based)
+### Disk-Based Fallback
 
-The **Format ST File** command reads the TwinCAT XML file from disk, formats the ST code
-inside the CDATA sections, and writes it back. This creates a `.bak` backup file first.
+If the live clipboard edit cannot be applied, the Host automatically falls back to reading
+the TwinCAT XML file from disk, formatting the ST inside the CDATA sections, and writing it
+back (creating a `.bak` backup first). This is an internal fallback, not a separate menu
+command, and only runs when the editor content actually changed.
 
-> **Warning**: This approach may trigger TcXaeShell's "file changed on disk" reload dialog.
-> Use **Format ST Document** (clipboard-based) for a seamless experience.
+> **Note**: The disk-write fallback may trigger the "file changed on disk" reload dialog.
+> The normal clipboard-based path avoids it.
 
 ### System Tray Icon
 
@@ -199,9 +225,10 @@ The Host provides a system tray icon with these options:
 | Menu Item | Description |
 |---|---|
 | **Settings** | Opens a settings dialog where you can change formatting and Host options |
-| **Instances** | Shows connected TcXaeShell processes and their DTE version |
+| **Instances** | Shows connected engineering environments (TcXaeShell / VS 2022) and their DTE version |
 | **History** | Shows a list of recent format operations with before/after diffs |
 | **Log** | Opens the live log file (`%TEMP%\STBud_Host.log`) |
+| **Toolbox** | TwinCAT machine pinger and a copyable environment-diagnostics report |
 | **Exit** | Stops the Host process |
 
 ### Configuration (TcXaeShell)
@@ -313,9 +340,9 @@ st_keep_single_line_blocks = false
 
 ### Format a Single POU in TcXaeShell
 
-1. Open the POU in TcXaeShell
+1. Open the POU in TcXaeShell or VS 2022
 2. Click in the code editor
-3. Right-click → **Format ST Document**
+3. Right-click → **Format Document** (or press Ctrl+Shift+F)
 4. The code is reformatted instantly
 5. Press Ctrl+Z to undo if you don't like the result
 

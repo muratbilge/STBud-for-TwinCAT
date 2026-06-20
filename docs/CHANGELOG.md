@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **TwinCAT 3 Build 4026 support**, verified on a live install: the Host connects to and
+  injects its menu into the 4024 TcXaeShell (DTE 15.0), the 4026 TcXaeShell (DTE 17.0, via
+  the dynamic moniker fallback), and **TwinCAT loaded inside Visual Studio 2022** (`devenv`,
+  detected by the `PlcCodeWinContextMenu` command bar rather than the DTE name). The 64-bit
+  `TcXaeShell64` process is recognized.
+- `stfmt doctor` — environment diagnostics: TwinCAT install + build, install model (TcPkg
+  vs classic), running shells with their live ROT monikers (classified
+  SUPPORTED/fallback/unknown), the deployed Host, and a local ADS check. `--save` writes
+  the report for diffing across upgrades.
+- `stfmt ping <host>` and a tray-UI **Toolbox** tab — TwinCAT machine pinger (ICMP + ADS
+  ports 48898/8016) with persisted recent targets, plus the diagnostics report.
+- `WrapLongLines` formatting option (`st_wrap_long_lines`) — master switch for long-line
+  wrapping; a "Wrap long lines" checkbox in Settings.
+- I/O Linking browser rebuilt: live filter, direction-aware coloring, attribute preview,
+  and **TIID / TIIB** link-style selection (terminal-relative, rename-safe links).
+- Pragma showcase fixtures and exact-preservation tests covering every documented pragma
+  family in every structural position.
+
+### Changed
+
+- Context menu reorganized to surface common actions: **Format Document**, **Format
+  Selection**, and **I/O Linking…** are now top-level items.
+
+### Fixed
+
+- Formatter correctness, found by token-preservation gates over ~1,400 real TwinCAT files
+  (TcUnit/TcOpen/struckig) plus the regression corpus: time/date literals in expressions
+  and argument lists, bracket array initializers, paren-form enums, `STRING(n)`, `REF_TO`,
+  namespace-qualified names, pointer dereference (`^`), post-keyword modifiers, soft
+  keywords used as identifiers, and pragmas containing `}` inside quoted values — all
+  previously dropped or truncated.
+- `.editorconfig`: honor top-level `root = true`, and apply later sections over earlier ones.
+- Host live-edit robustness: write via `TextSelection.Insert` instead of spraying SendKeys
+  at whatever window has focus; own all dialogs to the editor window (no focus theft);
+  wait for modifier-key release; detect clipboard-set failure.
+
 ### Removed
 
 - Removed legacy Visual Studio VSIX and in-process TcXaeShell VSPackage projects.
