@@ -750,6 +750,7 @@ internal static class LiveEditor
             if (dte.ActiveDocument == null)
             {
                 Log("InsertLineAbove: No active document");
+                Program.ShowInfoMessage("Could not insert — no active editor. Open a POU and try again.");
                 return false;
             }
 
@@ -806,6 +807,7 @@ internal static class LiveEditor
                 {
                     Log("InsertLineAbove: Failed to set clipboard");
                     if (savedClipboard != null) { try { SetClipboardText(savedClipboard); } catch { } }
+                    Program.ShowInfoMessage("Could not insert — clipboard was unavailable. Try again.");
                     return false;
                 }
 
@@ -837,6 +839,7 @@ internal static class LiveEditor
         catch (Exception ex)
         {
             Log($"InsertLineAbove: FAILED: {ex.GetType().Name} - {ex.Message}");
+            Program.ShowInfoMessage("STBud could not insert the text. See the Host log for details.");
             return false;
         }
     }

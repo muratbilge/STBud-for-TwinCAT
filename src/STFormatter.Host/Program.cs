@@ -349,10 +349,12 @@ internal class Program
             RecordFormat(pid, filePath, "FileWrite",
                 xmlContent, formattedXml, "PlainFileWrite", true);
             Log("HandleFormatDocument: Written to disk — user must reload");
+            ShowInfoMessage("Formatted on disk — reload the file if TwinCAT prompts.");
         }
         catch (Exception ex)
         {
             Log($"HandleFormatDocument: PID {pid} FAILED: {ex.Message}");
+            ShowInfoMessage("STBud could not complete the format. See the Host log for details.");
         }
     }
 
@@ -398,17 +400,18 @@ internal class Program
             else if (!success && original == null)
             {
                 Log($"HandleFormatSelection: PID {pid} No text selected — showing info");
-                ShowInfoMessage("No text selected.\n\nPlease select code first, then use Format Selected Code.");
+                ShowInfoMessage("No code selected — select a complete statement block first.");
             }
             else if (!success)
             {
                 Log($"HandleFormatSelection: PID {pid} Could not format selection — showing info");
-                ShowInfoMessage("Could not format the selected code.\n\nThe selection contains ST syntax errors or is an incomplete fragment.\nFix compiler errors first, or select a complete statement block.");
+                ShowInfoMessage("Could not format the selection — ST syntax errors or an incomplete fragment. Fix compiler errors, or select a complete statement block.");
             }
         }
         catch (Exception ex)
         {
             Log($"HandleFormatSelection: PID {pid} FAILED: {ex.Message}");
+            ShowInfoMessage("STBud could not complete the format. See the Host log for details.");
         }
     }
 
