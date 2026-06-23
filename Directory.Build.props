@@ -1,12 +1,43 @@
 <Project>
+  <!--
+    Single source of truth for the product version (SemVer).
+    - VersionPrefix is the ONLY number to edit (or let /release manage it).
+    - Default local builds are pre-release dev builds:  1.1.0-dev+<gitShortSha>
+    - Release builds pass -p:PublicRelease=true        ->  clean 1.1.0
+    Never hand-edit the installer version; it derives from here.
+  -->
   <PropertyGroup>
-    <Version Condition="'$(Version)' == ''">1.0.0</Version>
-    <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(Version).0</AssemblyVersion>
-    <FileVersion Condition="'$(FileVersion)' == ''">$(Version).0</FileVersion>
-    <InformationalVersion Condition="'$(InformationalVersion)' == ''">$(Version)</InformationalVersion>
+    <VersionPrefix Condition="'$(VersionPrefix)' == ''">1.1.0</VersionPrefix>
+    <VersionSuffix Condition="'$(VersionSuffix)' == '' and '$(PublicRelease)' != 'true'">dev</VersionSuffix>
+
+    <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(VersionPrefix).0</AssemblyVersion>
+    <FileVersion Condition="'$(FileVersion)' == ''">$(VersionPrefix).0</FileVersion>
+
+    <!-- We append our own git sha for dev builds (below); don't let the SDK add one. -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
     <Authors>STBud Project</Authors>
     <Company>STBud Project</Company>
     <Product>STBud for TwinCAT</Product>
   </PropertyGroup>
+
+  <!--
+    For dev builds (VersionSuffix non-empty) append the git short SHA to the
+    informational version so a dev binary is traceable to a commit:
+    1.1.0-dev+a1b2c3d. No-op for release builds and when git/.git is absent.
+    Runs before GetAssemblyVersion, which only sets InformationalVersion when
+    it is still empty - so our value wins.
+  -->
+  <Target Name="StampDevGitSha"
+          BeforeTargets="GetAssemblyVersion"
+          Condition="'$(VersionSuffix)' != '' and '$(InformationalVersion)' == ''">
+    <Exec Command="git -C &quot;$(MSBuildProjectDirectory)&quot; rev-parse --short HEAD"
+          ConsoleToMSBuild="true" ContinueOnError="true" StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_GitShortSha" />
+      <Output TaskParameter="ExitCode" PropertyName="_GitExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <InformationalVersion Condition="'$(_GitExitCode)' == '0' and '$(_GitShortSha)' != ''">$(VersionPrefix)-$(VersionSuffix)+$(_GitShortSha)</InformationalVersion>
+    </PropertyGroup>
+  </Target>
 </Project>

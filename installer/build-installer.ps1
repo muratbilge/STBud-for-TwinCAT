@@ -21,7 +21,8 @@ Skip creating the installer; only populate installer/files.
 Build configuration. Default: Debug.
 
 .PARAMETER Version
-Version number for the installer. Default: 1.0.0.
+Installer version. Default: derived from Directory.Build.props (VersionPrefix),
+the single source of truth. Pass an explicit value only to override.
 #>
 
 param(
@@ -29,11 +30,22 @@ param(
     [switch]$SkipHost = $false,
     [switch]$SkipInstaller = $false,
     [string]$Configuration = "Debug",
-    [string]$Version = "1.0.0"
+    [string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
 $RootDir = Resolve-Path (Join-Path $PSScriptRoot "..")
+
+# Single source of truth: take the version from Directory.Build.props unless
+# explicitly overridden. Releases produce a clean number (e.g. 1.0.0); dev
+# installers carry the same numeric prefix.
+if ([string]::IsNullOrEmpty($Version)) {
+    $propsPath = Join-Path $RootDir "Directory.Build.props"
+    $m = Select-String -Path $propsPath -Pattern '<VersionPrefix[^>]*>([^<]+)</VersionPrefix>' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($m) { $Version = $m.Matches[0].Groups[1].Value }
+    if ([string]::IsNullOrEmpty($Version)) { $Version = "1.0.0" }
+    Write-Host "Version (from Directory.Build.props): $Version" -ForegroundColor Cyan
+}
 $FilesDir = Join-Path $PSScriptRoot "files"
 
 $HostPayloadFiles = @(

@@ -18,6 +18,23 @@ with generic placeholders (`a`, `b`, `fbSample`, `ST_Sample`, `MAIN`, …). The 
 fixture must reproduce the *construct* that broke, never the user's real naming — even when
 the rest is synthetic. If you cannot rename it safely, do not commit it.
 
+## Versioning (SemVer, dev/release)
+
+`Directory.Build.props` `<VersionPrefix>` is the **single source of truth** for the version
+— the only number to edit. Everything else derives from it: assembly versions, the CLI
+`stfmt --version`, the Host doctor report, and the installer (`build-installer.ps1` reads
+`VersionPrefix`; never hand-edit the version in `STFormatter-Setup.iss`).
+
+- **Dev builds** (default): `dotnet build` produces a pre-release `X.Y.Z-dev+<gitShortSha>`,
+  so every dev binary is traceable to a commit.
+- **Release builds**: `dotnet build -p:PublicRelease=true` drops the suffix → clean
+  `X.Y.Z`. Releases are git-tagged `vX.Y.Z`.
+- **Bump rule**: feature → minor, fix → patch, breaking → major. Between releases the
+  `VersionPrefix` already points at the *next* version with `-dev`.
+- To cut a release, run the **`/release` skill** (`.claude/skills/release/`): it bumps the
+  version, moves the CHANGELOG `[Unreleased]` block to the new version, builds, commits,
+  tags `vX.Y.Z`, then sets the next `-dev` line. It never pushes — you push tags yourself.
+
 ## Read AGENTS.md First
 
 [AGENTS.md](AGENTS.md) is the TcXaeShell integration survival guide. It documents, with evidence, why

@@ -1,5 +1,6 @@
 ; STBud for TwinCAT - Inno Setup Installer
-; Version: 1.0.0
+; Version: derived from Directory.Build.props by build-installer.ps1
+; (the AppVersion literal below is only a fallback for direct ISCC runs).
 ;
 ; Prerequisites for BUILDING:
 ;   - Inno Setup (ISCC.exe on PATH) - https://jrsoftware.org/isdl.php
@@ -10,7 +11,7 @@
 ;   [x] CLI Tool (optional formatter CLI) - requires .NET 8 runtime
 
 #define AppName "STBud for TwinCAT"
-#define AppVersion "1.0.0"
+#define AppVersion "1.1.0"
 #define AppPublisher "STBud Project"
 #define AppURL "https://github.com/anomalyco/opencode"
 #define AppExeName "STFormatter.Host.exe"
