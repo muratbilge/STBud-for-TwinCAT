@@ -197,6 +197,32 @@ namespace STFormatter.UI
 
         public void AddFormatRecord(FormatRecord record) => _formatHistory.Add(record);
 
+        /// <summary>
+        /// Shows a non-blocking tray balloon. Used for transient format feedback
+        /// (e.g. "could not format") instead of a modal dialog, which — when
+        /// owned by the wrong editor window across multiple instances — could
+        /// render off-screen and block the IDE.
+        /// </summary>
+        public void ShowNotification(string title, string text)
+        {
+            try
+            {
+                if (InvokeRequired)
+                {
+                    BeginInvoke((Action)(() => ShowNotification(title, text)));
+                    return;
+                }
+                _trayIcon.BalloonTipTitle = title;
+                _trayIcon.BalloonTipText = text;
+                _trayIcon.BalloonTipIcon = ToolTipIcon.Warning;
+                _trayIcon.ShowBalloonTip(5000);
+            }
+            catch (Exception ex)
+            {
+                HostLog.Append("MainForm", $"ShowNotification failed: {ex.Message}");
+            }
+        }
+
         private void OnTabChanged(object? sender, EventArgs e) => RefreshActiveTab();
 
         private void RefreshActiveTab()

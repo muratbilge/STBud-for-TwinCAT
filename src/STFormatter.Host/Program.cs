@@ -444,48 +444,13 @@ internal class Program
         public IntPtr Handle { get; }
     }
 
-    // HWND of any alive TcXaeShell instance, so message boxes shown without a
-    // pid context (e.g. from LiveEditor) can still be owned by the editor and
-    // not hand focus to an always-on-top window like Task Manager when closed.
-    private static IntPtr GetAnyEditorWindow()
-    {
-        if (_hostManager == null) return IntPtr.Zero;
-        foreach (var kvp in _hostManager.GetAllInstances())
-        {
-            if (!_hostManager.IsInstanceAlive(kvp.Key)) continue;
-            try
-            {
-                var hwnd = (IntPtr)(long)kvp.Value.Dte.MainWindow.HWnd;
-                if (hwnd != IntPtr.Zero) return hwnd;
-            }
-            catch { }
-        }
-        return IntPtr.Zero;
-    }
-
+    // Transient format feedback (e.g. "could not format"). A non-blocking tray
+    // balloon - NOT a modal MessageBox: an unsolicited modal owned by the wrong
+    // editor window (across multiple TcXaeShell/VS2022 instances) could render
+    // off-screen and block the IDE with no visible dialog.
     public static void ShowInfoMessage(string message)
     {
-        _mainForm?.Invoke((Action)(() =>
-        {
-            var consoleHandle = GetConsoleWindow();
-            if (consoleHandle != IntPtr.Zero)
-                ShowWindow(consoleHandle, SW_HIDE);
-
-            var owner = GetAnyEditorWindow();
-            if (owner != IntPtr.Zero)
-            {
-                System.Windows.Forms.MessageBox.Show(new Win32Owner(owner), message,
-                    "STBud for TwinCAT",
-                    System.Windows.Forms.MessageBoxButtons.OK,
-                    System.Windows.Forms.MessageBoxIcon.Information);
-            }
-            else
-            {
-                System.Windows.Forms.MessageBox.Show(message, "STBud for TwinCAT",
-                    System.Windows.Forms.MessageBoxButtons.OK,
-                    System.Windows.Forms.MessageBoxIcon.Information);
-            }
-        }));
+        _mainForm?.ShowNotification("STBud for TwinCAT", message);
     }
 
     public static void ShowSettingsGui()
