@@ -2,6 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Privacy — never commit real project data
+
+This repo is public. **Never add real customer/project ST files, machine diagnostics, ROT
+dumps, IP addresses, or AMS Net IDs.** Test fixtures in `samples/` must be **synthetic** —
+write generic examples that exercise the construct, never copy files from the user's
+TwinCAT projects or `Documents\TcXaeShell`. `samples/RealUnformatted/`, `docs/baseline-*.txt`,
+and `docs/after-*.txt` are git-ignored for this reason.
+
+**Rule — rename every identifier when turning real code into a test.** When you reproduce a
+bug from a user's real code, use that code only locally (e.g. from the Host log) and, before
+committing any test or fixture for it, **change all the code names**: variable names,
+FB/POU/DUT/GVL names, method names, project names, file paths, and comments must be replaced
+with generic placeholders (`a`, `b`, `fbSample`, `ST_Sample`, `MAIN`, …). The committed
+fixture must reproduce the *construct* that broke, never the user's real naming — even when
+the rest is synthetic. If you cannot rename it safely, do not commit it.
+
 ## Read AGENTS.md First
 
 [AGENTS.md](AGENTS.md) is the TcXaeShell integration survival guide. It documents, with evidence, why

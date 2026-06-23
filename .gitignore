@@ -39,3 +39,9 @@ Thumbs.db
 
 ## Logs
 *.log
+
+## Private project / machine data — NEVER commit real customer or project
+## ST files or machine diagnostics. Use synthetic fixtures in samples/ only.
+samples/RealUnformatted/
+docs/baseline-*.txt
+docs/after-*.txt
