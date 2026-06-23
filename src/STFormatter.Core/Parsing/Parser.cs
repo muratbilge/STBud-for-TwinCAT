@@ -1369,14 +1369,22 @@ public sealed class Parser
 
         if (Current.Kind == SyntaxKind.AssignmentOperator)
         {
-            var assignOp = NextToken();
-            var right = ParseExpression();
+            // Chained assignment a := b := c := value; (valid TwinCAT ST) -
+            // collect all operands and their := tokens. For the common case
+            // this is exactly [target, value] + [:=, ;] as before.
+            var operands = new List<SyntaxNode> { left };
+            var assignOps = new List<SyntaxToken>();
+            while (Current.Kind == SyntaxKind.AssignmentOperator)
+            {
+                assignOps.Add(NextToken()); // :=
+                operands.Add(ParseExpression());
+            }
             var semicolon = MatchToken(SyntaxKind.Semicolon);
             var span = TextSpan.FromBounds(start, semicolon.Span.End);
 
+            var tokens = new List<SyntaxToken>(assignOps) { semicolon };
             return SyntaxFactory.Node(SyntaxKind.AssignmentStatement, span,
-                new[] { left, right },
-                new[] { assignOp, semicolon });
+                operands, tokens);
         }
         else if (Current.Kind == SyntaxKind.ArrowOperator)
         {

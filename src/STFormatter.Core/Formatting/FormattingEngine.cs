@@ -1276,6 +1276,14 @@ internal sealed class FormattingVisitor
         var tokens = node.ChildTokens.ToList();
         var nodes = node.ChildNodes.ToList();
 
+        // Chained assignment (a := b := c) doesn't column-align meaningfully -
+        // emit it normally without padding.
+        if (nodes.Count > 2)
+        {
+            VisitAssignmentStatement(node);
+            return;
+        }
+
         Visit(nodes[0]); // left side
 
         // Pad to align :=
@@ -1531,12 +1539,19 @@ internal sealed class FormattingVisitor
         var tokens = node.ChildTokens.ToList();
         var nodes = node.ChildNodes.ToList();
 
-        Visit(nodes[0]); // left
-        _writer.WriteSpace();
-        WriteToken(tokens[0]); // := or =>
-        _writer.WriteSpace();
-        Visit(nodes[1]); // right
-        WriteSemicolon(tokens[1]); // ;
+        // nodes: operand0 .. operandN  (N >= 1); for chained a := b := c there
+        // are 3 operands. tokens: assignOp0 .. assignOp(N-1), semicolon.
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            Visit(nodes[i]);
+            if (i < nodes.Count - 1)
+            {
+                _writer.WriteSpace();
+                WriteToken(tokens[i]); // := (or =>)
+                _writer.WriteSpace();
+            }
+        }
+        WriteSemicolon(tokens[tokens.Count - 1]); // ;
         _writer.EnsureNewLine();
     }
 
