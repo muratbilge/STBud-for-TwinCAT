@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-06-23
+
 ### Added
 
 - **TwinCAT 3 Build 4026 support**, verified on a live install: the Host connects to and
@@ -113,8 +115,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Multi-targeting: `net8.0`, `net48`, `net462`
 - 57 unit tests passing
 
-[0.5.0]: https://github.com/anomalyco/CodeFormatter/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/anomalyco/CodeFormatter/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/anomalyco/CodeFormatter/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/anomalyco/CodeFormatter/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/anomalyco/CodeFormatter/releases/tag/v0.1.0
+[Unreleased]: https://github.com/muratbilge/STBud-for-TwinCAT/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/muratbilge/STBud-for-TwinCAT/compare/v0.5.0...v1.0.0
+[0.5.0]: https://github.com/muratbilge/STBud-for-TwinCAT/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/muratbilge/STBud-for-TwinCAT/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/muratbilge/STBud-for-TwinCAT/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/muratbilge/STBud-for-TwinCAT/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/muratbilge/STBud-for-TwinCAT/releases/tag/v0.1.0
