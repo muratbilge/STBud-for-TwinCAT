@@ -239,6 +239,9 @@ public enum SyntaxKind
     VariableDeclaration,
     VariableInitializer,
     VarInitDecl,
+    // Function-block instance initializer: the (arg := val, ...) after the type in
+    // `inst : FB_Type(a := 1, b := 2);`. Holds the argument nodes + paren/comma tokens.
+    FbInstanceInitializer,
 
     // Nodes - Types
     NamedType,

@@ -621,6 +621,10 @@ public sealed class Parser
         var atClause = ParseOptionalAtClause();
         var colon = MatchToken(SyntaxKind.Colon);
         var type = ParseType();
+        // Function-block instance initializer: `inst : FB_Type(a := 1, b := 2);`. The
+        // parenthesized argument list attaches to the type (no `:=`). A `:= value`
+        // initializer may still follow in rare combined forms.
+        var fbInitializer = ParseOptionalFbInstanceInitializer();
         var initializer = ParseOptionalInitializer();
         var semicolon = MatchToken(SyntaxKind.Semicolon);
 
@@ -629,6 +633,7 @@ public sealed class Parser
 
         var children = new List<SyntaxNode> { type };
         if (atClause != null) children.Insert(0, atClause);
+        if (fbInitializer != null) children.Add(fbInitializer);
         if (initializer != null) children.Add(initializer);
 
         var tokens = new List<SyntaxToken> { name, colon, semicolon };
@@ -645,6 +650,35 @@ public sealed class Parser
         var variable = MatchToken(SyntaxKind.DirectVariable);
         return SyntaxFactory.Node(SyntaxKind.AtClause, TextSpan.FromBounds(atKeyword.Span.Start, variable.Span.End),
             new[] { atKeyword, variable });
+    }
+
+    // `(arg := val, arg2 := val2, ...)` immediately after the type in a variable
+    // declaration — a function-block instance initializer. Reuses the call-argument
+    // grammar (ParseArgument handles named, positional, and => output args).
+    private SyntaxNode? ParseOptionalFbInstanceInitializer()
+    {
+        if (Current.Kind != SyntaxKind.OpenParen)
+            return null;
+
+        var openParen = NextToken();
+        var args = new List<SyntaxNode>();
+        var commas = new List<SyntaxToken>();
+        if (Current.Kind != SyntaxKind.CloseParen)
+        {
+            args.Add(ParseArgument());
+            while (Current.Kind == SyntaxKind.Comma)
+            {
+                commas.Add(NextToken());
+                args.Add(ParseArgument());
+            }
+        }
+        var closeParen = MatchToken(SyntaxKind.CloseParen);
+
+        var span = TextSpan.FromBounds(openParen.Span.Start, closeParen.Span.End);
+        var tokens = new List<SyntaxToken> { openParen };
+        tokens.AddRange(commas);
+        tokens.Add(closeParen);
+        return SyntaxFactory.Node(SyntaxKind.FbInstanceInitializer, span, args, tokens);
     }
 
     private SyntaxNode? ParseOptionalInitializer()

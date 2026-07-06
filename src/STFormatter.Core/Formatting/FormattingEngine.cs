@@ -770,6 +770,9 @@ internal sealed class FormattingVisitor
             case SyntaxKind.VariableInitializer:
                 VisitVariableInitializer(node);
                 break;
+            case SyntaxKind.FbInstanceInitializer:
+                VisitFbInstanceInitializer(node);
+                break;
             case SyntaxKind.AtClause:
                 VisitAtClause(node);
                 break;
@@ -1089,6 +1092,13 @@ internal sealed class FormattingVisitor
             Visit(type);
         }
 
+        // FB instance initializer: (args) attaches directly to the type, no space.
+        var fbInit = nodes.FirstOrDefault(n => n.Kind == SyntaxKind.FbInstanceInitializer);
+        if (fbInit != null)
+        {
+            Visit(fbInit);
+        }
+
         // Initializer (only pad type if this declaration has one)
         var init = nodes.FirstOrDefault(n => n.Kind == SyntaxKind.VariableInitializer);
         if (init != null)
@@ -1135,6 +1145,13 @@ internal sealed class FormattingVisitor
         if (type != null)
         {
             Visit(type);
+        }
+
+        // FB instance initializer: (args) attaches directly to the type, no space.
+        var fbInit = nodes.FirstOrDefault(n => n.Kind == SyntaxKind.FbInstanceInitializer);
+        if (fbInit != null)
+        {
+            Visit(fbInit);
         }
 
         // Initializer
@@ -1701,6 +1718,26 @@ internal sealed class FormattingVisitor
             Visit(nodes[i]);
         }
 
+        WriteToken(tokens[tokens.Count - 1]); // )
+    }
+
+    private void VisitFbInstanceInitializer(SyntaxNode node)
+    {
+        // (arg := val, ...) — tokens are [ ( commas... ) ], nodes are the args.
+        var tokens = node.ChildTokens.ToList();
+        var args = node.ChildNodes.ToList();
+
+        WriteToken(tokens[0]); // (
+        for (var i = 0; i < args.Count; i++)
+        {
+            if (i > 0)
+            {
+                WriteToken(tokens[i]); // comma before this arg
+                if (_config.SpaceAfterComma)
+                    _writer.WriteSpace();
+            }
+            Visit(args[i]);
+        }
         WriteToken(tokens[tokens.Count - 1]); // )
     }
 
