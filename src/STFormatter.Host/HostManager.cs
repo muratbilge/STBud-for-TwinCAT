@@ -96,7 +96,11 @@ internal sealed class HostManager
 
     public int InstanceCount => _instances.Count;
 
-    public IReadOnlyDictionary<int, TcXaeInstance> GetAllInstances() => _instances;
+    // A snapshot copy: callers (cleanup sweeps, Git-bridge enumerations) iterate this
+    // while CleanupInstance/Unregister mutate the live dictionary. Returning the live
+    // map caused "Collection was modified" during Cleanup Stale.
+    public IReadOnlyDictionary<int, TcXaeInstance> GetAllInstances() =>
+        new Dictionary<int, TcXaeInstance>(_instances);
 
     public void RefreshAllTitles()
     {
@@ -455,6 +459,7 @@ internal sealed class HostManager
             try { attrPopupGroup.BeginGroup = true; } catch { }
             AddTaskSubmenu(instance, mainPopup);
             AddRegionSubmenu(instance, mainPopup);
+            AddGitSubmenu(instance, mainPopup);
 
             var warningBtn = (CommandBarButton)mainPopup.Controls.Add(
                 MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
@@ -523,6 +528,35 @@ internal sealed class HostManager
         ioLinkBtn.Click += (CommandBarButton ctrl, ref bool cancel) =>
             Program.HandleAddIOLinking(instance.Pid);
         instance.InjectedControls.Add(ioLinkBtn);
+    }
+
+    // Git tools: history/compare/commit for the active POU. ST-aware (diffs the
+    // Structured Text inside CDATA, not the raw XML). Opens STBud's Git tab / diff.
+    private void AddGitSubmenu(TcXaeInstance instance, CommandBarPopup parent)
+    {
+        var gitPopup = (CommandBarPopup)parent.Controls.Add(
+            MsoControlType.msoControlPopup, Type.Missing, Type.Missing, Type.Missing, true);
+        gitPopup.Caption = "Git";
+        gitPopup.Tag = "STBud.Git";
+        try { gitPopup.BeginGroup = true; } catch { }
+        instance.InjectedControls.Add(gitPopup);
+
+        AddGitButton(instance, gitPopup, "File History...", "STBud.Git.History",
+            () => Program.HandleGitFileHistory(instance.Pid));
+        AddGitButton(instance, gitPopup, "Compare with HEAD...", "STBud.Git.CompareHead",
+            () => Program.HandleGitCompareHead(instance.Pid));
+        AddGitButton(instance, gitPopup, "Commit...", "STBud.Git.Commit",
+            () => Program.HandleGitCommit(instance.Pid));
+    }
+
+    private void AddGitButton(TcXaeInstance instance, CommandBarPopup parent, string caption, string tag, Action handler)
+    {
+        var btn = (CommandBarButton)parent.Controls.Add(
+            MsoControlType.msoControlButton, Type.Missing, Type.Missing, Type.Missing, true);
+        btn.Caption = caption;
+        btn.Tag = tag;
+        btn.Click += (CommandBarButton ctrl, ref bool cancel) => handler();
+        instance.InjectedControls.Add(btn);
     }
 
     private CommandBarPopup AddAttributeSubmenu(TcXaeInstance instance, CommandBarPopup parent)

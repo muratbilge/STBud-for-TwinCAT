@@ -84,6 +84,14 @@ internal class Program
         _mainForm = mainForm;
         var dummy = mainForm.Handle; // force handle creation for Invoke
 
+        // Let the UI's Git tab reach the live editor without taking a COM dependency.
+        STFormatter.UI.GitEditorBridge.GetActiveFilePath = TryGetActiveFilePathAny;
+        STFormatter.UI.GitEditorBridge.GetActiveSolutionDir = TryGetActiveSolutionDir;
+        STFormatter.UI.GitEditorBridge.RestoreToEditor = RestoreLinesToEditor;
+        STFormatter.UI.GitEditorBridge.ReadEditorSection = ReadEditorSection;
+        STFormatter.UI.GitEditorBridge.WriteAcceptsToDisk = WriteAcceptsToDisk;
+        STFormatter.UI.GitEditorBridge.UndoLastSave = UndoLastSave;
+
         mainForm.BeginInvoke((Action)(() => _keyboardHook.Start()));
 
         Application.Run(mainForm);
@@ -133,13 +141,21 @@ internal class Program
     private static void CleanupStaleInstances()
     {
         if (_hostManager == null) return;
-        var snapshot = _hostManager.GetAllInstances();
-        foreach (var kvp in snapshot)
+        // GetAllInstances is a snapshot, so removing during the sweep is safe; still
+        // guard each removal so one wedged DTE can't abort the whole cleanup.
+        foreach (var kvp in _hostManager.GetAllInstances())
         {
-            if (!_hostManager.IsInstanceAlive(kvp.Key))
+            try
             {
-                Log($"CleanupStale: Removing dead instance PID {kvp.Key}");
-                _hostManager.CleanupInstance(kvp.Key);
+                if (!_hostManager.IsInstanceAlive(kvp.Key))
+                {
+                    Log($"CleanupStale: Removing dead instance PID {kvp.Key}");
+                    _hostManager.CleanupInstance(kvp.Key);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"CleanupStale: PID {kvp.Key} cleanup failed: {ex.Message}");
             }
         }
     }
@@ -465,6 +481,443 @@ internal class Program
             if (consoleHandle != IntPtr.Zero)
                 ShowWindow(consoleHandle, SW_HIDE);
         }));
+    }
+
+    // ---- Git tools --------------------------------------------------------------
+
+    public static void HandleGitFileHistory(int pid)
+    {
+        Log($"HandleGitFileHistory: PID {pid}");
+        try
+        {
+            if (!EnsureGitAvailable()) return;
+            if (!TryGetActiveFilePath(pid, "HandleGitFileHistory", out string filePath)) return;
+            string? repoRoot = ResolveAndLogRepoRoot(pid, "HandleGitFileHistory", filePath);
+            _mainForm?.ShowGitForFile(filePath, 0, repoRoot);
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleGitFileHistory: PID {pid} FAILED: {ex.Message}");
+            ShowInfoMessage("STBud could not open Git history. See the Host log for details.");
+        }
+    }
+
+    public static void HandleGitCommit(int pid)
+    {
+        Log($"HandleGitCommit: PID {pid}");
+        try
+        {
+            if (!EnsureGitAvailable()) return;
+            if (!TryGetActiveFilePath(pid, "HandleGitCommit", out string filePath)) return;
+            string? repoRoot = ResolveAndLogRepoRoot(pid, "HandleGitCommit", filePath);
+            // Open the Git tab on the Status sub-tab where staging + commit live.
+            _mainForm?.ShowGitForFile(filePath, 2, repoRoot);
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleGitCommit: PID {pid} FAILED: {ex.Message}");
+            ShowInfoMessage("STBud could not open Git commit. See the Host log for details.");
+        }
+    }
+
+    public static void HandleGitCompareHead(int pid)
+    {
+        Log($"HandleGitCompareHead: PID {pid}");
+        try
+        {
+            if (!EnsureGitAvailable()) return;
+            if (!TryGetActiveFilePath(pid, "HandleGitCompareHead", out string filePath)) return;
+
+            string? repo = ResolveAndLogRepoRoot(pid, "HandleGitCompareHead", filePath);
+            if (repo == null)
+            {
+                ShowInfoMessage("This file is not inside a git repository.");
+                return;
+            }
+
+            string rel = STBud.Git.GitClient.RelativePath(repo, filePath);
+            var committedSections = STFormatter.Core.Formatting.TwinCatStExtractor.Extract(
+                STBud.Git.GitClient.ShowFile(repo, "HEAD", rel));
+            var workingSections = System.IO.File.Exists(filePath)
+                ? STFormatter.Core.Formatting.TwinCatStExtractor.Extract(System.IO.File.ReadAllText(filePath))
+                : new STFormatter.Core.Formatting.TwinCatStExtractor.StSections();
+
+            // For a non-TwinCAT-XML file (.st), Extract returns empty sections; fall
+            // back to the raw text so the diff still shows the plain source.
+            string committedCombined = committedSections.IsEmpty
+                ? STBud.Git.GitClient.ShowFile(repo, "HEAD", rel)
+                : committedSections.Combined();
+            string workingCombined = workingSections.IsEmpty
+                ? (System.IO.File.Exists(filePath) ? System.IO.File.ReadAllText(filePath) : "")
+                : workingSections.Combined();
+
+            if (STBud.Git.Diff.LineDiff.AreEqual(committedCombined, workingCombined))
+            {
+                ShowInfoMessage("No ST changes between HEAD and the working file.");
+                return;
+            }
+
+            // BeginInvoke (non-blocking) so the TcXaeShell COM/click thread is released
+            // immediately — the editor is not frozen while the diff dialog is open. The
+            // dialog is owned by the Host main form so it doesn't render ownerless.
+            _mainForm?.BeginInvoke((Action)(() =>
+            {
+                var consoleHandle = GetConsoleWindow();
+                if (consoleHandle != IntPtr.Zero) ShowWindow(consoleHandle, SW_HIDE);
+
+                STFormatter.UI.DiffViewerForm diff;
+                if (!committedSections.IsEmpty || !workingSections.IsEmpty)
+                {
+                    // Section-aware diff: decl/impl as separate tagged blocks.
+                    diff = new STFormatter.UI.DiffViewerForm(
+                        $"{System.IO.Path.GetFileName(rel)} @ HEAD <-> working",
+                        committedSections, workingSections,
+                        STFormatter.UI.GitEditorBridge.RestoreToEditor,
+                        STFormatter.UI.Strings.Get("Git.Diff.Committed"),
+                        STFormatter.UI.Strings.Get("Git.Diff.Working"),
+                        pid,
+                        filePath);
+                }
+                else
+                {
+                    // Plain .st file — no sections.
+                    diff = new STFormatter.UI.DiffViewerForm(
+                        $"{System.IO.Path.GetFileName(rel)} @ HEAD <-> working",
+                        committedCombined, workingCombined,
+                        STFormatter.UI.GitEditorBridge.RestoreToEditor,
+                        STFormatter.UI.Strings.Get("Git.Diff.Committed"),
+                        STFormatter.UI.Strings.Get("Git.Diff.Working"),
+                        pid,
+                        filePath);
+                }
+                using (diff) diff.ShowDialog(_mainForm);
+            }));
+        }
+        catch (Exception ex)
+        {
+            Log($"HandleGitCompareHead: PID {pid} FAILED: {ex.Message}");
+            ShowInfoMessage("STBud could not compare with HEAD. See the Host log for details.");
+        }
+    }
+
+    /// <summary>Resolve the active document's on-disk path for a given instance.</summary>
+    private static bool TryGetActiveFilePath(int pid, string who, out string filePath)
+    {
+        filePath = "";
+        var instance = _hostManager?.GetInstance(pid);
+        if (instance == null || !_hostManager!.IsInstanceAlive(pid))
+        {
+            Log($"{who}: PID {pid} instance not found/alive");
+            return false;
+        }
+        if (instance.Dte.ActiveDocument == null)
+        {
+            Log($"{who}: PID {pid} No active document");
+            ShowInfoMessage("No active editor — open a POU first.");
+            return false;
+        }
+        try
+        {
+            filePath = instance.Dte.ActiveDocument.FullName;
+        }
+        catch (Exception ex)
+        {
+            Log($"{who}: PID {pid} ActiveDocument.FullName failed: {ex.Message}");
+            ShowInfoMessage("Could not determine the active file.");
+            return false;
+        }
+        if (string.IsNullOrEmpty(filePath) || !System.IO.File.Exists(filePath))
+        {
+            Log($"{who}: PID {pid} file not on disk: {filePath}");
+            ShowInfoMessage("Save the file first — STBud's Git tools work on the file on disk.");
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Resolve the git repo root from the active file, falling back to the solution
+    /// folder (where `git init` is typically run) — a POU can live in a subtree that
+    /// doesn't walk up to the repo. Logs every anchor so wrong-folder reports are easy
+    /// to diagnose.
+    /// </summary>
+    private static string? ResolveAndLogRepoRoot(int pid, string who, string filePath)
+    {
+        string? solutionPath = null;
+        try { solutionPath = _hostManager?.GetInstance(pid)?.Dte.Solution?.FullName; } catch { }
+        string? solutionDir = string.IsNullOrEmpty(solutionPath)
+            ? null
+            : System.IO.Path.GetDirectoryName(solutionPath);
+
+        string? fromFile = STBud.Git.GitClient.FindRepoRoot(filePath);
+        string? fromSln = string.IsNullOrEmpty(solutionDir) ? null : STBud.Git.GitClient.FindRepoRoot(solutionDir);
+
+        // The solution IS the project, so its repo is canonical. Prefer it over the
+        // file anchor, which can stop at a stray nested .git below the project.
+        string? repo = fromSln ?? fromFile;
+
+        Log($"{who}: PID {pid} repo resolve: file='{filePath}' sln='{solutionPath}' " +
+            $"repoFromFile='{fromFile ?? "<none>"}' repoFromSln='{fromSln ?? "<none>"}' -> repo='{repo ?? "<none>"}'");
+
+        // A nested .git under the project shadows the main repo — tell the user once
+        // so they can remove it; we still use the main project repo.
+        if (fromSln != null && fromFile != null &&
+            !string.Equals(fromSln, fromFile, StringComparison.OrdinalIgnoreCase))
+        {
+            ShowInfoMessage($"Using the main project repo '{fromSln}'. A separate .git was " +
+                $"found under the project ('{fromFile}') — remove it if it's unintended.");
+        }
+        return repo;
+    }
+
+    /// <summary>The active solution's directory (anchor for repo-root discovery).</summary>
+    private static string? TryGetActiveSolutionDir()
+    {
+        try
+        {
+            if (_hostManager == null) return null;
+            foreach (var kvp in _hostManager.GetAllInstances())
+            {
+                if (!_hostManager.IsInstanceAlive(kvp.Key)) continue;
+                try
+                {
+                    string? sln = kvp.Value.Dte.Solution?.FullName;
+                    if (!string.IsNullOrEmpty(sln))
+                        return System.IO.Path.GetDirectoryName(sln);
+                }
+                catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"TryGetActiveSolutionDir failed: {ex.Message}");
+        }
+        return null;
+    }
+
+    /// <summary>The active document path of any alive instance (for the Git tab opened from the tray).</summary>
+    private static string? TryGetActiveFilePathAny()
+    {
+        try
+        {
+            if (_hostManager == null) return null;
+            foreach (var kvp in _hostManager.GetAllInstances())
+            {
+                if (!_hostManager.IsInstanceAlive(kvp.Key)) continue;
+                try
+                {
+                    var doc = kvp.Value.Dte.ActiveDocument;
+                    if (doc != null)
+                    {
+                        string path = doc.FullName;
+                        if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
+                            return path;
+                    }
+                }
+                catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"TryGetActiveFilePathAny failed: {ex.Message}");
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Apply a committed block into the editor of the TcXaeShell instance identified by
+    /// <paramref name="pid"/>. The git-restore logic lives in the isolated
+    /// <see cref="STBud.Git.Editor.EditorRestore"/> (separate from the formatter); this
+    /// just resolves the instance, invokes it, and turns the outcome into a user balloon.
+    /// </summary>
+    private static bool RestoreLinesToEditor(string committed, string working, string? sectionTag, int pid)
+    {
+        try
+        {
+            var instance = ResolveInstanceForRestore(pid);
+            if (instance == null)
+            {
+                ShowInfoMessage("No active editor - open the POU in TcXaeShell and try again.");
+                return false;
+            }
+
+            string wantLabel = sectionTag == "decl" ? "Declaration"
+                             : sectionTag == "impl" ? "Implementation" : "section";
+            var outcome = STBud.Git.Editor.EditorRestore.Apply(instance.Dte, committed, working, sectionTag);
+            switch (outcome)
+            {
+                case STBud.Git.Editor.RestoreOutcome.AppliedLive:
+                    return true;
+                case STBud.Git.Editor.RestoreOutcome.AppliedDisk:
+                    ShowInfoMessage(
+                        $"Restored into the {wantLabel} section on disk.\n\n" +
+                        $"TwinCAT will prompt to reload the file — accept it. Save other editor edits first.");
+                    return true;
+                case STBud.Git.Editor.RestoreOutcome.WrongTabClipboard:
+                    ShowInfoMessage(
+                        $"STBud couldn't apply the {wantLabel} lines automatically. They're on your " +
+                        $"clipboard — switch to the {wantLabel} tab in TcXaeShell and paste (Ctrl+V).");
+                    return false;
+                case STBud.Git.Editor.RestoreOutcome.NotFoundInEditor:
+                    ShowInfoMessage("STBud couldn't find these lines in the editor (it may have unsaved edits). " +
+                        "The committed text is on your clipboard — paste it where you want.");
+                    return false;
+                case STBud.Git.Editor.RestoreOutcome.Ambiguous:
+                    ShowInfoMessage("These lines appear more than once, so STBud won't guess which to change. " +
+                        "The committed text is on your clipboard — paste it at the right place.");
+                    return false;
+                default:
+                    ShowInfoMessage("STBud could not apply the lines. See the Host log for details.");
+                    return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"RestoreLinesToEditor FAILED: {ex.Message}");
+            return false;
+        }
+    }
+
+    // One-level undo snapshot of the last staged-accept save, keyed by file path.
+    private static readonly System.Collections.Generic.Dictionary<string, byte[]> _undoSnapshots =
+        new System.Collections.Generic.Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+    private static string? _lastSavePath;
+
+    // Stable "Save": write the staged accept blocks straight to the working file on disk
+    // (the diff's working side was read from this same file, so each block locates cleanly even
+    // when the open editor has diverged or the wrong tab is active). Returns (applied, failed).
+    private static (int applied, int failed) WriteAcceptsToDisk(
+        string filePath,
+        System.Collections.Generic.IReadOnlyList<(string committed, string working, string? section)> blocks,
+        int pid)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                Log($"WriteAcceptsToDisk: file not found: {filePath}");
+                return (0, blocks?.Count ?? 0);
+            }
+
+            var diskBlocks = new System.Collections.Generic.List<STBud.Git.Editor.EditorRestore.DiskBlock>(blocks.Count);
+            foreach (var b in blocks)
+                diskBlocks.Add(new STBud.Git.Editor.EditorRestore.DiskBlock(b.committed, b.working, b.section));
+
+            var r = STBud.Git.Editor.EditorRestore.ApplyBlocksToDisk(filePath, diskBlocks);
+            if (r.Applied > 0 && r.UndoSnapshot != null)
+            {
+                _undoSnapshots[filePath] = r.UndoSnapshot;
+                _lastSavePath = filePath;
+                NudgeEditorReload(pid);
+            }
+            Log($"WriteAcceptsToDisk: applied={r.Applied} failed={r.Failed} file={System.IO.Path.GetFileName(filePath)}");
+            return (r.Applied, r.Failed);
+        }
+        catch (Exception ex)
+        {
+            Log($"WriteAcceptsToDisk FAILED: {ex.Message}");
+            return (0, blocks?.Count ?? 0);
+        }
+    }
+
+    // Undo the last WriteAcceptsToDisk by writing the stashed snapshot back to disk.
+    private static bool UndoLastSave(int pid)
+    {
+        try
+        {
+            string? path = _lastSavePath;
+            if (path == null || !_undoSnapshots.TryGetValue(path, out var snap))
+            {
+                Log("UndoLastSave: nothing to undo");
+                return false;
+            }
+            bool ok = STBud.Git.Editor.EditorRestore.RestoreBytes(path, snap);
+            if (ok) { _undoSnapshots.Remove(path); _lastSavePath = null; NudgeEditorReload(pid); }
+            return ok;
+        }
+        catch (Exception ex)
+        {
+            Log($"UndoLastSave FAILED: {ex.Message}");
+            return false;
+        }
+    }
+
+    // After a Git disk write, foreground TcXaeShell so it detects the external file change and
+    // shows its reload prompt (it only re-checks files when its window is activated, and our
+    // diff is a modal dialog that keeps it in the background). Git-only — never the formatter.
+    private static void NudgeEditorReload(int pid)
+    {
+        try
+        {
+            var instance = ResolveInstanceForRestore(pid);
+            if (instance != null) STBud.Git.Editor.EditorRestore.BringToForeground(instance.Dte);
+        }
+        catch (Exception ex) { Log($"NudgeEditorReload: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// Read the active editor section's text for the TcXaeShell instance identified by
+    /// <paramref name="pid"/>. Used by the diff viewer to refresh after a restore.
+    /// </summary>
+    private static string? ReadEditorSection(int pid)
+    {
+        try
+        {
+            var instance = ResolveInstanceForRestore(pid);
+            if (instance == null) return null;
+            return STBud.Git.Editor.EditorRestore.ReadActiveSectionText(instance.Dte);
+        }
+        catch (Exception ex)
+        {
+            Log($"ReadEditorSection FAILED: {ex.Message}");
+            return null;
+        }
+    }
+
+    // Resolve the instance the diff was opened from. Falls back to the old
+    // FindActiveInstance behavior only when the pid is unknown (0/-1), which happens
+    // for the format-history diff viewer that isn't tied to a specific editor.
+    private static TcXaeInstance? ResolveInstanceForRestore(int pid)
+    {
+        if (_hostManager == null) return null;
+
+        if (pid > 0)
+        {
+            if (_hostManager.IsInstanceAlive(pid))
+            {
+                var inst = _hostManager.GetInstance(pid);
+                if (inst != null)
+                {
+                    try { if (inst.Dte.ActiveDocument != null) return inst; }
+                    catch { }
+                }
+            }
+            // If the originating instance died, fall through to FindActiveInstance
+            // rather than refusing outright — the user may have restarted TcXaeShell.
+        }
+        return FindActiveInstance();
+    }
+
+    private static bool EnsureGitAvailable()
+    {
+        if (STBud.Git.GitClient.IsGitAvailable(out _)) return true;
+        ShowInfoMessage(STFormatter.UI.Strings.Get("Git.GitMissing"));
+        return false;
+    }
+
+    private static TcXaeInstance? FindActiveInstance()
+    {
+        if (_hostManager == null) return null;
+
+        foreach (var kvp in _hostManager.GetAllInstances())
+        {
+            if (!_hostManager.IsInstanceAlive(kvp.Key)) continue;
+            try { if (kvp.Value.Dte.ActiveDocument != null) return kvp.Value; }
+            catch { }
+        }
+        foreach (var kvp in _hostManager.GetAllInstances())
+            if (_hostManager.IsInstanceAlive(kvp.Key)) return kvp.Value;
+        return null;
     }
 
     public static void HandleAddPragma(int pid, string pragmaText)

@@ -26,5 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\STFormatter.Core\STFormatter.Core.csproj" />
     <ProjectReference Include="..\STFormatter.UI\STFormatter.UI.csproj" />
+    <ProjectReference Include="..\STBud.Git\STBud.Git.csproj" />
+    <ProjectReference Include="..\STBud.Git.Editor\STBud.Git.Editor.csproj" />
   </ItemGroup>
 </Project>
