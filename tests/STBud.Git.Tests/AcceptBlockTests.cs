@@ -88,6 +88,34 @@ public class AcceptBlockTests
     }
 
     [Fact]
+    public void ExtractAcceptBlock_anchored_delete_run_reinserts_via_context_line()
+    {
+        // Re-adding HEAD-only (deleted) lines: the viewer widens the range to include an
+        // adjacent Equal row as the anchor. Working must then be just the anchor line
+        // (locatable in the file) and Committed the anchor + the deleted lines in row
+        // order — so replacing anchor with committed re-inserts the deleted lines.
+        var rows = new List<DiffRow>
+        {
+            new DiffRow { Op = DiffOp.Equal, Left = "ctx", Right = "ctx" },
+            new DiffRow { Op = DiffOp.Delete, Left = "gone1" },
+            new DiffRow { Op = DiffOp.Delete, Left = "gone2" },
+        };
+
+        var blk = LineDiff.ExtractAcceptBlock(rows, 0, 2); // anchor before
+        Assert.Equal("ctx", blk.Working);
+        Assert.Equal("ctx\r\ngone1\r\ngone2", blk.Committed);
+
+        var rowsAfter = new List<DiffRow>
+        {
+            new DiffRow { Op = DiffOp.Delete, Left = "gone" },
+            new DiffRow { Op = DiffOp.Equal, Left = "ctx", Right = "ctx" },
+        };
+        var blkAfter = LineDiff.ExtractAcceptBlock(rowsAfter, 0, 1); // anchor after
+        Assert.Equal("ctx", blkAfter.Working);
+        Assert.Equal("gone\r\nctx", blkAfter.Committed);
+    }
+
+    [Fact]
     public void ExtractAcceptBlock_skips_snip_rows()
     {
         var rows = new List<DiffRow>

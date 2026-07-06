@@ -909,8 +909,31 @@ namespace STFormatter.UI
                 var blk = LineDiff.ExtractAcceptBlock(_allDiffLines, s, e);
                 if (blk.Working.Length == 0)
                 {
-                    // Re-adding a HEAD-only (deleted) line: nothing to locate on disk → clipboard.
-                    try { Clipboard.SetText(blk.Committed); } catch (Exception ex) { DiagLog($"SaveAccepts: clipboard fallback failed: {ex.Message}"); }
+                    // Re-adding HEAD-only (deleted) lines: there's nothing of theirs in the
+                    // working file to locate, so anchor the block on an adjacent UNCHANGED
+                    // line instead — the disk write then replaces `anchor` with
+                    // `anchor + restored lines` (or `restored + anchor` when anchoring after).
+                    int anchor = -1;
+                    if (s > 0 && _allDiffLines[s - 1].Op == DiffOp.Equal
+                              && _allDiffLines[s - 1].SectionTag == row.SectionTag)
+                        anchor = s - 1;
+                    else if (e + 1 < _allDiffLines.Count && _allDiffLines[e + 1].Op == DiffOp.Equal
+                              && _allDiffLines[e + 1].SectionTag == row.SectionTag)
+                        anchor = e + 1;
+
+                    if (anchor >= 0)
+                    {
+                        blk = LineDiff.ExtractAcceptBlock(_allDiffLines, Math.Min(anchor, s), Math.Max(anchor, e));
+                        DiagLog($"SaveAccepts: delete-only run rows={s}..{e} anchored on row {anchor}");
+                    }
+                }
+
+                if (blk.Working.Length == 0)
+                {
+                    // No usable anchor either (rare): clipboard fallback so the user can paste.
+                    DiagLog($"SaveAccepts: rows={s}..{e} has no anchor - clipboard fallback");
+                    if (!string.IsNullOrEmpty(blk.Committed))
+                        try { Clipboard.SetText(blk.Committed); } catch (Exception ex) { DiagLog($"SaveAccepts: clipboard fallback failed: {ex.Message}"); }
                     skipped++;
                 }
                 else
