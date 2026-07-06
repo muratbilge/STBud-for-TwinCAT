@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net48;net462</TargetFrameworks>
+    <PlatformTarget>x86</PlatformTarget>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>STBud.Git.Editor</AssemblyName>
+    <RootNamespace>STBud.Git.Editor</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.Interop" Version="17.0.32112.339" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <!-- net462's BCL has no System.ValueTuple (used by DecodeFile's tuple return). -->
+    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Read-only ST/CDATA helpers only (LooksLikeDeclaration, ReplaceStBlockInSection).
+         No dependency on the formatter Host. -->
+    <ProjectReference Include="..\STFormatter.Core\STFormatter.Core.csproj" />
+  </ItemGroup>
+
+</Project>
