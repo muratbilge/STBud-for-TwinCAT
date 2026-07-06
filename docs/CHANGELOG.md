@@ -7,6 +7,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Compare-tool accept workflow in the Git diff viewer.** Left pane = HEAD (source),
+  right pane = working file, with labelled column headers. Accepting is **line-granular
+  and staged**: the ▶ gutter arrow / context menu / toolbar stage a **blue preview** of
+  HEAD's line (nothing is written yet); **Save to working file** then writes all staged
+  accepts **per change-block straight to the `.TcPOU/.TcGVL` on disk** (deterministic —
+  no editor/tab guessing) and brings TcXaeShell to the front so its native reload prompt
+  appears. A one-level **Undo** reverts the last save from a file snapshot. Clear-staged
+  drops previews. Accepted-added lines are struck through in the preview and removed on
+  save.
+- **Diff viewer UI overhaul**: compact glyph toolbar with tooltips (nothing clips),
+  semantic icon colors (green accept / red clear / blue save / amber undo), light/dark
+  **theme toggle**, bottom color-key legend with live swatches, and a distinct blue
+  "staged" color that can't be confused with added-green.
+- **Deploy verification.** `deploy.ps1` (with `deploy.bat` as wrapper) stops the Host,
+  copies, **verifies every file** (timestamp + length, exits 1 on any stale file), and
+  restarts the Host — no more silent stale deploys when the Host held file locks.
+- Repo-wide `.editorconfig` + `.gitattributes` pin UTF-8 for sources (several contain
+  Unicode glyph literals, now written as `\uXXXX` escapes).
+- **Git tools (TwinCAT-aware), kept separate from the formatter.** A new `STBud.Git`
+  engine (shells out to `git.exe`, so it works on all target frameworks) plus a standalone
+  **`stgit`** CLI (now multi-targeted net48/net8.0 and shipped in the install) — `stfmt`
+  and the formatter engine are untouched.
+  - **Git tab** in the tray UI: initialize/open a local repo, view status, stage/unstage,
+    commit, and create/switch local branches; browse commits and their changed files;
+    see **change hotspots** (most-churned POUs); and a **Current File** view with the
+    active POU's history.
+  - **Context menu** in TcXaeShell (under STBud → Git): **File History…**, **Compare with
+    HEAD…**, **Commit…** for the active POU.
+  - **ST-level diffs**: `.TcPOU/.TcDUT/.TcGVL` are compared at the Structured-Text level
+    (inside CDATA), not as raw XML, via a read-only `TwinCatStExtractor` in the core.
+    Declaration and Implementation are diffed **separately** as two tagged blocks in the
+    same window, so restore knows which editor tab a line belongs to.
+  - **Section-aware restore**: select committed lines in the diff and push them back into
+    the open editor through the clipboard live-edit pipeline. The active editor tab is
+    detected (`LooksLikeDeclaration`) and the restore is **refused with a warning** when
+    the active tab doesn't match the line's section — preventing a declaration line being
+    pasted into the implementation tab (and vice versa). The originating TcXaeShell
+    instance (PID) is threaded through so restore lands in the right editor when more
+    than one is open.
+  - `stgit` commands: `init`, `status`, `log`, `history`, `blame [--raw]`, `diff <rev> <file>`,
+    `churn`, `stage <file>...`, `unstage <file>...`, `commit -m <msg>`, `branch [name]`,
+    `checkout <branch>`, `restore <rev> <file>`. `stgit blame` on a `.TcPOU` now extracts
+    the ST from CDATA and attributes the ST lines (use `--raw` for the old XML-level output).
+
+### Fixed
+
+- **Unified diff engine.** The tray DiffViewer and `stgit` now share a single `LineDiff`
+  implementation in `STBud.Git/Diff/LineDiff.cs`. Previously the viewer had its own private
+  (divergent) LCS; `stgit diff` and the tray viewer could disagree on the same commit.
+- **Word-level intra-line highlight.** The diff viewer now tokenizes ST lines on natural
+  boundaries (identifiers, numbers, strings, operator runs) and runs a token-level LCS to
+  highlight the changed sub-spans per token — the old prefix/suffix approach lit up one big
+  middle block and couldn't tell that `a` and `b` swapped in `IF a AND b THEN`.
+- **Custom-drawn diff surface.** Replaced the RichTextBox-based rendering with a custom
+  `DiffCanvas`/`DiffPane`: full-width row bands (the RichTextBox `SelectionBackColor` only
+  painted character cells, leaving ragged bands), a real gutter overlay separate from the
+  text (so Copy yields clean ST without line-number noise), horizontal + vertical scroll
+  sync, dark-mode color scheme with system-theme detection, and HiDPI-aware layout.
+- **No more silent truncation.** The diff is now computed over the full input — the old
+  `MaxDiffLines=4000` cap could silently report "No changes" when real changes were beyond
+  line 4000. A visible `— large diff (N rows)` banner appears for huge diffs; the canvas
+  renders only visible rows so the UI stays responsive regardless of diff size.
+- **`ScanCData` misclassification.** The malformed-XML fallback in `TwinCatStExtractor`
+  now finds the real enclosing element via a backward depth-tracking scan (the old
+  `LastIndexOf('<', pos)` found the `<` of `<![CDATA[` itself, classifying every CDATA
+  block as Implementation). Element-name classification is now exact (`== "Declaration"`),
+  not substring. A previously-passing-but-weak test that masked the bug now asserts
+  `Declaration != null` for the malformed fixture.
+- **Non-blocking Compare-with-HEAD.** `HandleGitCompareHead` now uses `BeginInvoke` and
+  passes the Host main form as the dialog owner — the TcXaeShell editor is no longer frozen
+  for the lifetime of the diff dialog, and the dialog no longer renders ownerless.
+- **GitPanel UX.** The Status tab now reflects staged state in the row checkboxes after
+  refresh (so you can see at a glance what's staged), adds **Stage All** / **Unstage All**
+  buttons, and **Open Folder** no longer discards the currently-open file or runs a dead
+  double `FindRepoRoot`.
+- Git tools now resolve to the **main project (solution) repo** instead of stopping at a
+  stray nested `.git` under the project tree (and warn once when one shadows the repo).
+- **Cleanup Stale** no longer throws — the instance sweep iterates a snapshot rather than the
+  live dictionary it mutates, and the toolbar actions are guarded.
+- Deployed Host now ships `STFormatter.Host.exe.config` (binding redirects), fixing the
+  `System.Text.Json` initialization failure that prevented settings from saving. The
+  installer payload also now includes `STBud.Git.dll`, `stgit.exe`, and the config.
+
 ## [1.0.0] - 2026-06-23
 
 ### Added

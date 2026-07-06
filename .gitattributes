@@ -1,0 +1,24 @@
+# Normalize text and pin encodings. C# sources are UTF-8 (no BOM) and several contain
+# Unicode glyph literals — the working-tree-encoding guard keeps checkouts UTF-8 so a
+# misconfigured tool can't mojibake them.
+* text=auto
+
+*.cs      text working-tree-encoding=UTF-8 eol=crlf
+*.csproj  text eol=crlf
+*.props   text eol=crlf
+*.sln     text eol=crlf
+*.md      text
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+*.ps1     text eol=crlf
+*.editorconfig text
+
+# TwinCAT XML files keep CRLF (matches what TcXaeShell writes).
+*.TcPOU   text eol=crlf
+*.TcDUT   text eol=crlf
+*.TcGVL   text eol=crlf
+*.tsproj  text eol=crlf
+
+# Binaries
+*.ico     binary
+*.png     binary

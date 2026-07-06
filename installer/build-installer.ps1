@@ -50,8 +50,11 @@ $FilesDir = Join-Path $PSScriptRoot "files"
 
 $HostPayloadFiles = @(
     "STFormatter.Host.exe",
+    "STFormatter.Host.exe.config",
     "STFormatter.Core.dll",
     "STFormatter.UI.dll",
+    "STBud.Git.dll",
+    "STBud.Git.Editor.dll",
     "Microsoft.VisualStudio.Interop.dll",
     "Microsoft.Bcl.AsyncInterfaces.dll",
     "System.Buffers.dll",
@@ -62,7 +65,8 @@ $HostPayloadFiles = @(
     "System.Text.Encodings.Web.dll",
     "System.Text.Json.dll",
     "System.Threading.Tasks.Extensions.dll",
-    "System.ValueTuple.dll"
+    "System.ValueTuple.dll",
+    "stgit.exe"
 )
 
 $ForbiddenHostPayloadPatterns = @(
@@ -100,7 +104,7 @@ function Copy-HostPayload {
         }
     }
 
-    $required = @("STFormatter.Host.exe", "STFormatter.Core.dll", "STFormatter.UI.dll", "Microsoft.VisualStudio.Interop.dll")
+    $required = @("STFormatter.Host.exe", "STFormatter.Host.exe.config", "STFormatter.Core.dll", "STFormatter.UI.dll", "STBud.Git.dll", "STBud.Git.Editor.dll", "Microsoft.VisualStudio.Interop.dll", "stgit.exe")
     foreach ($file in $required) {
         $path = Join-Path $DestinationDir $file
         if (-not (Test-Path -LiteralPath $path)) {
@@ -153,6 +157,21 @@ if (-not $SkipCLI) {
 }
 
 if (-not $SkipHost) {
+    # Build stgit (net48) so the installer can ship it alongside the Host.
+    Write-Host "  Building stgit (net48)..." -ForegroundColor Gray
+    dotnet build "$RootDir\src\STBud.Git.CLI\STBud.Git.CLI.csproj" `
+        -c $Configuration `
+        -p:TargetFramework=net48 `
+        -p:Version=$Version `
+        -p:AssemblyVersion=$Version.0 `
+        -p:FileVersion=$Version.0 `
+        -p:InformationalVersion=$Version | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "stgit net48 build failed — the installer will ship without stgit."
+    }
+}
+
+if (-not $SkipHost) {
     Write-Host "[2/4] Building Host (net48, x86)..." -ForegroundColor Yellow
 
     $hostNet48Dir = Join-Path $FilesDir "host-net48"
@@ -172,6 +191,15 @@ if (-not $SkipHost) {
     } else {
         $srcDir = Join-Path $RootDir "src\STFormatter.Host\bin\$Configuration\net48"
         Copy-HostPayload -SourceDir $srcDir -DestinationDir $hostNet48Dir
+
+        # stgit.exe builds to its own bin folder; copy it into the Host payload so the
+        # installer ships it. The net48 build of stgit runs without .NET 8 on the target.
+        $stgitSrc = Join-Path $RootDir "src\STBud.Git.CLI\bin\$Configuration\net48\stgit.exe"
+        if (Test-Path -LiteralPath $stgitSrc) {
+            Copy-Item -LiteralPath $stgitSrc -Destination $hostNet48Dir -Force
+        } else {
+            Write-Warning "stgit.exe not found at $stgitSrc — build the CLI before the installer."
+        }
 
         $hostFileCount = (Get-ChildItem $hostNet48Dir -File).Count
         Write-Host "  Host net48: $hostFileCount files copied to files\host-net48\" -ForegroundColor Green
@@ -196,6 +224,13 @@ if (-not $SkipHost) {
     } else {
         $srcDir462 = Join-Path $RootDir "src\STFormatter.Host\bin\$Configuration\net462"
         Copy-HostPayload -SourceDir $srcDir462 -DestinationDir $hostNet462Dir
+
+        # stgit only targets net48/net8.0; copy the net48 build when available so
+        # net462 hosts that also have .NET 4.8 can still use stgit.
+        $stgitSrc462 = Join-Path $RootDir "src\STBud.Git.CLI\bin\$Configuration\net48\stgit.exe"
+        if (Test-Path -LiteralPath $stgitSrc462) {
+            Copy-Item -LiteralPath $stgitSrc462 -Destination $hostNet462Dir -Force
+        }
 
         $host462FileCount = (Get-ChildItem $hostNet462Dir -File).Count
         Write-Host "  Host net462: $host462FileCount files copied to files\host-net462\" -ForegroundColor Green

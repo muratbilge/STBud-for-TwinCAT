@@ -228,6 +228,25 @@ The external Host connects via COM DTE's Running Object Table (ROT) moniker
 `!TcXaeShell.DTE.15.0:{PID}`, which is always available while TcXaeShell is
 running. See [AGENTS.md](AGENTS.md) for full details.
 
+### STBud.Git + stgit CLI
+
+TwinCAT-aware Git helper, kept separate from the formatter. Multi-targets
+net48/net8.0 and ships in the install alongside the Host.
+
+- **`stgit`** — standalone CLI: `init`, `status`, `log`, `history`, `blame [--raw]`,
+  `diff <rev> <file>`, `churn`, `stage`, `unstage`, `commit -m`, `branch`, `checkout`,
+  `restore <rev> <file>`. TwinCAT `.TcPOU/.TcDUT/.TcGVL` files are diffed and blamed
+  at the Structured-Text level (inside CDATA), not as raw XML.
+- **Git tab in the tray UI** — init/open a repo, view status, stage/unstage (with
+  Stage All / Unstage All), commit, branch/checkout, browse commits and their files,
+  see change hotspots, and a Current-File history view.
+- **Context menu in TcXaeShell** (under STBud → Git) — File History, Compare with
+  HEAD, and Commit for the active POU.
+- **Section-aware diff viewer** — Declaration and Implementation are diffed as two
+  separate tagged blocks; restore detects the active editor tab and refuses to paste
+  across tabs to avoid corrupting the file. Word-level intra-line highlight, dark
+  mode, HiDPI layout, and clean Copy (no gutter noise in the copied ST).
+
 ------------------------------------------------------------------------
 
 ## Supported File Types
@@ -539,16 +558,24 @@ STBud/
       Configuration/           FormattingConfiguration, EditorConfigParser
       Formatting/              FormattingEngine, FormattingVisitor, FormattingWriter
     STFormatter.CLI/           Command-line interface (net8.0)
+    STBud.Git/                 TwinCAT-aware Git engine (net8.0/net48/net462)
+      Diff/                    LineDiff, IntraLineHighlight (word-level)
+      GitClient.cs             shells out to git.exe; parsers are pure/testable
+    STBud.Git.CLI/             stgit CLI (net48/net8.0)
     STFormatter.Host/          TcXaeShell external host (net48 / x86, production)
       Program.cs               Main host executable — DTE connection, context menu injection,
-                               formatting engine integration, auto-reconnect
+                               formatting engine integration, Git menu actions, auto-reconnect
       HostManager.cs            COM DTE discovery, menu injection, instance tracking
       KeyboardHook.cs          Low-level keyboard hook for Ctrl+Shift+F/D shortcuts
-      LiveEditor.cs            DTE ExecuteCommand + clipboard live edit pipeline
+      LiveEditor.cs            DTE ExecuteCommand + clipboard live edit + section-aware restore
       STFormatter.Host.csproj  Project file — references Microsoft.VisualStudio.Interop
     STFormatter.UI/            Tray UI, settings, instances, history, diff viewer
+      DiffRendering/           DiffCanvas, DiffPane, DiffColorScheme (custom-drawn)
+      GitPanel.cs              Tray Git tab
+      DiffViewer.cs            Section-aware diff form (consumes LineDiff + DiffCanvas)
   tests/
-    STFormatter.Core.Tests/    Unit tests (132 passing)
+    STFormatter.Core.Tests/    Unit tests (306 passing)
+    STBud.Git.Tests/           Unit tests for LineDiff, IntraLineHighlight, StExtractor, GitClient
   docs/                        Documentation
   screens/                      Screenshots and demos
   assets/                       Logos, icons, demo GIF

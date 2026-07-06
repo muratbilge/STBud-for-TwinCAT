@@ -1,0 +1,23 @@
+# Repo-wide editor settings. The important rule is charset: several sources contain
+# Unicode glyph literals (toolbar icons, diff markers) that a non-UTF-8 write corrupts
+# silently (this has happened). Everything else matches the existing code style.
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.cs]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+
+[*.{csproj,props,targets,sln}]
+indent_size = 2
+
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+[*.md]
+trim_trailing_whitespace = false

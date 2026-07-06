@@ -66,12 +66,16 @@ dotnet test tests/STFormatter.Core.Tests --filter "DisplayName~MethodName"
 dotnet run --project src/STFormatter.CLI -- format <file> [--dry-run]
 dotnet run --project src/STFormatter.CLI -- batch ./samples/RealTcFiles --twincat --dry-run
 
-# Build + deploy the Host to C:\Program Files (x86)\STBud (requires admin)
+# Build + deploy the Host to C:\Program Files (x86)\STBud (self-elevates via UAC).
+# deploy.ps1 stops the Host, copies, VERIFIES every file (timestamp+length; exits 1 and
+# reports if anything is stale), then restarts the Host. deploy.bat is a thin wrapper.
 dotnet build src/STFormatter.Host/STFormatter.Host.csproj -c Debug
 deploy.bat            # net48 (default)
 deploy.bat net462     # older machines
+deploy.bat -NoPause   # automation (no interactive pause)
 
-# Host log when debugging TcXaeShell integration
+# Host log when debugging TcXaeShell integration (single log; DiffViewer logs here too,
+# rotates at 5 MB to STBud_Host.log.1)
 Get-Content "$env:TEMP\STBud_Host.log" -Tail 20
 
 # Build the installer (Inno Setup)
