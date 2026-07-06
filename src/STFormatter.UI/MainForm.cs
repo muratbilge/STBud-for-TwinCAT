@@ -21,6 +21,7 @@ namespace STFormatter.UI
         private readonly HistoryPanel _historyPanel;
         private readonly LogPanel _logPanel;
         private readonly ToolboxPanel _toolboxPanel;
+        private readonly GitPanel _gitPanel;
         private readonly ConcurrentBag<FormatRecord> _formatHistory = new();
         private readonly System.Windows.Forms.Timer _maintainTimer;
         private readonly System.Windows.Forms.Timer _refreshTimer;
@@ -75,6 +76,7 @@ namespace STFormatter.UI
             _historyPanel = new HistoryPanel(_formatHistory);
             _logPanel = new LogPanel();
             _toolboxPanel = new ToolboxPanel();
+            _gitPanel = new GitPanel();
 
             _tabControl = new TabControl
             {
@@ -98,11 +100,15 @@ namespace STFormatter.UI
             var toolboxTab = new TabPage(Strings.Get("Tab.Toolbox")) { Padding = new Padding(4) };
             toolboxTab.Controls.Add(_toolboxPanel);
 
+            var gitTab = new TabPage(Strings.Get("Tab.Git")) { Padding = new Padding(4) };
+            gitTab.Controls.Add(_gitPanel);
+
             _tabControl.TabPages.Add(settingsTab);
             _tabControl.TabPages.Add(instancesTab);
             _tabControl.TabPages.Add(historyTab);
             _tabControl.TabPages.Add(logTab);
             _tabControl.TabPages.Add(toolboxTab);
+            _tabControl.TabPages.Add(gitTab);
 
             _tabControl.SelectedIndexChanged += OnTabChanged;
 
@@ -145,6 +151,7 @@ namespace STFormatter.UI
             _trayMenu.Items.Add(Strings.Get("Tray.History"), null, (s, e) => ShowWindow(2));
             _trayMenu.Items.Add(Strings.Get("Tray.Log"), null, (s, e) => ShowWindow(3));
             _trayMenu.Items.Add(Strings.Get("Tray.Toolbox"), null, (s, e) => ShowWindow(4));
+            _trayMenu.Items.Add(Strings.Get("Tray.Git"), null, (s, e) => ShowWindow(5));
             _trayMenu.Items.Add(new ToolStripSeparator());
             _trayMenu.Items.Add(Strings.Get("Tray.Restart"), null, OnRestart);
             _trayMenu.Items.Add(Strings.Get("Tray.Exit"), null, OnExit);
@@ -158,13 +165,14 @@ namespace STFormatter.UI
             try
             {
                 Text = Strings.Get("App.Title");
-                if (_tabControl.TabPages.Count >= 5)
+                if (_tabControl.TabPages.Count >= 6)
                 {
                     _tabControl.TabPages[0].Text = Strings.Get("Tab.Settings");
                     _tabControl.TabPages[1].Text = Strings.Get("Tab.Instances");
                     _tabControl.TabPages[2].Text = Strings.Get("Tab.History");
                     _tabControl.TabPages[3].Text = Strings.Get("Tab.Log");
                     _tabControl.TabPages[4].Text = Strings.Get("Tab.Toolbox");
+                    _tabControl.TabPages[5].Text = Strings.Get("Tab.Git");
                 }
                 _trayIcon.Text = Strings.Get("Tray.Text");
                 BuildTrayMenu();
@@ -174,6 +182,7 @@ namespace STFormatter.UI
                 _historyPanel.RebuildUi();
                 _logPanel.RebuildUi();
                 _toolboxPanel.RebuildUi();
+                _gitPanel.RebuildUi();
             }
             finally
             {
@@ -196,6 +205,25 @@ namespace STFormatter.UI
         }
 
         public void AddFormatRecord(FormatRecord record) => _formatHistory.Add(record);
+
+        /// <summary>Open the Git tab focused on a specific file (from the Host context menu).</summary>
+        public void ShowGitForFile(string filePath, int subTab = 0, string? repoRootHint = null)
+        {
+            try
+            {
+                if (InvokeRequired)
+                {
+                    BeginInvoke((Action)(() => ShowGitForFile(filePath, subTab, repoRootHint)));
+                    return;
+                }
+                _gitPanel.LoadForFile(filePath, subTab, repoRootHint);
+                ShowWindow(5);
+            }
+            catch (Exception ex)
+            {
+                HostLog.Append("MainForm", $"ShowGitForFile failed: {ex.Message}");
+            }
+        }
 
         /// <summary>
         /// Shows a non-blocking tray balloon. Used for transient format feedback
@@ -232,6 +260,7 @@ namespace STFormatter.UI
                 case 1: _instancesPanel.RefreshInstances(); break;
                 case 2: _historyPanel.CheckRefresh(); break;
                 case 3: _logPanel.RefreshLog(); break;
+                case 5: _gitPanel.EnsureLoaded(); break;
             }
         }
 

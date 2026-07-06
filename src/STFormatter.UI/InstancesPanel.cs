@@ -66,6 +66,18 @@ namespace STFormatter.UI
             BuildUI();
         }
 
+        // Never let a COM/transient failure in a toolbar action surface as an
+        // unhandled-exception dialog; log it and move on.
+        private void SafeRun(string what, Action action)
+        {
+            try { action(); }
+            catch (Exception ex)
+            {
+                STFormatter.Core.Configuration.HostLog.Append("InstancesPanel", $"{what} failed: {ex.Message}");
+                try { RefreshInstances(); } catch { }
+            }
+        }
+
         private void BuildUI()
         {
             Controls.Clear();
@@ -82,18 +94,10 @@ namespace STFormatter.UI
             _refreshBtn.Click += (s, e) => RefreshInstances();
 
             _scanBtn = new Button { Text = Strings.Get("Instances.Scan"), AutoSize = true, Margin = new Padding(0, 0, 8, 0) };
-            _scanBtn.Click += (s, e) =>
-            {
-                _scan?.Invoke();
-                RefreshInstances();
-            };
+            _scanBtn.Click += (s, e) => SafeRun("Scan", () => { _scan?.Invoke(); RefreshInstances(); });
 
             _cleanupBtn = new Button { Text = Strings.Get("Instances.Cleanup"), AutoSize = true, Margin = new Padding(0, 0, 8, 0) };
-            _cleanupBtn.Click += (s, e) =>
-            {
-                _cleanup();
-                RefreshInstances();
-            };
+            _cleanupBtn.Click += (s, e) => SafeRun("Cleanup", () => { _cleanup(); RefreshInstances(); });
 
             _toolbar.Controls.Add(_refreshBtn);
             _toolbar.Controls.Add(_scanBtn);
