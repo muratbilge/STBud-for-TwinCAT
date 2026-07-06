@@ -110,10 +110,13 @@ if ($bad.Count -gt 0) {
 }
 Write-Host "Verified $($toVerify.Count) file(s) - deployed build is current." -ForegroundColor Green
 
-# 4. Restart the Host if it was running before.
+# 4. Restart the Host if it was running before. Launch via explorer.exe so the Host
+# starts UN-elevated even though this script runs elevated — an elevated Host cannot
+# see the non-elevated TcXaeShell's DTE in the ROT (elevation mismatch kills the
+# whole integration: no context menu, no Git, endless "no ROT moniker" scans).
 if ($hostWasRunning) {
-    Start-Process (Join-Path $dst "STFormatter.Host.exe")
-    Write-Host "Host restarted."
+    Start-Process explorer.exe -ArgumentList ('"' + (Join-Path $dst "STFormatter.Host.exe") + '"')
+    Write-Host "Host restarted (un-elevated)."
 }
 
 Write-Host "Deployment complete ($Tfm)."
