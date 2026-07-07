@@ -74,7 +74,8 @@ namespace STFormatter.UI
         private Panel _legendStrip = null!;
         private Button _themeBtn = null!;
         private readonly List<Button> _toolButtons = new List<Button>();
-        private Font _glyphFont = null!;  // Segoe UI Symbol — the toolbar glyph font
+        private Font _mdlFont = null!;    // Segoe MDL2 Assets — the icon font (when available)
+        private Font _symbolFont = null!; // Segoe UI Symbol — fallback dingbats + A-/A+ text
         private readonly List<(Panel box, string kind)> _legendBoxes = new List<(Panel, string)>();
         private readonly List<Label> _legendLabels = new List<Label>();
 
@@ -149,9 +150,11 @@ namespace STFormatter.UI
 
         private void BuildLayout(string leftLabel, string rightLabel)
         {
-            // Segoe UI Symbol covers the toolbar glyphs (▲▼≠≡✓✗⧉⤓✎☀☾) and falls back
-            // gracefully if absent. Point size keeps it DPI-independent.
-            _glyphFont = new Font("Segoe UI Symbol", 10.5f);
+            // Toolbar icons: Segoe MDL2 Assets (proper Windows UI icons) with a Segoe UI Symbol
+            // fallback. MakeIcon routes each glyph to the right font. Point sizes stay
+            // DPI-independent.
+            _mdlFont = new Font("Segoe MDL2 Assets", 12f);
+            _symbolFont = new Font("Segoe UI Symbol", 10.5f);
 
             // The window title bar already shows the comparison; the stats live in the bottom
             // legend strip (no duplicated in-window title).
@@ -169,7 +172,7 @@ namespace STFormatter.UI
             _bar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, AutoScroll = false, Padding = new Padding(6, 4, 6, 0) };
 
             // Navigation: ‹ counter ›
-            _bar.Controls.Add(MakeIcon("\u25B2" /* up triangle */, "Diff.Tip.Prev", (s, e) => Navigate(-1)));
+            _bar.Controls.Add(MakeIcon(DiffGlyphs.Prev, "Diff.Tip.Prev", (s, e) => Navigate(-1)));
             _counterLabel = new Label
             {
                 AutoSize = false,
@@ -180,45 +183,45 @@ namespace STFormatter.UI
                 Margin = new Padding(2, 4, 2, 0),
             };
             _bar.Controls.Add(_counterLabel);
-            _bar.Controls.Add(MakeIcon("\u25BC" /* down triangle */, "Diff.Tip.Next", (s, e) => Navigate(+1)));
+            _bar.Controls.Add(MakeIcon(DiffGlyphs.Next, "Diff.Tip.Next", (s, e) => Navigate(+1)));
 
             _bar.Controls.Add(MakeSeparator());
 
             // View toggles
-            _changesOnlyBtn = MakeIcon("\u2260" /* not equal */, "Diff.Tip.ChangesOnly",
+            _changesOnlyBtn = MakeIcon(DiffGlyphs.ChangesOnly, "Diff.Tip.ChangesOnly",
                 (s, e) => { _changesOnly = !_changesOnly; UpdateToggleVisual(_changesOnlyBtn, _changesOnly); RenderDiff(); });
             _bar.Controls.Add(_changesOnlyBtn);
-            _unifiedBtn = MakeIcon("\u2261" /* triple bar */, "Diff.Tip.Unified",
+            _unifiedBtn = MakeIcon(DiffGlyphs.Unified, "Diff.Tip.Unified",
                 (s, e) => { _unified = !_unified; UpdateToggleVisual(_unifiedBtn, _unified); RenderDiff(); });
             _bar.Controls.Add(_unifiedBtn);
 
             // Font size + copy
-            _bar.Controls.Add(MakeIcon("A-", "Diff.Tip.FontDec", (s, e) => ChangeFont(-1)));
-            _bar.Controls.Add(MakeIcon("A+", "Diff.Tip.FontInc", (s, e) => ChangeFont(+1)));
-            _bar.Controls.Add(MakeIcon("\u29C9" /* two squares */, "Diff.Tip.Copy", (s, e) => CopyFocusedSelection()));
+            _bar.Controls.Add(MakeIcon(DiffGlyphs.FontDec, "Diff.Tip.FontDec", (s, e) => ChangeFont(-1)));
+            _bar.Controls.Add(MakeIcon(DiffGlyphs.FontInc, "Diff.Tip.FontInc", (s, e) => ChangeFont(+1)));
+            _bar.Controls.Add(MakeIcon(DiffGlyphs.Copy, "Diff.Tip.Copy", (s, e) => CopyFocusedSelection()));
 
             if (_restoreCallback != null)
             {
                 _bar.Controls.Add(MakeSeparator());
-                _bar.Controls.Add(MakeIcon("\u2713" /* check */, "Diff.Tip.AcceptSel", (s, e) => SafeAction(RestoreSelected), "accept"));
-                _bar.Controls.Add(MakeIcon("\u2713\u2713" /* double check */, "Diff.Tip.AcceptAll", (s, e) => SafeAction(AcceptAllFromHead), "accept"));
+                _bar.Controls.Add(MakeIcon(DiffGlyphs.AcceptSel, "Diff.Tip.AcceptSel", (s, e) => SafeAction(RestoreSelected), "accept"));
+                _bar.Controls.Add(MakeIcon(DiffGlyphs.AcceptAll, "Diff.Tip.AcceptAll", (s, e) => SafeAction(AcceptAllFromHead), "accept"));
 
-                _clearStagedBtn = MakeIcon("\u2717" /* cross */, "Diff.Tip.ClearStaged", (s, e) => SafeAction(ClearAllStaged), "clear");
+                _clearStagedBtn = MakeIcon(DiffGlyphs.ClearStaged, "Diff.Tip.ClearStaged", (s, e) => SafeAction(ClearAllStaged), "clear");
                 _clearStagedBtn.Enabled = false;
                 _bar.Controls.Add(_clearStagedBtn);
 
-                _saveAcceptsBtn = MakeIcon("\u2913" /* down arrow to bar */, "Diff.Tip.Save", (s, e) => SafeAction(SaveAccepts), "save");
+                _saveAcceptsBtn = MakeIcon(DiffGlyphs.Save, "Diff.Tip.Save", (s, e) => SafeAction(SaveAccepts), "save");
                 _saveAcceptsBtn.Enabled = false;
                 _bar.Controls.Add(_saveAcceptsBtn);
 
-                _undoBtn = MakeIcon("\u21B6" /* undo arrow */, "Diff.Tip.Undo", (s, e) => SafeAction(UndoLastSave), "undo");
+                _undoBtn = MakeIcon(DiffGlyphs.Undo, "Diff.Tip.Undo", (s, e) => SafeAction(UndoLastSave), "undo");
                 _undoBtn.Enabled = false;
                 _bar.Controls.Add(_undoBtn);
 
                 _bar.Controls.Add(MakeSeparator());
-                _bar.Controls.Add(MakeIcon("\u270E" /* pencil */, "Diff.Tip.Edit", (s, e) => EnterEditMode()));
-                _saveBtn = MakeIcon("\u2913" /* down arrow to bar */, "Diff.Tip.EditSave", (s, e) => SaveEdit(), "save");
-                _cancelBtn = MakeIcon("\u2717" /* cross */, "Diff.Tip.EditCancel", (s, e) => ExitEditMode(saved: false), "clear");
+                _bar.Controls.Add(MakeIcon(DiffGlyphs.Edit, "Diff.Tip.Edit", (s, e) => EnterEditMode()));
+                _saveBtn = MakeIcon(DiffGlyphs.Save, "Diff.Tip.EditSave", (s, e) => SaveEdit(), "save");
+                _cancelBtn = MakeIcon(DiffGlyphs.ClearStaged, "Diff.Tip.EditCancel", (s, e) => ExitEditMode(saved: false), "clear");
                 _saveBtn.Visible = false;
                 _cancelBtn.Visible = false;
                 _bar.Controls.Add(_saveBtn);
@@ -226,7 +229,7 @@ namespace STFormatter.UI
             }
 
             _bar.Controls.Add(MakeSeparator());
-            _themeBtn = MakeIcon(_scheme.IsDark ? "\u2600" : "\u263E" /* sun : moon */, "Diff.Tip.Theme", (s, e) => ToggleTheme());
+            _themeBtn = MakeIcon(_scheme.IsDark ? DiffGlyphs.ThemeSun : DiffGlyphs.ThemeMoon, "Diff.Tip.Theme", (s, e) => ToggleTheme());
             _bar.Controls.Add(_themeBtn);
 
             _applyStatus = new Label
@@ -297,12 +300,12 @@ namespace STFormatter.UI
             var b = new Button
             {
                 AutoSize = false,
-                Size = new Size(38, 32),
+                Size = new Size(40, 34),
                 FlatStyle = FlatStyle.Flat,
                 Margin = new Padding(2, 3, 2, 0),
                 TabStop = false,
                 UseVisualStyleBackColor = false,
-                Font = _glyphFont,
+                Font = DiffGlyphs.IsIconGlyph(glyph) ? _mdlFont : _symbolFont,
                 Text = glyph,
                 Tag = role,
             };
@@ -419,7 +422,7 @@ namespace STFormatter.UI
         {
             _scheme = _scheme.IsDark ? DiffColorScheme.Light : DiffColorScheme.Dark;
             _canvas.Scheme = _scheme;
-            _themeBtn.Text = _scheme.IsDark ? "\u2600" : "\u263E"; // sun : moon
+            _themeBtn.Text = _scheme.IsDark ? DiffGlyphs.ThemeSun : DiffGlyphs.ThemeMoon; // sun : moon
             ApplyTheme();
             RenderDiff();
         }
@@ -438,7 +441,8 @@ namespace STFormatter.UI
             if (disposing)
             {
                 _normalFont?.Dispose();
-                _glyphFont?.Dispose();
+                _mdlFont?.Dispose();
+                _symbolFont?.Dispose();
                 _statusTimer?.Dispose();
                 _toolTip?.Dispose();
             }
