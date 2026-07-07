@@ -90,7 +90,10 @@ function Copy-HostPayload {
     )
 
     foreach ($pattern in $ForbiddenHostPayloadPatterns) {
-        $matches = Get-ChildItem -LiteralPath $SourceDir -File -Filter $pattern -ErrorAction SilentlyContinue
+        # The broad patterns (e.g. *Editor.dll, meant for Beckhoff/VS interop) can also match
+        # our own allowlisted payload (STBud.Git.Editor.dll) - never flag an allowlisted file.
+        $matches = Get-ChildItem -LiteralPath $SourceDir -File -Filter $pattern -ErrorAction SilentlyContinue |
+            Where-Object { $HostPayloadFiles -notcontains $_.Name }
         if ($matches) {
             $names = ($matches | ForEach-Object { $_.Name }) -join ", "
             throw "Forbidden Host payload artifact(s) in ${SourceDir}: $names"
@@ -104,7 +107,9 @@ function Copy-HostPayload {
         }
     }
 
-    $required = @("STFormatter.Host.exe", "STFormatter.Host.exe.config", "STFormatter.Core.dll", "STFormatter.UI.dll", "STBud.Git.dll", "STBud.Git.Editor.dll", "Microsoft.VisualStudio.Interop.dll", "stgit.exe")
+    # stgit.exe is not in the Host bin; it's built from a separate project and copied (with its
+    # own presence check) right after this call, so it isn't required here.
+    $required = @("STFormatter.Host.exe", "STFormatter.Host.exe.config", "STFormatter.Core.dll", "STFormatter.UI.dll", "STBud.Git.dll", "STBud.Git.Editor.dll", "Microsoft.VisualStudio.Interop.dll")
     foreach ($file in $required) {
         $path = Join-Path $DestinationDir $file
         if (-not (Test-Path -LiteralPath $path)) {
@@ -167,7 +172,7 @@ if (-not $SkipHost) {
         -p:FileVersion=$Version.0 `
         -p:InformationalVersion=$Version | Out-Null
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "stgit net48 build failed — the installer will ship without stgit."
+        Write-Warning "stgit net48 build failed - the installer will ship without stgit."
     }
 }
 
@@ -198,7 +203,7 @@ if (-not $SkipHost) {
         if (Test-Path -LiteralPath $stgitSrc) {
             Copy-Item -LiteralPath $stgitSrc -Destination $hostNet48Dir -Force
         } else {
-            Write-Warning "stgit.exe not found at $stgitSrc — build the CLI before the installer."
+            Write-Warning "stgit.exe not found at $stgitSrc - build the CLI before the installer."
         }
 
         $hostFileCount = (Get-ChildItem $hostNet48Dir -File).Count

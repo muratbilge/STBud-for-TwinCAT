@@ -13,7 +13,7 @@
 #define AppName "STBud for TwinCAT"
 #define AppVersion "1.1.0"
 #define AppPublisher "STBud Project"
-#define AppURL "https://github.com/anomalyco/opencode"
+#define AppURL "https://github.com/muratbilge/STBud-for-TwinCAT"
 #define AppExeName "STFormatter.Host.exe"
 #define CliExeName "STFormatter.CLI.exe"
 

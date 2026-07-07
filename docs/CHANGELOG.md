@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-07
+
 ### Added
 
 - **Compare-tool accept workflow in the Git diff viewer.** Left pane = HEAD (source),
@@ -200,7 +202,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Multi-targeting: `net8.0`, `net48`, `net462`
 - 57 unit tests passing
 
-[Unreleased]: https://github.com/muratbilge/STBud-for-TwinCAT/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/muratbilge/STBud-for-TwinCAT/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/muratbilge/STBud-for-TwinCAT/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/muratbilge/STBud-for-TwinCAT/compare/v0.5.0...v1.0.0
 [0.5.0]: https://github.com/muratbilge/STBud-for-TwinCAT/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/muratbilge/STBud-for-TwinCAT/compare/v0.3.0...v0.4.0
