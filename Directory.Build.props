@@ -7,7 +7,7 @@
     Never hand-edit the installer version; it derives from here.
   -->
   <PropertyGroup>
-    <VersionPrefix Condition="'$(VersionPrefix)' == ''">1.1.0</VersionPrefix>
+    <VersionPrefix Condition="'$(VersionPrefix)' == ''">1.2.0</VersionPrefix>
     <VersionSuffix Condition="'$(VersionSuffix)' == '' and '$(PublicRelease)' != 'true'">dev</VersionSuffix>
 
     <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(VersionPrefix).0</AssemblyVersion>
