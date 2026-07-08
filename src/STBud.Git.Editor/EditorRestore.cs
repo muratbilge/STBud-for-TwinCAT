@@ -47,7 +47,8 @@ namespace STBud.Git.Editor
                     try
                     {
                         string? ext = dte.ActiveDocument?.FullName == null ? null
-                            : System.IO.Path.GetExtension(dte.ActiveDocument!.FullName);
+                            : System.IO.Path.GetExtension(
+                                DocumentPath.Normalize(dte.ActiveDocument!.FullName));
                         if (string.Equals(ext, ".TcGVL", StringComparison.OrdinalIgnoreCase)
                             || string.Equals(ext, ".TcDUT", StringComparison.OrdinalIgnoreCase))
                             skipGuard = true;
@@ -262,7 +263,7 @@ namespace STBud.Git.Editor
         private static bool TryDiskWriteRestore(EnvDTE.DTE dte, string committed, string working, string? sectionTag)
         {
             string? path = null;
-            try { path = dte.ActiveDocument?.FullName; } catch (Exception ex) { LogSwallow("ActiveDocument.FullName", ex); }
+            try { path = DocumentPath.Normalize(dte.ActiveDocument?.FullName); } catch (Exception ex) { LogSwallow("ActiveDocument.FullName", ex); }
             if (string.IsNullOrEmpty(path) || !IsTwinCatXmlFile(path!))
             {
                 Log("TryDiskWriteRestore: no TwinCAT XML file path — cannot disk-write");

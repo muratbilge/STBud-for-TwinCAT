@@ -110,7 +110,13 @@ internal class Program
             var principal = new WindowsPrincipal(identity);
             bool elevated = principal.IsInRole(WindowsBuiltInRole.Administrator);
             using var current = System.Diagnostics.Process.GetCurrentProcess();
-            Log($"Environment: pid={current.Id}, session={current.SessionId}, elevated={elevated}, user='{identity.Name}', exe='{Application.ExecutablePath}'");
+            // Version in every startup line: without it, log forensics can't tell which
+            // build produced a given session (bit us diagnosing a work-machine log).
+            string version = typeof(Program).Assembly
+                .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+                is System.Reflection.AssemblyInformationalVersionAttribute[] { Length: > 0 } attrs
+                ? attrs[0].InformationalVersion : "unknown";
+            Log($"Environment: version={version}, pid={current.Id}, session={current.SessionId}, elevated={elevated}, user='{identity.Name}', exe='{Application.ExecutablePath}'");
         }
         catch (Exception ex)
         {
@@ -261,7 +267,10 @@ internal class Program
             }
 
             var dte = instance.Dte;
-            string filePath = dte.ActiveDocument.FullName;
+            // Method/action tabs report "<file>.TcPOU;POU.Member" - strip to the real file
+            // (the raw pseudo-path made Format Document fail with "File not found").
+            string filePath = STFormatter.Core.Configuration.DocumentPath.Normalize(
+                dte.ActiveDocument.FullName);
             Log($"HandleFormatDocument: PID {pid} Formatting {filePath}");
 
             if (!File.Exists(filePath))
@@ -410,7 +419,8 @@ internal class Program
 
             if (success && original != null && formatted != null)
             {
-                RecordFormat(pid, instance.Dte.ActiveDocument?.FullName ?? "",
+                RecordFormat(pid, STFormatter.Core.Configuration.DocumentPath.Normalize(
+                        instance.Dte.ActiveDocument?.FullName),
                     "Selection", original, formatted, "Clipboard-Selection", true);
             }
             else if (!success && original == null)
@@ -618,7 +628,9 @@ internal class Program
         }
         try
         {
-            filePath = instance.Dte.ActiveDocument.FullName;
+            // Method/action tabs report "<file>.TcPOU;POU.Member" - strip to the real file.
+            filePath = STFormatter.Core.Configuration.DocumentPath.Normalize(
+                instance.Dte.ActiveDocument.FullName);
         }
         catch (Exception ex)
         {
@@ -709,7 +721,8 @@ internal class Program
                     var doc = kvp.Value.Dte.ActiveDocument;
                     if (doc != null)
                     {
-                        string path = doc.FullName;
+                        // Method tabs report "<file>.TcPOU;POU.Member" - strip to the file.
+                        string path = STFormatter.Core.Configuration.DocumentPath.Normalize(doc.FullName);
                         if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
                             return path;
                     }
