@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **DUT name stays on the `TYPE` line.** The formatter moved the name to the next line
+  (`TYPE` ⏎ `U_Sample : UNION`), which read as the UNION/STRUCT name being deleted. The
+  header is now TwinCAT-conventional (`TYPE U_Sample :`), composite bodies start on the
+  next line, alias types stay inline.
+- **Format Document / Git work on method tabs.** TcXaeShell reports method/action editor
+  tabs as `<file>.TcPOU;POU.Member`; the pseudo-path made Format Document fail with
+  "File not found" and broke git repo resolution. The suffix is now stripped everywhere.
+- Host log stamps include the date, and the startup line logs the product version —
+  multi-day log forensics no longer have to guess which build produced a session.
+
 ## [1.1.0] - 2026-07-07
 
 ### Added
