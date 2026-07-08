@@ -24,8 +24,10 @@ namespace STFormatter.Core.Configuration
                 lock (_gate)
                 {
                     RotateIfNeeded();
+                    // Date included: logs span days and sessions - time-only stamps made
+                    // multi-day logs read as one confusing stream.
                     System.IO.File.AppendAllText(Path,
-                        $"[{DateTime.Now:HH:mm:ss.fff}] {prefix}{message}{Environment.NewLine}");
+                        $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {prefix}{message}{Environment.NewLine}");
                 }
             }
             catch (Exception ex)
