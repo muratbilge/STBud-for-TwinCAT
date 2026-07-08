@@ -1172,19 +1172,36 @@ internal sealed class FormattingVisitor
         var tokens = node.ChildTokens.ToList();
         var nodes = node.ChildNodes.ToList();
 
+        // TwinCAT-conventional header: the name STAYS on the TYPE line
+        // ("TYPE U_Sample :"). The old layout moved it to the next line, leaving a
+        // bare "TYPE" first line - which users read as their DUT name being deleted.
         WriteTokenWithCasing(tokens[0]); // TYPE
-        _writer.WriteNewLine();
-        _writer.IndentLevel++;
-
+        _writer.WriteSpace();
         WriteToken(tokens[1]); // name
         _writer.WriteSpace();
         WriteToken(tokens[2]); // :
-        if (_config.SpaceAfterColon)
-            _writer.WriteSpace();
 
         var type = nodes.FirstOrDefault(n => IsTypeNode(n.Kind));
-        if (type != null)
+        bool composite = type != null &&
+            (type.Kind == SyntaxKind.StructuredType ||
+             type.Kind == SyntaxKind.UnionType ||
+             type.Kind == SyntaxKind.EnumerationType);
+
+        if (composite)
+        {
+            // STRUCT/UNION/(...) body starts on the next line at TYPE's own column
+            // (member indentation is handled inside the type visitor) - matching the
+            // layout TcXaeShell itself writes into .TcDUT files.
+            _writer.WriteNewLine();
+            Visit(type!);
+        }
+        else if (type != null)
+        {
+            // Alias/array/subrange types stay inline: "TYPE MyAlias : INT;".
+            if (_config.SpaceAfterColon)
+                _writer.WriteSpace();
             Visit(type);
+        }
 
         var semicolon = tokens.FirstOrDefault(t => t.Kind == SyntaxKind.Semicolon);
         if (semicolon != null)
@@ -1192,7 +1209,6 @@ internal sealed class FormattingVisitor
             WriteSemicolon(semicolon);
         }
         _writer.EnsureNewLine();
-        _writer.IndentLevel--;
 
         var endType = tokens.First(t => t.Kind == SyntaxKind.EndTypeKeyword);
         WriteTokenWithCasing(endType); // END_TYPE
