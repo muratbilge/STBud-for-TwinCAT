@@ -30,6 +30,12 @@ public sealed class FormattingConfiguration
 
     /// <summary>The wrap threshold the writer should use; 0 disables wrapping.</summary>
     public int EffectiveMaxLineLength => WrapLongLines ? MaxLineLength : 0;
+
+    /// <summary>
+    /// Wrap FB/function call arguments one per line (aligned under the first argument)
+    /// when the call has at least this many named (:=) arguments. 0 disables wrapping.
+    /// </summary>
+    public int WrapCallArgumentsAt { get; set; } = 4;
     public int EmptyLinesBetweenPOUs { get; set; } = 2;
     public int EmptyLinesBetweenVarSections { get; set; } = 1;
     public bool KeepSingleLineBlocks { get; set; } = false;

@@ -187,6 +187,12 @@ public sealed class EditorConfigParser
             config.WrapLongLines = IsTruthy(wrapLongLines);
         }
 
+        if (properties.TryGetValue("st_wrap_call_arguments_at", out var wrapCallArgsAt)
+            && int.TryParse(wrapCallArgsAt, out var wrapCallArgsAtValue))
+        {
+            config.WrapCallArgumentsAt = Math.Max(0, wrapCallArgsAtValue);
+        }
+
         if (properties.TryGetValue("st_space_after_comma", out var spaceAfterComma))
         {
             config.SpaceAfterComma = IsTruthy(spaceAfterComma);

@@ -476,6 +476,23 @@ internal sealed class FormattingWriter
 
     public bool AtLineStart => _atLineStart;
 
+    /// <summary>Current column (characters on the line so far); 0 at line start.</summary>
+    public int CurrentColumn => _atLineStart ? 0 : _currentLineLength;
+
+    /// <summary>
+    /// Start a fresh line padded with spaces to an exact column — used for wrapped call
+    /// arguments aligned under the first argument (spaces regardless of indent style, so
+    /// the alignment holds in any editor).
+    /// </summary>
+    public void WriteContinuationTo(int column)
+    {
+        if (!_atLineStart)
+            WriteNewLine();
+        _builder.Append(' ', Math.Max(0, column));
+        _currentLineLength = Math.Max(0, column);
+        _atLineStart = false;
+    }
+
     public void UndoLastNewLineAndIndent()
     {
         var nl = _config.GetNewLine();
@@ -1344,6 +1361,20 @@ internal sealed class FormattingVisitor
         _writer.EnsureNewLine();
     }
 
+    private static bool HasCommentTrivia(SyntaxNode node)
+    {
+        foreach (var token in node.DescendantTokens())
+        {
+            foreach (var t in token.LeadingTrivia)
+                if (t.Kind == SyntaxKind.SingleLineCommentTrivia || t.Kind == SyntaxKind.MultiLineCommentTrivia)
+                    return true;
+            foreach (var t in token.TrailingTrivia)
+                if (t.Kind == SyntaxKind.SingleLineCommentTrivia || t.Kind == SyntaxKind.MultiLineCommentTrivia)
+                    return true;
+        }
+        return false;
+    }
+
     private static bool IsBlockStatement(SyntaxKind kind)
     {
         return kind is SyntaxKind.IfStatement or SyntaxKind.CaseStatement
@@ -1732,15 +1763,31 @@ internal sealed class FormattingVisitor
         var tokens = node.ChildTokens.ToList();
         var nodes = node.ChildNodes.ToList();
 
+        // FB/function calls with many named (:=) arguments read best one argument per
+        // line, aligned under the first argument:
+        //   fbTest(a := 233,
+        //          b := 'x');
+        int namedArgs = 0;
+        for (var i = 1; i < nodes.Count; i++)
+            if (nodes[i].Kind == SyntaxKind.NamedArgument) namedArgs++;
+        bool wrapArgs = _config.WrapCallArgumentsAt > 0 && namedArgs >= _config.WrapCallArgumentsAt
+            // Comments between arguments (e.g. a commented-out argument line) don't have a
+            // stable home on wrapped continuation lines - keep such calls inline so the
+            // output stays idempotent and the comment stays where the author put it.
+            && !HasCommentTrivia(node);
+
         Visit(nodes[0]); // function
         WriteToken(tokens[0]); // (
+        int argColumn = _writer.CurrentColumn;
 
         for (var i = 1; i < nodes.Count; i++)
         {
             if (i > 1)
             {
                 WriteToken(tokens[i - 1]); // comma
-                if (_config.SpaceAfterComma)
+                if (wrapArgs)
+                    _writer.WriteContinuationTo(argColumn);
+                else if (_config.SpaceAfterComma)
                     _writer.WriteSpace();
             }
             Visit(nodes[i]);
