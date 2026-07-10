@@ -43,7 +43,7 @@ END_PROGRAM";
         y := 1;
     ELSE
         y := 0;
-    END_IF
+    END_IF;
 END_PROGRAM
 ";
 
@@ -65,7 +65,7 @@ END_PROGRAM";
         var expected = @"PROGRAM Test
     FOR i := 0 TO 9 DO
         arr[i] := i;
-    END_FOR
+    END_FOR;
 END_PROGRAM
 ";
 
@@ -93,7 +93,7 @@ END_PROGRAM";
         2, 3: y := 2;
     ELSE
         y := 0;
-    END_CASE
+    END_CASE;
 END_PROGRAM
 ";
 
@@ -153,7 +153,7 @@ end_program";
         var expected = @"PROGRAM Test
     IF x > 0 THEN
         y := 1;
-    END_IF
+    END_IF;
 END_PROGRAM
 ";
 

@@ -1230,15 +1230,26 @@ internal sealed class FormattingVisitor
             {
                 var stmt = statements[i];
 
-                // Skip empty statements that immediately follow block statements
+                // The ';' after END_IF/END_WHILE/... parses as a separate empty statement.
+                // TwinCAT writes these everywhere, so preserve it glued to the END keyword
+                // (dropping it churned nearly every real project in the OSS corpus scan).
                 if (stmt.Kind == SyntaxKind.EmptyStatement && i > 0 && IsBlockStatement(statements[i - 1].Kind))
                 {
+                    GlueSemicolonToPreviousLine(stmt);
                     continue;
                 }
 
                 Visit(stmt);
             }
         }
+    }
+
+    // Re-attach a block's trailing ';' to the line the block's END keyword ended on.
+    private void GlueSemicolonToPreviousLine(SyntaxNode emptyStatement)
+    {
+        _writer.UndoLastNewLineAndIndent();
+        WriteSemicolon(emptyStatement.ChildTokens[0]);
+        _writer.EnsureNewLine();
     }
 
     private void VisitStatementListWithAlignment(List<SyntaxNode> statements)
@@ -1248,9 +1259,10 @@ internal sealed class FormattingVisitor
         {
             var stmt = statements[i];
 
-            // Skip empty statements that immediately follow block statements
+            // Preserve the trailing ';' after a block statement (see VisitStatementList).
             if (stmt.Kind == SyntaxKind.EmptyStatement && i > 0 && IsBlockStatement(statements[i - 1].Kind))
             {
+                GlueSemicolonToPreviousLine(stmt);
                 i++;
                 continue;
             }
