@@ -90,6 +90,24 @@ public sealed class Parser
         return MatchToken(SyntaxKind.Identifier);
     }
 
+    // After a '.', any word is a member name - users legitimately name members after
+    // keywords (stFb.Test.Var.x broke here: 'Var' lexed as VarKeyword and the parse
+    // error silently truncated the formatted output). Consume and re-type as identifier.
+    private SyntaxToken MatchMemberName()
+    {
+        if (Current.Kind == SyntaxKind.Identifier)
+            return NextToken();
+
+        if (IsWordToken(Current))
+        {
+            var token = NextToken();
+            return new SyntaxToken(SyntaxKind.Identifier, token.Text, token.Span,
+                token.LeadingTrivia, token.TrailingTrivia);
+        }
+
+        return MatchToken(SyntaxKind.Identifier);
+    }
+
     private static bool IsWordToken(SyntaxToken token)
     {
         if (string.IsNullOrEmpty(token.Text))
@@ -433,7 +451,7 @@ public sealed class Parser
         while (Current.Kind == SyntaxKind.Dot)
         {
             tokens.Add(NextToken()); // dot
-            tokens.Add(MatchToken(SyntaxKind.Identifier));
+            tokens.Add(MatchMemberName()); // keywords allowed after '.'
         }
     }
 
@@ -745,7 +763,7 @@ public sealed class Parser
         while (Current.Kind == SyntaxKind.Dot)
         {
             nameTokens.Add(NextToken()); // dot
-            nameTokens.Add(MatchToken(SyntaxKind.Identifier));
+            nameTokens.Add(MatchMemberName()); // keywords allowed after '.'
         }
         var span = TextSpan.FromBounds(start, nameTokens[nameTokens.Count - 1].Span.End);
         return SyntaxFactory.Node(SyntaxKind.NamedType, span, nameTokens.ToArray());
@@ -1032,7 +1050,7 @@ public sealed class Parser
         while (Current.Kind == SyntaxKind.Dot)
         {
             var dot = NextToken();
-            var part = MatchToken(SyntaxKind.Identifier);
+            var part = MatchMemberName(); // keywords allowed after '.'
             dottedParts.Add(dot);
             dottedParts.Add(part);
         }
@@ -1644,7 +1662,7 @@ public sealed class Parser
             if (Current.Kind == SyntaxKind.Dot)
             {
                 var dot = NextToken();
-                var memberName = MatchToken(SyntaxKind.Identifier);
+                var memberName = MatchMemberName();
                 var span = TextSpan.FromBounds(start, memberName.Span.End);
                 result = SyntaxFactory.Node(SyntaxKind.MemberAccessExpression, span,
                     new[] { result }, new[] { dot, memberName });
