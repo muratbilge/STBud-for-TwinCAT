@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Trailing `;` after `END_IF`/`END_WHILE`/`END_FOR`/`END_CASE` is preserved.** The
+  formatter silently dropped it (the ';' parses as an empty statement after the block),
+  churning nearly every file in an open-source corpus scan (TcUnit, TcOpen, struckig,
+  TcBlack — 208 files). It now stays glued to the END keyword; formatting remains
+  idempotent.
+- **UTF-8 BOM preserved by `stfmt`.** TwinCAT writes `.TcPOU/.TcDUT/.TcGVL` with a BOM;
+  `stfmt format`/`batch` re-wrote them BOM-less, differing from TcXaeShell's own output.
+  Files are now written back with their original preamble (UTF-8 BOM / UTF-16 LE).
+
 - **DUT name stays on the `TYPE` line.** The formatter moved the name to the next line
   (`TYPE` ⏎ `U_Sample : UNION`), which read as the UNION/STRUCT name being deleted. The
   header is now TwinCAT-conventional (`TYPE U_Sample :`), composite bodies start on the
