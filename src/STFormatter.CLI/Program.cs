@@ -88,7 +88,7 @@ class Program
 
             if (IsTwinCatXml(extension))
             {
-                var xml = File.ReadAllText(filePath);
+                var xml = ReadPreservingEncoding(filePath, out var xmlEnc);
                 var config = FormattingEngine.LoadConfiguration(filePath);
                 var formatter = new TwinCatXmlFormatter(config);
 
@@ -100,7 +100,7 @@ class Program
                     }
                     else
                     {
-                        File.WriteAllText(outputPath, formattedXml);
+                        File.WriteAllText(outputPath, formattedXml, xmlEnc);
                         Console.WriteLine($"Formatted: {filePath} -> {outputPath}");
                     }
                 }
@@ -111,7 +111,7 @@ class Program
             }
             else
             {
-                var source = File.ReadAllText(filePath);
+                var source = ReadPreservingEncoding(filePath, out var srcEnc);
                 var config = FormattingEngine.LoadConfiguration(filePath);
                 var engine = new FormattingEngine(config);
                 var formatted = engine.Format(source);
@@ -122,7 +122,7 @@ class Program
                 }
                 else
                 {
-                    File.WriteAllText(outputPath, formatted);
+                    File.WriteAllText(outputPath, formatted, srcEnc);
                     Console.WriteLine($"Formatted: {filePath} -> {outputPath}");
                 }
             }
@@ -135,6 +135,11 @@ class Program
             return 1;
         }
     }
+
+    // TwinCAT writes .TcPOU/.TcDUT/.TcGVL with a UTF-8 BOM; File.WriteAllText's default
+    // drops it, churning every file against TcXaeShell's own output.
+    static string ReadPreservingEncoding(string path, out System.Text.Encoding encoding) =>
+        STFormatter.Core.Configuration.FileText.ReadPreservingEncoding(path, out encoding);
 
     static int CheckCommand(string[] args)
     {
@@ -215,7 +220,7 @@ class Program
 
                     if (IsTwinCatXml(extension))
                     {
-                        var xml = File.ReadAllText(file);
+                        var xml = ReadPreservingEncoding(file, out var xmlEnc);
                         var config = FormattingEngine.LoadConfiguration(file);
                         var formatter = new TwinCatXmlFormatter(config);
 
@@ -227,7 +232,7 @@ class Program
                             }
                             else
                             {
-                                File.WriteAllText(file, formattedXml);
+                                File.WriteAllText(file, formattedXml, xmlEnc);
                                 Console.WriteLine($"Formatted: {file}");
                             }
                             formattedCount++;
@@ -239,7 +244,7 @@ class Program
                     }
                     else
                     {
-                        var source = File.ReadAllText(file);
+                        var source = ReadPreservingEncoding(file, out var srcEnc);
                         var config = FormattingEngine.LoadConfiguration(file);
                         var engine = new FormattingEngine(config);
                         var formatted = engine.Format(source);
@@ -252,7 +257,7 @@ class Program
                             }
                             else
                             {
-                                File.WriteAllText(file, formatted);
+                                File.WriteAllText(file, formatted, srcEnc);
                                 Console.WriteLine($"Formatted: {file}");
                             }
                             formattedCount++;
@@ -483,7 +488,7 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
 
             if (IsTwinCatXml(extension))
             {
-                var xml = File.ReadAllText(filePath);
+                var xml = ReadPreservingEncoding(filePath, out var xmlEnc);
                 var config = FormattingEngine.LoadConfiguration(filePath);
                 var formatter = new TwinCatXmlFormatter(config);
 
@@ -498,7 +503,7 @@ st_format_on_save = {(config.FormatOnSave ? "true" : "false")}
             }
             else
             {
-                var source = File.ReadAllText(filePath);
+                var source = ReadPreservingEncoding(filePath, out var srcEnc);
                 var config = FormattingEngine.LoadConfiguration(filePath);
                 var engine = new FormattingEngine(config);
                 var formatted = engine.Format(source);
