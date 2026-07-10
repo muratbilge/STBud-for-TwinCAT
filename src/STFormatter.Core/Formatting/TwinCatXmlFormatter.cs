@@ -159,6 +159,26 @@ public sealed class TwinCatXmlFormatter
         return !tree.Diagnostics.Any(d => d.Severity == Syntax.DiagnosticSeverity.Error);
     }
 
+    /// <summary>
+    /// True when <paramref name="formatted"/> contains exactly the non-whitespace content
+    /// of <paramref name="original"/> (case-insensitive, so keyword casing is fine). The
+    /// formatter only ever moves whitespace; anything else means parser recovery dropped
+    /// tokens and the result must not be written.
+    /// </summary>
+    public static bool PreservesContent(string original, string formatted)
+    {
+        return string.Equals(StripWhitespace(original), StripWhitespace(formatted),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string StripWhitespace(string text)
+    {
+        var sb = new System.Text.StringBuilder(text.Length);
+        foreach (var c in text)
+            if (!char.IsWhiteSpace(c)) sb.Append(c);
+        return sb.ToString();
+    }
+
     public static bool LooksLikeDeclaration(string? text)
     {
         if (string.IsNullOrEmpty(text)) return true;

@@ -7,7 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **FB/function call argument wrapping.** Calls with many named (`:=`) arguments now
+  format one argument per line, aligned under the first argument:
+  `fbTest(a := 233,` ⏎ `       b := 'dfd', …);`. Threshold configurable via
+  `st_wrap_call_arguments_at` (default 4 named arguments; 0 disables). Calls containing
+  comments between arguments stay inline so comments keep their place.
+- **Content-preservation gate in `stfmt`.** `format`/`batch` now verify the formatted
+  output contains exactly the input's non-whitespace content and refuse to write
+  otherwise — parser-recovery truncation can no longer silently lose code.
+
 ### Fixed
+
+- **Members named after keywords parse correctly.** `stFb.Test.Var.x` (member `Var`)
+  used to break the parse and silently truncate output; keywords are now accepted as
+  member names after `.` (also in dotted type names and USING directives).
 
 - **Trailing `;` after `END_IF`/`END_WHILE`/`END_FOR`/`END_CASE` is preserved.** The
   formatter silently dropped it (the ';' parses as an empty statement after the block),

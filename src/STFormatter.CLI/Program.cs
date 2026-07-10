@@ -116,6 +116,14 @@ class Program
                 var engine = new FormattingEngine(config);
                 var formatted = engine.Format(source);
 
+                // The formatter only ever moves whitespace; anything else means parser
+                // recovery dropped tokens - refuse instead of silently truncating.
+                if (!TwinCatXmlFormatter.PreservesContent(source, formatted))
+                {
+                    Console.Error.WriteLine($"Refusing to format {filePath}: the ST has syntax errors and formatting would lose content.");
+                    return 1;
+                }
+
                 if (dryRun)
                 {
                     Console.WriteLine(formatted);
@@ -248,6 +256,14 @@ class Program
                         var config = FormattingEngine.LoadConfiguration(file);
                         var engine = new FormattingEngine(config);
                         var formatted = engine.Format(source);
+
+                        // Refuse instead of silently truncating (see FormatCommand).
+                        if (!TwinCatXmlFormatter.PreservesContent(source, formatted))
+                        {
+                            Console.Error.WriteLine($"Skipping {file}: ST syntax errors - formatting would lose content.");
+                            errorCount++;
+                            continue;
+                        }
 
                         if (formatted != source)
                         {
